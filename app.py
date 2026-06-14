@@ -15,6 +15,7 @@ headers = {
     "Prefer": "return=representation"
 }
 
+# Функция безопасного перевода текста в целое число (без копеек)
 def get_int(val):
     try:
         if not val: return 0
@@ -22,25 +23,6 @@ def get_int(val):
         return int(float(clean_val))
     except Exception:
         return 0
-
-# Парсинг строки "Текст 123" или "Имя -500" на текст и число
-def parse_input_line(line):
-    line = str(line).strip()
-    if not line:
-        return "", 0
-    parts = line.split()
-    if len(parts) < 2:
-        # Если ввели только текст или только число
-        if parts[0].lstrip('-').isdigit():
-            return "Без опису", get_int(parts[0])
-        return parts[0], 0
-    
-    last_part = parts[-1]
-    # Проверяем, является ли последняя часть числом (включая отрицательные)
-    if last_part.lstrip('-').isdigit():
-        description = " ".join(parts[:-1])
-        return description, get_int(last_part)
-    return line, 0
 
 def get_start_balance(date_str):
     try:
@@ -58,7 +40,7 @@ def get_previous_advances(date_str):
             last_date = res[0]['date']
             url_adv = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{last_date}"
             res_adv = requests.get(url_adv, headers=headers).json()
-            return [f"{item['employee']} {get_int(item['amount'])}" for item in res_adv]
+            return [(item['employee'], get_int(item['amount'])) for item in res_adv]
     except Exception:
         pass
     return []
@@ -89,10 +71,11 @@ with tab1:
         if "inc_count" not in st.session_state: st.session_state.inc_count = 1
         inc_rows = []
         for i in range(st.session_state.inc_count):
-            line = st.text_input("Опис та сума (наприклад: Кава 450)", key=f"inc_line_{i}", placeholder="Опис надходження та сума через пробіл")
-            desc, amt = parse_input_line(line)
-            if amt != 0 or desc:
-                inc_rows.append({"date": selected_date, "type": "income", "description": desc, "amount": str(amt)})
+            c1, c2 = st.columns([3, 1])
+            with c1: desc = st.text_input("Опис приходу", key=f"inc_desc_{i}", label_visibility="collapsed", placeholder="Опис надходження")
+            with c2: amt_raw = st.text_input("Сума приходу", key=f"inc_amt_{i}", label_visibility="collapsed", value="0")
+            amt = get_int(amt_raw)
+            if amt != 0 or desc: inc_rows.append({"date": selected_date, "type": "income", "description": desc, "amount": str(amt)})
         if st.button("➕ Додати рядок надходження"):
             st.session_state.inc_count += 1
             st.rerun()
@@ -105,10 +88,11 @@ with tab1:
         if "exp_count" not in st.session_state: st.session_state.exp_count = 1
         exp_rows = []
         for i in range(st.session_state.exp_count):
-            line = st.text_input("Опис та сума (наприклад: Посуд 1200)", key=f"exp_line_{i}", placeholder="Опис витрати та сума через пробіл")
-            desc, amt = parse_input_line(line)
-            if amt != 0 or desc:
-                exp_rows.append({"date": selected_date, "type": "expense", "description": desc, "amount": str(amt)})
+            c1, c2 = st.columns([3, 1])
+            with c1: desc = st.text_input("Опис витрати", key=f"exp_desc_{i}", label_visibility="collapsed", placeholder="Опис витрати")
+            with c2: amt_raw = st.text_input("Сума витрати", key=f"exp_amt_{i}", label_visibility="collapsed", value="0")
+            amt = get_int(amt_raw)
+            if amt != 0 or desc: exp_rows.append({"date": selected_date, "type": "expense", "description": desc, "amount": str(amt)})
         if st.button("➕ Додати рядок витрати"):
             st.session_state.exp_count += 1
             st.rerun()
@@ -125,43 +109,53 @@ with tab1:
             prev_advances = get_previous_advances(selected_date)
             st.session_state[f"adv_initialized_{selected_date}"] = True
             st.session_state.adv_count = max(len(prev_advances), 1)
-            for idx, adv_line in enumerate(prev_advances):
-                st.session_state[f"adv_line_{idx}"] = adv_line
+            for idx, (emp, amt) in enumerate(prev_advances):
+                st.session_state[f"emp_{idx}"] = emp
+                st.session_state[f"adv_amt_{idx}"] = str(get_int(amt))
         
         adv_rows = []
         for i in range(st.session_state.adv_count):
-            val_init = st.session_state.get(f"adv_line_{i}", "")
-            line = st.text_input("Співробітник та сума (наприклад: Юля 200)", key=f"adv_line_{i}", value=val_init, placeholder="Ім'я та сума авансу через пробіл")
-            emp, amt = parse_input_line(line)
-            if amt != 0 or emp:
-                adv_rows.append({"date": selected_date, "employee": emp, "amount": str(amt)})
+            c1, c2 = st.columns([3, 1])
+            with c1: emp = st.text_input("Співробітник", key=f"emp_{i}", label_visibility="collapsed", placeholder="Ім'я співробітника")
+            with c2: amt_raw = st.text_input("Сума авансу", key=f"adv_amt_{i}", label_visibility="collapsed", value="0")
+            amt = get_int(amt_raw)
+            if amt != 0 or emp: adv_rows.append({"date": selected_date, "employee": emp, "amount": str(amt)})
         if st.button("➕ Додати рядок авансу"):
             st.session_state.adv_count += 1
             st.rerun()
         total_advances = sum(get_int(item["amount"]) for item in adv_rows)
         st.markdown(f"### Загалом авансів: {total_advances} грн")
 
-    # --- ФАКТИЧНИЙ ЗАЛИШОК (КУПЮРЫ В ОДНУ СТРОКУ) ---
+    # --- ФАКТИЧНИЙ ЗАЛИШОК (КОМПАКТНЫЙ ВВОД В ОДНУ ЛИНИЮ) ---
     with col_fact:
         st.subheader("Фактичний залишок:")
         
-        m_coins_raw = st.text_input("Монети (загальна сума):", value="0", key="coins_input")
-        m_coins = get_int(m_coins_raw)
+        # Монеты в одну строку
+        mc1, mc2 = st.columns([2, 6])
+        with mc1:
+            st.markdown("<div style='padding-top: 5px; font-weight: bold;'>Монети:</div>", unsafe_allow_html=True)
+        with mc2:
+            m_coins = get_int(st.text_input("Сума монет", value="0", label_visibility="collapsed", key="coins_input"))
 
-        def cash_row_input(label, multiplier):
-            # Ввод числового значения в текстовое поле
-            qty_raw = st.text_input(f"Купюри {label} грн (кількість):", value="0", key=f"cash_qty_{label}")
-            qty = get_int(qty_raw)
-            subtotal = qty * multiplier
-            st.markdown(f"<div style='margin-top: -10px; margin-bottom: 10px; font-weight: 500; color: #474747;'>Разом для {label} грн: {subtotal} грн</div>", unsafe_allow_html=True)
+        # Функция построчного вывода: Номинал | Инпут к-ва | Автосумма
+        def cash_row_safe(label, multiplier):
+            rc1, rc2, rc3 = st.columns([2, 3, 3])
+            with rc1:
+                st.markdown(f"<div style='padding-top: 5px; font-weight: bold;'>{label} грн</div>", unsafe_allow_html=True)
+            with rc2:
+                qty = get_int(st.text_input("К-сть", value="0", key=f"cash_qty_{label}", label_visibility="collapsed", placeholder="0"))
+            with rc3:
+                subtotal = qty * multiplier
+                st.markdown(f"<div style='padding-top: 5px; font-weight: 500;'>= {subtotal} грн</div>", unsafe_allow_html=True)
             return subtotal
 
-        v_20 = cash_row_input("20", 20)
-        v_50 = cash_row_input("50", 50)
-        v_100 = cash_row_input("100", 100)
-        v_200 = cash_row_input("200", 200)
-        v_500 = cash_row_input("500", 500)
-        v_1000 = cash_row_input("1000", 1000)
+        # Номиналы строго в ряд
+        v_20 = cash_row_safe("20", 20)
+        v_50 = cash_row_safe("50", 50)
+        v_100 = cash_row_safe("100", 100)
+        v_200 = cash_row_safe("200", 200)
+        v_500 = cash_row_safe("500", 500)
+        v_1000 = cash_row_safe("1000", 1000)
             
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
         st.divider()
