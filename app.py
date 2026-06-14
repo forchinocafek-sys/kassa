@@ -86,7 +86,7 @@ def on_date_change():
 
 
 # ==============================================================================
-# 🔥 КРИТИЧЕСКИЙ БЛОК: Инициализация жизненного цикла данных ДО рендеринга интерфейса
+# 🔥 Инициализация жизненного цикла данных ДО рендеринга интерфейса
 # ==============================================================================
 if "form_date" in st.session_state:
     selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
@@ -103,7 +103,7 @@ if st.session_state.get("current_loaded_date") != selected_date:
 st.set_page_config(layout="wide")
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.2 (Стабільна безпека)")
+st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.3 (Динамічні ключі таблиць)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
@@ -128,13 +128,15 @@ with tab1:
         col_t1, col_t2 = st.columns(2)
         with col_t1:
             st.subheader("Надходження:")
-            edited_inc_df = st.data_editor(st.session_state["inc_df"], num_rows="dynamic", use_container_width=True, key="inc_editor")
+            # Использование динамического ключа f"inc_editor_{selected_date}" заставляет Streamlit обновлять таблицу из сессии
+            edited_inc_df = st.data_editor(st.session_state["inc_df"], num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
             subtotal_inc = sum(get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>", unsafe_allow_html=True)
             
         with col_t2:
             st.subheader("Витрати:")
-            edited_exp_df = st.data_editor(st.session_state["exp_df"], num_rows="dynamic", use_container_width=True, key="exp_editor")
+            # Использование динамического ключа f"exp_editor_{selected_date}"
+            edited_exp_df = st.data_editor(st.session_state["exp_df"], num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
             subtotal_exp = sum(get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #c62828;'>Загалом: {subtotal_exp} грн</p>", unsafe_allow_html=True)
 
@@ -144,7 +146,8 @@ with tab1:
         col_b1, col_b2 = st.columns(2)
         with col_b1:
             st.subheader("Аванси співробітникам:")
-            edited_adv_df = st.data_editor(st.session_state["adv_df"], num_rows="dynamic", use_container_width=True, key="adv_editor")
+            # Использование динамического ключа f"adv_editor_{selected_date}"
+            edited_adv_df = st.data_editor(st.session_state["adv_df"], num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
             subtotal_adv = sum(get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
@@ -291,4 +294,4 @@ with tab2:
     elif passwd_archive != "":
         st.error("❌ Невірний пароль для доступу до архіву!")
     else:
-        st.info("🔒 Будь ласка, введіть пароль для доступу до перегляду історії минулих днів.")
+        st.info("🔒 Будь ласка, введіть пароль для доступу до перегляду історії минулих днів.")                 
