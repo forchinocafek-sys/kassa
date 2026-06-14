@@ -19,7 +19,6 @@ headers = {
 def get_int(val):
     try:
         if not val: return 0
-        # Очищаем строку от пробелов и возможных минусов для корректной проверки
         clean_val = str(val).strip().replace(" ", "")
         return int(float(clean_val))
     except Exception:
@@ -29,7 +28,7 @@ def get_start_balance(date_str):
     try:
         url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
         res = requests.get(url, headers=headers).json()
-        # ПУНКТ 5: Берем именно РОЗРАХУНКОВИЙ кінець дня (calculated_end) вместо фактического
+        # ПУНКТ 5: Подтягиваем именно расчетный остаток (calculated_end) за прошлый день
         return get_int(res[0]['calculated_end']) if res else 0
     except Exception:
         return 0
@@ -57,7 +56,7 @@ tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 А
 with tab1:
     col1, col2 = st.columns(2)
     with col1:
-        # ПУНКТ 3: Формат даты в календаре ДД/ММ/ГГГГ
+        # ПУНКТ 3: Формат даты ДД/ММ/ГГГГ в календаре
         selected_date_raw = st.date_input("Дата", datetime.today(), format="DD/MM/YYYY")
         selected_date = selected_date_raw.strftime('%Y-%m-%d')
     with col2:
@@ -169,13 +168,13 @@ with tab1:
         requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
         requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
         
-        # ПУНКТ 1: Сохраняем всё массивом, чтобы данные архива не затирались
+        # ПУНКТ 1: Сохраняем всё массивом
         requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={"date": selected_date, "start_balance": str(start_balance), "calculated_end": str(calculated_end), "actual_end": str(total_actual)})
         if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
         if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
         if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
                 
-        st.success(f"Звіт за {selected_date}_raw.strftime('%d/%m/%Y')} успішно збережено!")
+        st.success(f"Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно збережено!")
         st.rerun()
 
 # --- Архів ---
@@ -201,7 +200,7 @@ with tab2:
             exp_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.expense", headers=headers).json()
             for item in exp_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {get_int(item['amount'])} грн")
         with ac3:
-            st.markdown("**Aванси:**")
+            st.markdown("**Аванси:**")
             adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}", headers=headers).json()
             for item in adv_res: st.write(f"• {item['employee'] if item['employee'] else 'Без імені'}: {get_int(item['amount'])} грн")
     else:
