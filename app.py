@@ -1,6 +1,7 @@
 import streamlit as st
 from datetime import datetime
 import requests
+import pandas as pd
 
 # Настройки облачного веб-доступа к Supabase
 SUPABASE_URL = "https://ajkprfhuypcamnybqusr.supabase.co"
@@ -15,7 +16,6 @@ headers = {
     "Prefer": "return=representation"
 }
 
-# Функция безопасного перевода текста в целое число (без копеек)
 def get_int(val):
     try:
         if not val: return 0
@@ -28,166 +28,192 @@ def get_start_balance(date_str):
     try:
         url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
         res = requests.get(url, headers=headers).json()
-        return get_int(res[0]['calculated_end']) if res else 0
+        if isinstance(res, list) and len(res) > 0:
+            return get_int(res[0].get('calculated_end', 0))
     except Exception:
-        return 0
+        pass
+    return 0
 
 def get_previous_advances(date_str):
     try:
         url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
         res = requests.get(url, headers=headers).json()
-        if res:
-            last_date = res[0]['date']
-            url_adv = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{last_date}"
-            res_adv = requests.get(url_adv, headers=headers).json()
-            return [(item['employee'], get_int(item['amount'])) for item in res_adv]
+        if isinstance(res, list) and len(res) > 0:
+            last_date = res[0].get('date')
+            if last_date:
+                url_adv = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{last_date}"
+                res_adv = requests.get(url_adv, headers=headers).json()
+                if isinstance(res_adv, list):
+                    return [{"Співробітник": item.get('employee', ''), "Сума": get_int(item.get('amount', 0))} for item in res_adv]
     except Exception:
         pass
     return []
 
+# Функция-callback: срабатывает при изменении даты и гарантирует чистоту данных
+def on_date_change():
+    new_date = st.session_state["form_date"].strftime('%Y-%m-%d')
+    st.session_state["inc_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
+    st.session_state["exp_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
+    
+    prev_adv = get_previous_advances(new_date)
+    if prev_adv:
+        st.session_state["adv_df"] = pd.DataFrame(prev_adv)
+    else:
+        st.session_state["adv_df"] = pd.DataFrame([{"Співробітник": "", "Сума": 0}])
+
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
+
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація (Всі пристрої)")
+st.caption("🌐 Хмарна синхронізація | Реактивна версія 4.1 (Стабільна)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
 with tab1:
+    # 1. Определение текущей даты до инициализации таблиц (Защита от асинхронного сбоя)
+    if "form_date" in st.session_state:
+        selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
+    else:
+        selected_date = datetime.today().strftime('%Y-%m-%d')
+
+    # Первичная базовая инициализация структур данных
+    if "inc_df" not in st.session_state:
+        st.session_state["inc_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
+    if "exp_df" not in st.session_state:
+        st.session_state["exp_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
+    if "adv_df" not in st.session_state:
+        prev_adv = get_previous_advances(selected_date)
+        if prev_adv:
+            st.session_state["adv_df"] = pd.DataFrame(prev_adv)
+        else:
+            st.session_state["adv_df"] = pd.DataFrame([{"Співробітник": "", "Сума": 0}])
+
+    # 2. Выбор даты и автоматический расчет остатка
     col1, col2 = st.columns(2)
     with col1:
-        selected_date_raw = st.date_input("Дата", datetime.today(), format="DD/MM/YYYY")
+        selected_date_raw = st.date_input("Дата", datetime.today(), format="DD/MM/YYYY", key="form_date", on_change=on_date_change)
         selected_date = selected_date_raw.strftime('%Y-%m-%d')
     with col2:
         db_start = get_start_balance(selected_date)
-        start_balance_raw = st.text_input("Залишок на початок дня:", value=str(db_start))
+        start_balance_raw = st.text_input("Залишок на початок дня:", value=str(db_start), key=f"start_balance_{selected_date}")
         start_balance = get_int(start_balance_raw)
 
     st.divider()
-    col_inc, col_exp = st.columns(2)
-
-    # --- НАДХОДЖЕННЯ ---
-    with col_inc:
+    st.markdown("<p style='color: #888888; font-size: 13px;'>💡 <b>Крок 1:</b> Внесіть дані в таблиці. Рядки додаються кнопкою <b>+ Add row</b> внизу кожної таблиці. Дані зберігаються автоматично.</p>", unsafe_allow_html=True)
+    
+    # 3. ТАБЛИЦЫ ДВИЖЕНИЯ СРЕДСТВ
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
         st.subheader("Надходження:")
-        if "inc_count" not in st.session_state: st.session_state.inc_count = 1
-        inc_rows = []
-        for i in range(st.session_state.inc_count):
-            c1, c2 = st.columns([3, 1])
-            with c1: desc = st.text_input("Опис приходу", key=f"inc_desc_{i}", label_visibility="collapsed", placeholder="Опис надходження")
-            with c2: amt_raw = st.text_input("Сума приходу", key=f"inc_amt_{i}", label_visibility="collapsed", value="0")
-            amt = get_int(amt_raw)
-            if amt != 0 or desc: inc_rows.append({"date": selected_date, "type": "income", "description": desc, "amount": str(amt)})
-        if st.button("➕ Додати рядок надходження"):
-            st.session_state.inc_count += 1
-            st.rerun()
-        total_income = sum(get_int(item["amount"]) for item in inc_rows)
-        st.markdown(f"### Загалом прихід: {total_income} грн")
-
-    # --- ВИТРАТИ ---
-    with col_exp:
+        edited_inc_df = st.data_editor(st.session_state["inc_df"], num_rows="dynamic", use_container_width=True, key="inc_editor")
+    with col_t2:
         st.subheader("Витрати:")
-        if "exp_count" not in st.session_state: st.session_state.exp_count = 1
-        exp_rows = []
-        for i in range(st.session_state.exp_count):
-            c1, c2 = st.columns([3, 1])
-            with c1: desc = st.text_input("Опис витрати", key=f"exp_desc_{i}", label_visibility="collapsed", placeholder="Опис витрати")
-            with c2: amt_raw = st.text_input("Сума витрати", key=f"exp_amt_{i}", label_visibility="collapsed", value="0")
-            amt = get_int(amt_raw)
-            if amt != 0 or desc: exp_rows.append({"date": selected_date, "type": "expense", "description": desc, "amount": str(amt)})
-        if st.button("➕ Додати рядок витрати"):
-            st.session_state.exp_count += 1
-            st.rerun()
-        total_expense = sum(get_int(item["amount"]) for item in exp_rows)
-        st.markdown(f"### Загалом витрати: {total_expense} грн")
+        edited_exp_df = st.data_editor(st.session_state["exp_df"], num_rows="dynamic", use_container_width=True, key="exp_editor")
 
+    st.subheader("Аванси співробітникам:")
+    edited_adv_df = st.data_editor(st.session_state["adv_df"], num_rows="dynamic", use_container_width=True, key="adv_editor")
+
+    # Синхронизация изменений
+    st.session_state["inc_df"] = edited_inc_df
+    st.session_state["exp_df"] = edited_exp_df
+    st.session_state["adv_df"] = edited_adv_df
+
+    # Парсинг для расчетов
+    inc_rows = []
+    for _, row in edited_inc_df.iterrows():
+        amt = get_int(row.get("Сума", 0))
+        desc = str(row.get("Опис", "")).strip()
+        if amt != 0 or desc: inc_rows.append({"date": selected_date, "type": "income", "description": desc, "amount": str(amt)})
+
+    exp_rows = []
+    for _, row in edited_exp_df.iterrows():
+        amt = get_int(row.get("Сума", 0))
+        desc = str(row.get("Опис", "")).strip()
+        if amt != 0 or desc: exp_rows.append({"date": selected_date, "type": "expense", "description": desc, "amount": str(amt)})
+
+    adv_rows = []
+    for _, row in edited_adv_df.iterrows():
+        amt = get_int(row.get("Сума", 0))
+        emp = str(row.get("Співробітник", "")).strip()
+        if amt != 0 or emp: adv_rows.append({"date": selected_date, "employee": emp, "amount": str(amt)})
+
+    total_income = sum(get_int(item["amount"]) for item in inc_rows)
+    total_expense = sum(get_int(item["amount"]) for item in exp_rows)
+    total_advances = sum(get_int(item["amount"]) for item in adv_rows)
+
+    # 4. БЛОК РАСЧЕТА НАЛИЧНЫХ (С ДИНАМИЧЕСКИМИ КЛЮЧАМИ ПО ДАТЕ)
     st.divider()
-    col_adv, col_fact = st.columns(2)
-
-    # --- АВАНСИ ---
-    with col_adv:
-        st.subheader("Аванси:")
-        if f"adv_initialized_{selected_date}" not in st.session_state:
-            prev_advances = get_previous_advances(selected_date)
-            st.session_state[f"adv_initialized_{selected_date}"] = True
-            st.session_state.adv_count = max(len(prev_advances), 1)
-            for idx, (emp, amt) in enumerate(prev_advances):
-                st.session_state[f"emp_{idx}"] = emp
-                st.session_state[f"adv_amt_{idx}"] = str(get_int(amt))
+    st.subheader("💰 Крок 2: Розрахунок готівки в касі (Ізольовано для кожної дати)")
+    
+    col_f1, col_f2 = st.columns(2)
+    with col_f1:
+        # Ключ привязан к выбранной дате. При смене даты поле обнулится.
+        m_coins = get_int(st.text_input("Монети (загальна сума в грн):", value="0", key=f"coins_live_{selected_date}"))
         
-        adv_rows = []
-        for i in range(st.session_state.adv_count):
-            c1, c2 = st.columns([3, 1])
-            with c1: emp = st.text_input("Співробітник", key=f"emp_{i}", label_visibility="collapsed", placeholder="Ім'я співробітника")
-            with c2: amt_raw = st.text_input("Сума авансу", key=f"adv_amt_{i}", label_visibility="collapsed", value="0")
-            amt = get_int(amt_raw)
-            if amt != 0 or emp: adv_rows.append({"date": selected_date, "employee": emp, "amount": str(amt)})
-        if st.button("➕ Додати рядок авансу"):
-            st.session_state.adv_count += 1
-            st.rerun()
-        total_advances = sum(get_int(item["amount"]) for item in adv_rows)
-        st.markdown(f"### Загалом авансів: {total_advances} грн")
-
-    # --- ФАКТИЧНИЙ ЗАЛИШОК (КОМПАКТНЫЙ ВВОД В ОДНУ ЛИНИЮ) ---
-    with col_fact:
-        st.subheader("Фактичний залишок:")
-        
-        # Монеты в одну строку
-        mc1, mc2 = st.columns([2, 6])
-        with mc1:
-            st.markdown("<div style='padding-top: 5px; font-weight: bold;'>Монети:</div>", unsafe_allow_html=True)
-        with mc2:
-            m_coins = get_int(st.text_input("Сума монет", value="0", label_visibility="collapsed", key="coins_input"))
-
-        # Функция построчного вывода: Номинал | Инпут к-ва | Автосумма
-        def cash_row_safe(label, multiplier):
-            rc1, rc2, rc3 = st.columns([2, 3, 3])
+        def cash_row_live(label, multiplier):
+            rc1, rc2 = st.columns([1, 1])
             with rc1:
-                st.markdown(f"<div style='padding-top: 5px; font-weight: bold;'>{label} грн</div>", unsafe_allow_html=True)
+                # Динамический key предотвращает перетекание номиналов купюр между датами
+                qty = get_int(st.text_input(f"{label} грн (кількість купюр):", value="0", key=f"qty_{label}_{selected_date}"))
             with rc2:
-                qty = get_int(st.text_input("К-сть", value="0", key=f"cash_qty_{label}", label_visibility="collapsed", placeholder="0"))
-            with rc3:
                 subtotal = qty * multiplier
-                st.markdown(f"<div style='padding-top: 5px; font-weight: 500;'>= {subtotal} грн</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding-top: 32px; font-weight: bold; color: #0066cc;'>= {subtotal} грн</div>", unsafe_allow_html=True)
             return subtotal
 
-        # Номиналы строго в ряд
-        v_20 = cash_row_safe("20", 20)
-        v_50 = cash_row_safe("50", 50)
-        v_100 = cash_row_safe("100", 100)
-        v_200 = cash_row_safe("200", 200)
-        v_500 = cash_row_safe("500", 500)
-        v_1000 = cash_row_safe("1000", 1000)
-            
+        v_20 = cash_row_live("20", 20)
+        v_50 = cash_row_live("50", 50)
+        v_100 = cash_row_live("100", 100)
+        
+    with col_f2:
+        v_200 = cash_row_live("200", 200)
+        v_500 = cash_row_live("500", 500)
+        v_1000 = cash_row_live("1000", 1000)
+        
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
-        st.divider()
-        st.markdown(f"### Загалом в касі: {cash_pure} грн")
+        st.markdown(f"## 💵 Разом готівки в касі: {cash_pure} грн")
 
+    # 5. ИТОГИ И БЕЗОПАСНАЯ СИНХРОНИЗАЦИЯ
     st.divider()
-    
     calculated_end = start_balance + total_income - total_expense
     total_actual = cash_pure + total_advances
     discrepancy = total_actual - calculated_end
 
-    st.subheader("Підсумки зміни")
+    st.subheader("🏁 Підсумки зміни")
     res_c1, res_c2, res_c3 = st.columns(3)
-    res_c1.metric("Розрахунковий залишок на кінець дня", f"{calculated_end} грн")
+    res_c1.metric("Розрахунковий залишок", f"{calculated_end} грн")
     res_c2.metric("Фактичний залишок (Каса + Аванси)", f"{total_actual} грн")
     
     if discrepancy == 0: res_c3.success("Каса зійшлася!")
     elif discrepancy > 0: res_c3.warning(f"Надлишок: +{discrepancy} грн")
     else: res_c3.error(f"Недостача: {discrepancy} грн")
 
-    if st.button("Зберегти звіт за день", type="primary"):
-        requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
-        requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
-        requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
-        
-        requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={"date": selected_date, "start_balance": str(start_balance), "calculated_end": str(calculated_end), "actual_end": str(total_actual)})
-        if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
-        if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
-        if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
+    save_report = st.button("🚀 ЗБЕРЕГТИ ГОТОВИЙ ЗВІТ В ХМАРУ", type="primary", use_container_width=True)
+
+    if save_report:
+        with st.spinner("Синхронізація з Supabase..."):
+            try:
+                # Атомарное удаление старых данных строго перед записью новых
+                requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
+                requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
+                requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
                 
-        st.success(f"Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно збережено!")
-        st.rerun()
+                # Чистая запись
+                res_shift = requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={
+                    "date": selected_date, "start_balance": str(start_balance), 
+                    "calculated_end": str(calculated_end), "actual_end": str(total_actual)
+                })
+                
+                if res_shift.status_code in [200, 201]:
+                    if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
+                    if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
+                    if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
+                    
+                    st.success(f"🎉 Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно та безпечно збережено в хмарі!")
+                    st.rerun()
+                else:
+                    st.error(f"❌ Помилка сервера бази даних: {res_shift.status_code}. Дані не збережено.")
+            except Exception as e:
+                st.error(f"💥 Помилка мережі: {e}. Перевірте з'єднання з інтернетом.")
 
 # --- Архів ---
 with tab2:
@@ -198,22 +224,25 @@ with tab2:
     url_shift = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{search_date}"
     shift_res = requests.get(url_shift, headers=headers).json()
     
-    if shift_res and isinstance(shift_res, list) and len(shift_res) > 0:
+    if isinstance(shift_res, list) and len(shift_res) > 0:
         shift = shift_res[0]
-        st.info(f"**Залишок на початок:** {get_int(shift['start_balance'])} грн | **Розрахунковий кінець:** {get_int(shift['calculated_end'])} грн | **Фактичний залишок (Каса+Аванси):** {get_int(shift['actual_end'])} грн")
+        st.info(f"**Залишок на початок:** {get_int(shift.get('start_balance'))} грн | **Розрахунковий кінець:** {get_int(shift.get('calculated_end'))} грн | **Фактичний залишок (Каса+Аванси):** {get_int(shift.get('actual_end'))} грн")
         
         ac1, ac2, ac3 = st.columns(3)
         with ac1:
             st.markdown("**Надходження:**")
             inc_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.income", headers=headers).json()
-            for item in inc_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {get_int(item['amount'])} грн")
+            if isinstance(inc_res, list):
+                for item in inc_res: st.write(f"• {item.get('description', 'Без опису')}: {get_int(item.get('amount'))} грн")
         with ac2:
             st.markdown("**Витрати:**")
             exp_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.expense", headers=headers).json()
-            for item in exp_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {get_int(item['amount'])} грн")
+            if isinstance(exp_res, list):
+                for item in exp_res: st.write(f"• {item.get('description', 'Без опису')}: {get_int(item.get('amount'))} грн")
         with ac3:
             st.markdown("**Аванси:**")
             adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}", headers=headers).json()
-            for item in adv_res: st.write(f"• {item['employee'] if item['employee'] else 'Без імені'}: {get_int(item['amount'])} грн")
+            if isinstance(adv_res, list):
+                for item in adv_res: st.write(f"• {item.get('employee', 'Без імені')}: {get_int(item.get('amount'))} грн")
     else:
         st.warning("За цей день звітів не знайдено в хмарі.")
