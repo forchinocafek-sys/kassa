@@ -48,17 +48,18 @@ def get_previous_advances(date_str):
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
 
-# CSS-магия: Запрещаем колонкам схлопываться вертикально на телефонах
+# CSS-фикс: Удерживает только строки ввода (с ключом row_) в одну линию на телефонах
 st.markdown(
     """
     <style>
-    [data-testid="stHorizontalBlock"] {
+    div[data-testid="stHorizontalBlock"]:has(input[id*="row_"]) {
         display: flex !important;
         flex-direction: row !important;
         flex-wrap: nowrap !important;
         align-items: center !important;
+        width: 100% !important;
     }
-    [data-testid="column"] {
+    div[data-testid="stHorizontalBlock"]:has(input[id*="row_"]) div[data-testid="column"] {
         min-width: 0 !important;
     }
     </style>
@@ -90,9 +91,9 @@ with tab1:
         if "inc_count" not in st.session_state: st.session_state.inc_count = 1
         inc_rows = []
         for i in range(st.session_state.inc_count):
-            c1, c2 = st.columns([3, 1])
-            with c1: desc = st.text_input("Опис приходу", key=f"inc_desc_{i}", label_visibility="collapsed", placeholder="Опис надходження")
-            with c2: amt_raw = st.text_input("Сума приходу", key=f"inc_amt_{i}", label_visibility="collapsed", placeholder="Сума")
+            c1, c2 = st.columns([2, 1]) # Соотношение 2:1
+            with c1: desc = st.text_input("Опис приходу", key=f"row_inc_desc_{i}", label_visibility="collapsed", placeholder="Опис надходження")
+            with c2: amt_raw = st.text_input("Сума приходу", key=f"row_inc_amt_{i}", label_visibility="collapsed", placeholder="Сума")
             amt = get_int(amt_raw)
             if amt != 0 or desc: inc_rows.append({"date": selected_date, "type": "income", "description": desc, "amount": str(amt)})
         if st.button("➕ Додати рядок надходження"):
@@ -107,9 +108,9 @@ with tab1:
         if "exp_count" not in st.session_state: st.session_state.exp_count = 1
         exp_rows = []
         for i in range(st.session_state.exp_count):
-            c1, c2 = st.columns([3, 1])
-            with c1: desc = st.text_input("Опис витрати", key=f"exp_desc_{i}", label_visibility="collapsed", placeholder="Опис витрати")
-            with c2: amt_raw = st.text_input("Сума витрати", key=f"exp_amt_{i}", label_visibility="collapsed", placeholder="Сума")
+            c1, c2 = st.columns([2, 1]) # Соотношение 2:1
+            with c1: desc = st.text_input("Опис витрати", key=f"row_exp_desc_{i}", label_visibility="collapsed", placeholder="Опис витрати")
+            with c2: amt_raw = st.text_input("Сума витрати", key=f"row_exp_amt_{i}", label_visibility="collapsed", placeholder="Сума")
             amt = get_int(amt_raw)
             if amt != 0 or desc: exp_rows.append({"date": selected_date, "type": "expense", "description": desc, "amount": str(amt)})
         if st.button("➕ Додати рядок витрати"):
@@ -134,9 +135,9 @@ with tab1:
         
         adv_rows = []
         for i in range(st.session_state.adv_count):
-            c1, c2 = st.columns([3, 1])
-            with c1: emp = st.text_input("Співробітник", key=f"emp_{i}", label_visibility="collapsed", placeholder="Ім'я співробітника")
-            with c2: amt_raw = st.text_input("Сума авансу", key=f"adv_amt_{i}", label_visibility="collapsed", placeholder="Сума")
+            c1, c2 = st.columns([2, 1]) # Соотношение 2:1
+            with c1: emp = st.text_input("Співробітник", key=f"row_emp_{i}", label_visibility="collapsed", placeholder="Ім'я співробітника")
+            with c2: amt_raw = st.text_input("Сума авансу", key=f"row_adv_amt_{i}", label_visibility="collapsed", placeholder="Сума")
             amt = get_int(amt_raw)
             if amt != 0 or emp: adv_rows.append({"date": selected_date, "employee": emp, "amount": str(amt)})
         if st.button("➕ Додати рядок авансу"):
@@ -204,7 +205,7 @@ with tab1:
         if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
         if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
                 
-        st.success(f"Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успешно збережено!")
+        st.success(f"Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно збережено!")
         st.rerun()
 
 # --- Архів ---
