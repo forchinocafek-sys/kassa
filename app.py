@@ -28,7 +28,6 @@ def get_start_balance(date_str):
     try:
         url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
         res = requests.get(url, headers=headers).json()
-        # ПУНКТ 5: Подтягиваем именно расчетный остаток (calculated_end) за прошлый день
         return get_int(res[0]['calculated_end']) if res else 0
     except Exception:
         return 0
@@ -56,11 +55,9 @@ tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 А
 with tab1:
     col1, col2 = st.columns(2)
     with col1:
-        # ПУНКТ 3: Формат даты ДД/ММ/ГГГГ в календаре
         selected_date_raw = st.date_input("Дата", datetime.today(), format="DD/MM/YYYY")
         selected_date = selected_date_raw.strftime('%Y-%m-%d')
     with col2:
-        # ПУНКТ 2 и 4: Текстовое поле ввода без кнопок и без копеек
         db_start = get_start_balance(selected_date)
         start_balance_raw = st.text_input("Залишок на початок дня:", value=str(db_start))
         start_balance = get_int(start_balance_raw)
@@ -129,79 +126,23 @@ with tab1:
         total_advances = sum(get_int(item["amount"]) for item in adv_rows)
         st.markdown(f"### Загалом авансів: {total_advances} грн")
 
-    # --- ФАКТИЧНИЙ ЗАЛИШОК (КУПЮРЫ БЕЗ КОПЕЕК И КНОПОК) ---
+    # --- ФАКТИЧНИЙ ЗАЛИШОК (ПОСТРОЧНЫЙ ВВОД С АВТОСУММОЙ) ---
     with col_fact:
         st.subheader("Фактичний залишок:")
-        fc1, fc2 = st.columns(2)
-
-        with fc1:
-            m_coins = get_int(st.text_input("Монети (сума):", value="0"))
-            k_20 = get_int(st.text_input("20 грн (кількість):", value="0")) * 20
-            k_50 = get_int(st.text_input("50 грн (кількість):", value="0")) * 50
-            k_100 = get_int(st.text_input("100 грн (кількість):", value="0")) * 100
-        with fc2:
-            k_200 = get_int(st.text_input("200 грн (кількість):", value="0")) * 200
-            k_500 = get_int(st.text_input("500 грн (кількість):", value="0")) * 500
-            k_1000 = get_int(st.text_input("1000 грн (кількість):", value="0")) * 1000
-            
-        cash_pure = m_coins + k_20 + k_50 + k_100 + k_200 + k_500 + k_1000
-        st.markdown(f"**Готівка в касі:** {cash_pure} грн")
-
-    st.divider()
-    
-    calculated_end = start_balance + total_income - total_expense
-    total_actual = cash_pure + total_advances
-    discrepancy = total_actual - calculated_end
-
-    st.subheader("Підсумки зміни")
-    res_c1, res_c2, res_c3 = st.columns(3)
-    res_c1.metric("Розрахунковий залишок на кінець дня", f"{calculated_end} грн")
-    res_c2.metric("Фактичний залишок (Каса + Аванси)", f"{total_actual} грн")
-    
-    if discrepancy == 0: res_c3.success("Каса зійшлася!")
-    elif discrepancy > 0: res_c3.warning(f"Надлишок: +{discrepancy} грн")
-    else: res_c3.error(f"Недостача: {discrepancy} грн")
-
-    if st.button("Зберегти звіт за день", type="primary"):
-        # Очищаем старые данные за этот день
-        requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
-        requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
-        requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
         
-        # ПУНКТ 1: Сохраняем всё массивом
-        requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={"date": selected_date, "start_balance": str(start_balance), "calculated_end": str(calculated_end), "actual_end": str(total_actual)})
-        if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
-        if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
-        if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
-                
-        st.success(f"Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно збережено!")
-        st.rerun()
-
-# --- Архів ---
-with tab2:
-    st.subheader("🔎 Перегляд історії")
-    search_date_raw = st.date_input("Оберіть дату для перевірки", datetime.today(), key="search", format="DD/MM/YYYY")
-    search_date = search_date_raw.strftime('%Y-%m-%d')
-    
-    url_shift = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{search_date}"
-    shift_res = requests.get(url_shift, headers=headers).json()
-    
-    if shift_res and isinstance(shift_res, list) and len(shift_res) > 0:
-        shift = shift_res[0]
-        st.info(f"**Залишок на початок:** {get_int(shift['start_balance'])} грн | **Розрахунковий кінець:** {get_int(shift['calculated_end'])} грн | **Фактичний залишок (Каса+Аванси):** {get_int(shift['actual_end'])} грн")
+        # Монеты в 1 строку
+        m_coins = get_int(st.text_input("Монети (загальна сума):", value="0"))
         
-        ac1, ac2, ac3 = st.columns(3)
-        with ac1:
-            st.markdown("**Надходження:**")
-            inc_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.income", headers=headers).json()
-            for item in inc_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {get_int(item['amount'])} грн")
-        with ac2:
-            st.markdown("**Витрати:**")
-            exp_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.expense", headers=headers).json()
-            for item in exp_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {get_int(item['amount'])} грн")
-        with ac3:
-            st.markdown("**Аванси:**")
-            adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}", headers=headers).json()
-            for item in adv_res: st.write(f"• {item['employee'] if item['employee'] else 'Без імені'}: {get_int(item['amount'])} грн")
-    else:
-        st.warning("За цей день звітів не знайдено в хмарі.")
+        # Вспомогательная функция для генерации аккуратной строки купюры
+        def cash_row(label, multiplier):
+            rc1, rc2 = st.columns([2, 1])
+            with rc1:
+                qty = get_int(st.text_input(f"{label} грн (кількість):", value="0", key=f"cash_qty_{label}"))
+            with rc2:
+                subtotal = qty * multiplier
+                st.markdown(f"<div style='padding-top: 28px; font-weight: 500;'>= {subtotal} грн</div>", unsafe_allow_html=True)
+            return subtotal
+
+        # Купюры строго построчно друг за другом
+        v_20 = cash_row("20", 20)
+        v_50 = cash_
