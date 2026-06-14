@@ -54,15 +54,16 @@ def get_previous_advances(date_str):
 # --- Инициализация данных и загрузка черновиков ---
 def load_draft_or_init(date_str):
     coins_key = f"coins_live_{date_str}"
-    keys_cash = [coins_key] + [f"qty_{k}_{date_str}" for k in [20, 50, 100, 200, 500, 1000]]
     
     try:
         draft_res = requests.get(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{date_str}", headers=headers).json()
         if isinstance(draft_res, list) and len(draft_res) > 0:
             payload = draft_res[0].get('payload', {})
-            st.session_state["inc_df"] = pd.DataFrame(payload.get('inc', [{"Опис": "", "Сума": 0}]))
-            st.session_state["exp_df"] = pd.DataFrame(payload.get('exp', [{"Опис": "", "Сума": 0}]))
-            st.session_state["adv_df"] = pd.DataFrame(payload.get('adv', [{"Співробітник": "", "Сума": 0}]))
+            
+            # Записуємо чисті списки/dict в session_state
+            st.session_state["inc_data"] = payload.get('inc', [{"Опис": "", "Сума": 0}])
+            st.session_state["exp_data"] = payload.get('exp', [{"Опис": "", "Сума": 0}])
+            st.session_state["adv_data"] = payload.get('adv', [{"Співробітник": "", "Сума": 0}])
             
             cash_data = payload.get('cash', {})
             st.session_state[coins_key] = str(cash_data.get('coins', 0))
@@ -72,12 +73,15 @@ def load_draft_or_init(date_str):
     except Exception:
         pass
         
-    st.session_state["inc_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
-    st.session_state["exp_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
+    # Якщо чернетки немає — створюємо дефолтні значення
+    st.session_state["inc_data"] = [{"Опис": "", "Сума": 0}]
+    st.session_state["exp_data"] = [{"Опис": "", "Сума": 0}]
     prev_adv = get_previous_advances(date_str)
-    st.session_state["adv_df"] = pd.DataFrame(prev_adv) if prev_adv else pd.DataFrame([{"Співробітник": "", "Сума": 0}])
-    for k in keys_cash:
-        st.session_state[k] = "0"
+    st.session_state["adv_data"] = prev_adv if prev_adv else [{"Співробітник": "", "Сума": 0}]
+    
+    st.session_state[coins_key] = "0"
+    for k in [20, 50, 100, 200, 500, 1000]:
+        st.session_state[f"qty_{k}_{date_str}"] = "0"
 
 def on_date_change():
     new_date = st.session_state["form_date"].strftime('%Y-%m-%d')
@@ -103,7 +107,7 @@ if st.session_state.get("current_loaded_date") != selected_date:
 st.set_page_config(layout="wide")
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.3 (Динамічні ключі таблиць)")
+st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.4 (Фікс відновлення чернеток)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
@@ -128,15 +132,14 @@ with tab1:
         col_t1, col_t2 = st.columns(2)
         with col_t1:
             st.subheader("Надходження:")
-            # Использование динамического ключа f"inc_editor_{selected_date}" заставляет Streamlit обновлять таблицу из сессии
-            edited_inc_df = st.data_editor(st.session_state["inc_df"], num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
+            # Передаємо DataFrame безпосередньо зі сховища даних, ключ залишаємо статичним/динамічним, але без конфлікту сховища
+            edited_inc_df = st.data_editor(pd.DataFrame(st.session_state["inc_data"]), num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
             subtotal_inc = sum(get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>", unsafe_allow_html=True)
             
         with col_t2:
             st.subheader("Витрати:")
-            # Использование динамического ключа f"exp_editor_{selected_date}"
-            edited_exp_df = st.data_editor(st.session_state["exp_df"], num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
+            edited_exp_df = st.data_editor(pd.DataFrame(st.session_state["exp_data"]), num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
             subtotal_exp = sum(get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #c62828;'>Загалом: {subtotal_exp} грн</p>", unsafe_allow_html=True)
 
@@ -146,13 +149,12 @@ with tab1:
         col_b1, col_b2 = st.columns(2)
         with col_b1:
             st.subheader("Аванси співробітникам:")
-            # Использование динамического ключа f"adv_editor_{selected_date}"
-            edited_adv_df = st.data_editor(st.session_state["adv_df"], num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
+            edited_adv_df = st.data_editor(pd.DataFrame(st.session_state["adv_data"]), num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
             subtotal_adv = sum(get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
         with col_b2:
-            st.markdown("<p style='color: #0066cc; font-size: 14px; font-weight: bold;'>💰 Крок 2: Розрахунок готівки в касі</p>", unsafe_allow_html=True)
+            st.subheader("💰 Розрахунок готівки в касі")
             m_coins = get_int(st.text_input("Монети (загальна сума в грн):", key=f"coins_live_{selected_date}"))
             
             def cash_row_live(label, multiplier):
@@ -174,16 +176,16 @@ with tab1:
             cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
             st.markdown(f"## 💵 Разом готівки в касі: {cash_pure} грн")
 
-        # Синхронизация состояния таблиц
-        st.session_state["inc_df"] = edited_inc_df
-        st.session_state["exp_df"] = edited_exp_df
-        st.session_state["adv_df"] = edited_adv_df
+        # Зберігаємо актуальний стан назад у session_state у вигляді списків (dict)
+        st.session_state["inc_data"] = edited_inc_df.to_dict('records')
+        st.session_state["exp_data"] = edited_exp_df.to_dict('records')
+        st.session_state["adv_data"] = edited_adv_df.to_dict('records')
 
         # --- ТЕНЕВОЕ АВТОСОХРАНЕНИЕ ---
         current_payload = {
-            "inc": edited_inc_df.to_dict('records'),
-            "exp": edited_exp_df.to_dict('records'),
-            "adv": edited_adv_df.to_dict('records'),
+            "inc": st.session_state["inc_data"],
+            "exp": st.session_state["exp_data"],
+            "adv": st.session_state["adv_data"],
             "cash": {
                 "coins": m_coins, "20": q_20, "50": q_50, 
                 "100": q_100, "200": q_200, "500": q_500, "1000": q_1000
@@ -200,9 +202,9 @@ with tab1:
                 pass 
 
         # Парсинг строк для итогов
-        inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_inc_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
-        exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_exp_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
-        adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_adv_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
+        inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for r in st.session_state["inc_data"] if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
+        exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for r in st.session_state["exp_data"] if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
+        adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for r in st.session_state["adv_data"] if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
 
         total_income = subtotal_inc
         total_expense = subtotal_exp
@@ -294,4 +296,4 @@ with tab2:
     elif passwd_archive != "":
         st.error("❌ Невірний пароль для доступу до архіву!")
     else:
-        st.info("🔒 Будь ласка, введіть пароль для доступу до перегляду історії минулих днів.")                 
+        st.info("🔒 Будь ласка, введіть пароль для доступу до перегляду історії минулих днів.")
