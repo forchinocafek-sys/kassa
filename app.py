@@ -1,4 +1,4 @@
-import streamlit as st
+        import streamlit as st
 from datetime import datetime
 import requests
 
@@ -10,7 +10,8 @@ headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
     "Content-Type": "application/json",
-    "Prefer": "return=minimal"
+    "Content-Profile": "public",
+    "Accept-Profile": "public"
 }
 
 def get_start_balance(date_str):
@@ -46,11 +47,13 @@ with tab1:
     with col1:
         selected_date = st.date_input("Дата", datetime.today()).strftime('%Y-%m-%d')
     with col2:
-        start_balance = st.number_input("Залишок на початок дня:", value=get_start_balance(selected_date), step=100.0)
+        # Убрали кнопки +/- для начального остатка
+        start_balance = st.number_input("Залишок на початок дня:", value=get_start_balance(selected_date), step=None)
 
     st.divider()
     col_inc, col_exp = st.columns(2)
 
+    # --- НАДХОДЖЕННЯ ---
     with col_inc:
         st.subheader("Надходження:")
         if "inc_count" not in st.session_state: st.session_state.inc_count = 1
@@ -58,7 +61,8 @@ with tab1:
         for i in range(st.session_state.inc_count):
             c1, c2 = st.columns([3, 1])
             with c1: desc = st.text_input("Опис приходу", key=f"inc_desc_{i}", label_visibility="collapsed", placeholder="Опис надходження")
-            with c2: amt = st.number_input("Сума приходу", min_value=0.0, step=50.0, key=f"inc_amt_{i}", label_visibility="collapsed")
+            # Убрали кнопки +/- для суммы прихода
+            with c2: amt = st.number_input("Сума приходу", min_value=0.0, step=None, key=f"inc_amt_{i}", label_visibility="collapsed")
             if amt > 0 or desc: inc_rows.append((desc, amt))
         if st.button("➕ Додати рядок надходження"):
             st.session_state.inc_count += 1
@@ -66,6 +70,7 @@ with tab1:
         total_income = sum(item[1] for item in inc_rows)
         st.markdown(f"### Загалом прихід: {total_income} грн")
 
+    # --- ВИТРАТИ ---
     with col_exp:
         st.subheader("Витрати:")
         if "exp_count" not in st.session_state: st.session_state.exp_count = 1
@@ -73,7 +78,8 @@ with tab1:
         for i in range(st.session_state.exp_count):
             c1, c2 = st.columns([3, 1])
             with c1: desc = st.text_input("Опис витрати", key=f"exp_desc_{i}", label_visibility="collapsed", placeholder="Опис витрати")
-            with c2: amt = st.number_input("Сума витрати", min_value=0.0, step=50.0, key=f"exp_amt_{i}", label_visibility="collapsed")
+            # Убрали кнопки +/- для суммы расхода
+            with c2: amt = st.number_input("Сума витрати", min_value=0.0, step=None, key=f"exp_amt_{i}", label_visibility="collapsed")
             if amt > 0 or desc: exp_rows.append((desc, amt))
         if st.button("➕ Додати рядок витрати"):
             st.session_state.exp_count += 1
@@ -84,6 +90,7 @@ with tab1:
     st.divider()
     col_adv, col_fact = st.columns(2)
 
+    # --- АВАНСИ ---
     with col_adv:
         st.subheader("Аванси:")
         if f"adv_initialized_{selected_date}" not in st.session_state:
@@ -98,26 +105,28 @@ with tab1:
         for i in range(st.session_state.adv_count):
             c1, c2 = st.columns([3, 1])
             with c1: emp = st.text_input("Співробітник", key=f"emp_{i}", label_visibility="collapsed", placeholder="Ім'я співробітника")
-            with c2: amt = st.number_input("Сума авансу", min_value=0.0, step=50.0, key=f"adv_amt_{i}", label_visibility="collapsed")
-            if amt > 0 or emp: adv_rows.append((emp, amt))
+            # Разрешены минусы, убраны кнопки +/-
+            with c2: amt = st.number_input("Сума авансу", step=None, key=f"adv_amt_{i}", label_visibility="collapsed")
+            if amt != 0 or emp: adv_rows.append((emp, amt))
         if st.button("➕ Додати рядок авансу"):
             st.session_state.adv_count += 1
             st.rerun()
         total_advances = sum(item[1] for item in adv_rows)
         st.markdown(f"### Загалом авансів: {total_advances} грн")
 
+    # --- ФАКТИЧНИЙ ЗАЛИШОК (КУПЮРЫ) ---
     with col_fact:
         st.subheader("Фактичний залишок:")
         fc1, fc2 = st.columns(2)
         with fc1:
-            m_coins = st.number_input("Монети (сума):", min_value=0.0, step=1.0)
-            k_20 = st.number_input("20 грн (кількість):", min_value=0, step=1) * 20
-            k_50 = st.number_input("50 грн (кількість):", min_value=0, step=1) * 50
-            k_100 = st.number_input("100 грн (кількість):", min_value=0, step=1) * 100
+            m_coins = st.number_input("Монети (сума):", min_value=0.0, step=None)
+            k_20 = st.number_input("20 грн (кількість):", min_value=0, step=None) * 20
+            k_50 = st.number_input("50 грн (кількість):", min_value=0, step=None) * 50
+            k_100 = st.number_input("100 грн (кількість):", min_value=0, step=None) * 100
         with fc2:
-            k_200 = st.number_input("200 грн (кількість):", min_value=0, step=1) * 200
-            k_500 = st.number_input("500 грн (кількість):", min_value=0, step=1) * 500
-            k_1000 = st.number_input("1000 грн (кількість):", min_value=0, step=1) * 1000
+            k_200 = st.number_input("200 грн (кількість):", min_value=0, step=None) * 200
+            k_500 = st.number_input("500 грн (кількість):", min_value=0, step=None) * 500
+            k_1000 = st.number_input("1000 грн (кількість):", min_value=0, step=None) * 1000
             
         cash_pure = m_coins + k_20 + k_50 + k_100 + k_200 + k_500 + k_1000
         st.markdown(f"**Готівка в касі:** {cash_pure} грн")
@@ -147,7 +156,7 @@ with tab1:
         for desc, amt in exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json={"date": selected_date, "type": "expense", "description": desc, "amount": str(amt)})
         for emp, amt in adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json={"date": selected_date, "employee": emp, "amount": str(amt)})
                 
-        st.success(f"Звіт за {selected_date} успішно збережено в Хмару!")
+        st.success(f"Звіт за {selected_date} успешно сохранено!")
         st.rerun()
 
 # --- Архів ---
