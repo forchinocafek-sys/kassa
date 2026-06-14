@@ -241,27 +241,34 @@ with tab1:
     st.session_state["exp_data"] = edited_exp_df.to_dict('records')
     st.session_state["adv_data"] = edited_adv_df.to_dict('records')
 
-    # --- ТЕНЕВОЕ АВТОСОХРАНЕНИЕ ---
-    current_payload = {
-        "inc": st.session_state["inc_data"],
-        "exp": st.session_state["exp_data"],
-        "adv": st.session_state["adv_data"],
-        "cash": {
-            "coins": m_coins, "20": q_20, "50": q_50, 
-            "100": q_100, "200": q_200, "500": q_500, "1000": q_1000
+    # --- СОХРАНЕНИЕ ЧЕРНОВИКА (Через кнопку для скорости) ---
+    st.divider()
+    if st.button("💾 Зберегти чернетку", use_container_width=True):
+        current_payload = {
+            "inc": st.session_state["inc_data"],
+            "exp": st.session_state["exp_data"],
+            "adv": st.session_state["adv_data"],
+            "cash": {
+                "coins": m_coins, "20": q_20, "50": q_50, 
+                "100": q_100, "200": q_200, "500": q_500, "1000": q_1000
+            }
         }
-    }
-    payload_str = json.dumps(current_payload, sort_keys=True)
-    
-    if st.session_state.get(f"last_draft_{selected_date}") != payload_str:
         try:
-            url_draft_del = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}"
-            url_draft_post = f"{SUPABASE_URL}/rest/v1/drafts"
-            requests.delete(url_draft_del, headers=headers)
-            requests.post(url_draft_post, headers=headers, json={"date": selected_date, "payload": current_payload})
-            st.session_state[f"last_draft_{selected_date}"] = payload_str
-        except Exception:
-            pass 
+            # Используем Upsert (обновление или вставка) вместо Delete+Post для скорости
+            # Supabase API поддерживает это, если в таблице drafts стоит уникальный индекс по date
+            url_draft_upsert = f"{SUPABASE_URL}/rest/v1/drafts"
+            # Параметр 'Prefer: resolution=merge-duplicates' (или аналогичный для вашего API)
+            # Если не работает, оставьте просто requests.post
+            headers_upsert = headers.copy()
+            headers_upsert["Prefer"] = "resolution=merge-duplicates"
+            
+            requests.post(url_draft_upsert, headers=headers_upsert, json={
+                "date": selected_date, 
+                "payload": current_payload
+            })
+            st.toast("✅ Чернетку збережено!", icon="💾")
+        except Exception as e:
+            st.error(f"Помилка збереження: {e}")
 
     inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for r in st.session_state["inc_data"] if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
     exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for r in st.session_state["exp_data"] if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
