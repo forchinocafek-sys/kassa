@@ -47,26 +47,6 @@ def get_previous_advances(date_str):
 
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
-
-# CSS-фикс: Удерживает только строки ввода (с ключом row_) в одну линию на телефонах
-st.markdown(
-    """
-    <style>
-    div[data-testid="stHorizontalBlock"]:has(input[id*="row_"]) {
-        display: flex !important;
-        flex-direction: row !important;
-        flex-wrap: nowrap !important;
-        align-items: center !important;
-        width: 100% !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(input[id*="row_"]) div[data-testid="column"] {
-        min-width: 0 !important;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
-
 st.title("Cafe Forchino")
 st.caption("🌐 Хмарна синхронізація (Всі пристрої)")
 
@@ -91,9 +71,9 @@ with tab1:
         if "inc_count" not in st.session_state: st.session_state.inc_count = 1
         inc_rows = []
         for i in range(st.session_state.inc_count):
-            c1, c2 = st.columns([2, 1]) # Соотношение 2:1
-            with c1: desc = st.text_input("Опис приходу", key=f"row_inc_desc_{i}", label_visibility="collapsed", placeholder="Опис надходження")
-            with c2: amt_raw = st.text_input("Сума приходу", key=f"row_inc_amt_{i}", label_visibility="collapsed", placeholder="Сума")
+            c1, c2 = st.columns([3, 1])
+            with c1: desc = st.text_input("Опис приходу", key=f"inc_desc_{i}", label_visibility="collapsed", placeholder="Опис надходження")
+            with c2: amt_raw = st.text_input("Сума приходу", key=f"inc_amt_{i}", label_visibility="collapsed", value="0")
             amt = get_int(amt_raw)
             if amt != 0 or desc: inc_rows.append({"date": selected_date, "type": "income", "description": desc, "amount": str(amt)})
         if st.button("➕ Додати рядок надходження"):
@@ -108,9 +88,9 @@ with tab1:
         if "exp_count" not in st.session_state: st.session_state.exp_count = 1
         exp_rows = []
         for i in range(st.session_state.exp_count):
-            c1, c2 = st.columns([2, 1]) # Соотношение 2:1
-            with c1: desc = st.text_input("Опис витрати", key=f"row_exp_desc_{i}", label_visibility="collapsed", placeholder="Опис витрати")
-            with c2: amt_raw = st.text_input("Сума витрати", key=f"row_exp_amt_{i}", label_visibility="collapsed", placeholder="Сума")
+            c1, c2 = st.columns([3, 1])
+            with c1: desc = st.text_input("Опис витрати", key=f"exp_desc_{i}", label_visibility="collapsed", placeholder="Опис витрати")
+            with c2: amt_raw = st.text_input("Сума витрати", key=f"exp_amt_{i}", label_visibility="collapsed", value="0")
             amt = get_int(amt_raw)
             if amt != 0 or desc: exp_rows.append({"date": selected_date, "type": "expense", "description": desc, "amount": str(amt)})
         if st.button("➕ Додати рядок витрати"):
@@ -135,9 +115,9 @@ with tab1:
         
         adv_rows = []
         for i in range(st.session_state.adv_count):
-            c1, c2 = st.columns([2, 1]) # Соотношение 2:1
-            with c1: emp = st.text_input("Співробітник", key=f"row_emp_{i}", label_visibility="collapsed", placeholder="Ім'я співробітника")
-            with c2: amt_raw = st.text_input("Сума авансу", key=f"row_adv_amt_{i}", label_visibility="collapsed", placeholder="Сума")
+            c1, c2 = st.columns([3, 1])
+            with c1: emp = st.text_input("Співробітник", key=f"emp_{i}", label_visibility="collapsed", placeholder="Ім'я співробітника")
+            with c2: amt_raw = st.text_input("Сума авансу", key=f"adv_amt_{i}", label_visibility="collapsed", value="0")
             amt = get_int(amt_raw)
             if amt != 0 or emp: adv_rows.append({"date": selected_date, "employee": emp, "amount": str(amt)})
         if st.button("➕ Додати рядок авансу"):
@@ -146,18 +126,18 @@ with tab1:
         total_advances = sum(get_int(item["amount"]) for item in adv_rows)
         st.markdown(f"### Загалом авансів: {total_advances} грн")
 
-    # --- ФАКТИЧНИЙ ЗАЛИШОК ---
+    # --- ФАКТИЧНИЙ ЗАЛИШОК (КОМПАКТНЫЙ ВВОД В ОДНУ ЛИНИЮ) ---
     with col_fact:
         st.subheader("Фактичний залишок:")
         
-        # Монеты
+        # Монеты в одну строку
         mc1, mc2 = st.columns([2, 6])
         with mc1:
             st.markdown("<div style='padding-top: 5px; font-weight: bold;'>Монети:</div>", unsafe_allow_html=True)
         with mc2:
             m_coins = get_int(st.text_input("Сума монет", value="0", label_visibility="collapsed", key="coins_input"))
 
-        # Функция построчного вывода купюр
+        # Функция построчного вывода: Номинал | Инпут к-ва | Автосумма
         def cash_row_safe(label, multiplier):
             rc1, rc2, rc3 = st.columns([2, 3, 3])
             with rc1:
@@ -169,6 +149,7 @@ with tab1:
                 st.markdown(f"<div style='padding-top: 5px; font-weight: 500;'>= {subtotal} грн</div>", unsafe_allow_html=True)
             return subtotal
 
+        # Номиналы строго в ряд
         v_20 = cash_row_safe("20", 20)
         v_50 = cash_row_safe("50", 50)
         v_100 = cash_row_safe("100", 100)
