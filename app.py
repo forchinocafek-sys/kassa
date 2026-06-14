@@ -51,6 +51,29 @@ def get_previous_advances(date_str):
         pass
     return []
 
+# --- ДОПОМІЖНА ФУНКЦІЯ ДЛЯ СТАБІЛІЗАЦІЇ ТАБЛИЦЬ ---
+def prepare_df(data_list, columns):
+    """
+    Гарантує, що DataFrame завжди матиме правильні колонки,
+    правильний порядок та правильні типи даних, навіть якщо чернетка порожня.
+    """
+    if not data_list:
+        data_list = [{col: (0 if col == "Сума" else "") for col in columns}]
+        
+    df = pd.DataFrame(data_list)
+    
+    # Створюємо колонки, якщо вони раптом зникли
+    for col in columns:
+        if col not in df.columns:
+            df[col] = 0 if col == "Сума" else ""
+            
+    # Жорстко конвертуємо Суму в числа, щоб уникнути помилок в st.data_editor
+    if "Сума" in df.columns:
+        df["Сума"] = pd.to_numeric(df["Сума"], errors='coerce').fillna(0).astype(int)
+        
+    # Повертаємо датафрейм із суворим порядком колонок
+    return df[columns]
+
 # --- Инициализация данных и загрузка черновиков ---
 def load_draft_or_init(date_str):
     coins_key = f"coins_live_{date_str}"
@@ -60,7 +83,6 @@ def load_draft_or_init(date_str):
         if isinstance(draft_res, list) and len(draft_res) > 0:
             payload = draft_res[0].get('payload', {})
             
-            # Записуємо чисті списки/dict в session_state
             st.session_state["inc_data"] = payload.get('inc', [{"Опис": "", "Сума": 0}])
             st.session_state["exp_data"] = payload.get('exp', [{"Опис": "", "Сума": 0}])
             st.session_state["adv_data"] = payload.get('adv', [{"Співробітник": "", "Сума": 0}])
@@ -73,7 +95,6 @@ def load_draft_or_init(date_str):
     except Exception:
         pass
         
-    # Якщо чернетки немає — створюємо дефолтні значення
     st.session_state["inc_data"] = [{"Опис": "", "Сума": 0}]
     st.session_state["exp_data"] = [{"Опис": "", "Сума": 0}]
     prev_adv = get_previous_advances(date_str)
@@ -88,7 +109,6 @@ def on_date_change():
     st.session_state["current_loaded_date"] = new_date
     load_draft_or_init(new_date)
 
-
 # ==============================================================================
 # 🔥 Инициализация жизненного цикла данных ДО рендеринга интерфейса
 # ==============================================================================
@@ -102,12 +122,11 @@ if st.session_state.get("current_loaded_date") != selected_date:
     st.session_state["current_loaded_date"] = selected_date
 # ==============================================================================
 
-
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.4 (Фікс відновлення чернеток)")
+st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.5 (Фікс колонок та відновлення даних)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
@@ -132,14 +151,16 @@ with tab1:
         col_t1, col_t2 = st.columns(2)
         with col_t1:
             st.subheader("Надходження:")
-            # Передаємо DataFrame безпосередньо зі сховища даних, ключ залишаємо статичним/динамічним, але без конфлікту сховища
-            edited_inc_df = st.data_editor(pd.DataFrame(st.session_state["inc_data"]), num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
+            # Використовуємо prepare_df та жорстко задаємо column_order
+            inc_df = prepare_df(st.session_state["inc_data"], ["Опис", "Сума"])
+            edited_inc_df = st.data_editor(inc_df, column_order=["Опис", "Сума"], num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
             subtotal_inc = sum(get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>", unsafe_allow_html=True)
             
         with col_t2:
             st.subheader("Витрати:")
-            edited_exp_df = st.data_editor(pd.DataFrame(st.session_state["exp_data"]), num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
+            exp_df = prepare_df(st.session_state["exp_data"], ["Опис", "Сума"])
+            edited_exp_df = st.data_editor(exp_df, column_order=["Опис", "Сума"], num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
             subtotal_exp = sum(get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #c62828;'>Загалом: {subtotal_exp} грн</p>", unsafe_allow_html=True)
 
@@ -149,7 +170,9 @@ with tab1:
         col_b1, col_b2 = st.columns(2)
         with col_b1:
             st.subheader("Аванси співробітникам:")
-            edited_adv_df = st.data_editor(pd.DataFrame(st.session_state["adv_data"]), num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
+            # Жорсткий порядок для авансів
+            adv_df = prepare_df(st.session_state["adv_data"], ["Співробітник", "Сума"])
+            edited_adv_df = st.data_editor(adv_df, column_order=["Співробітник", "Сума"], num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
             subtotal_adv = sum(get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
@@ -176,7 +199,7 @@ with tab1:
             cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
             st.markdown(f"## 💵 Разом готівки в касі: {cash_pure} грн")
 
-        # Зберігаємо актуальний стан назад у session_state у вигляді списків (dict)
+        # Оновлення сесії
         st.session_state["inc_data"] = edited_inc_df.to_dict('records')
         st.session_state["exp_data"] = edited_exp_df.to_dict('records')
         st.session_state["adv_data"] = edited_adv_df.to_dict('records')
