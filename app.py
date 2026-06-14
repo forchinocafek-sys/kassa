@@ -145,4 +145,68 @@ with tab1:
 
         # Купюры строго построчно друг за другом
         v_20 = cash_row("20", 20)
-        v_50 = cash_
+        v_50 = cash_row("50", 50)
+        v_100 = cash_row("100", 100)
+        v_200 = cash_row("200", 200)
+        v_500 = cash_row("500", 500)
+        v_1000 = cash_row("1000", 1000)
+            
+        cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
+        st.markdown(f"### Загалом в касі: {cash_pure} грн")
+
+    st.divider()
+    
+    calculated_end = start_balance + total_income - total_expense
+    total_actual = cash_pure + total_advances
+    discrepancy = total_actual - calculated_end
+
+    st.subheader("Підсумки зміни")
+    res_c1, res_c2, res_c3 = st.columns(3)
+    res_c1.metric("Розрахунковий залишок на кінець дня", f"{calculated_end} грн")
+    res_c2.metric("Фактичний залишок (Каса + Аванси)", f"{total_actual} грн")
+    
+    if discrepancy == 0: res_c3.success("Каса зійшлася!")
+    elif discrepancy > 0: res_c3.warning(f"Надлишок: +{discrepancy} грн")
+    else: res_c3.error(f"Недостача: {discrepancy} грн")
+
+    if st.button("Зберегти звіт за день", type="primary"):
+        requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
+        requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
+        requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
+        
+        requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={"date": selected_date, "start_balance": str(start_balance), "calculated_end": str(calculated_end), "actual_end": str(total_actual)})
+        if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
+        if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
+        if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
+                
+        st.success(f"Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно збережено!")
+        st.rerun()
+
+# --- Архів ---
+with tab2:
+    st.subheader("🔎 Перегляд історії")
+    search_date_raw = st.date_input("Оберіть дату для перевірки", datetime.today(), key="search", format="DD/MM/YYYY")
+    search_date = search_date_raw.strftime('%Y-%m-%d')
+    
+    url_shift = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{search_date}"
+    shift_res = requests.get(url_shift, headers=headers).json()
+    
+    if shift_res and isinstance(shift_res, list) and len(shift_res) > 0:
+        shift = shift_res[0]
+        st.info(f"**Залишок на початок:** {get_int(shift['start_balance'])} грн | **Розрахунковий кінець:** {get_int(shift['calculated_end'])} грн | **Фактичний залишок (Каса+Аванси):** {get_int(shift['actual_end'])} грн")
+        
+        ac1, ac2, ac3 = st.columns(3)
+        with ac1:
+            st.markdown("**Надходження:**")
+            inc_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.income", headers=headers).json()
+            for item in inc_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {get_int(item['amount'])} грн")
+        with ac2:
+            st.markdown("**Витрати:**")
+            exp_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.expense", headers=headers).json()
+            for item in exp_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {get_int(item['amount'])} грн")
+        with ac3:
+            st.markdown("**Аванси:**")
+            adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}", headers=headers).json()
+            for item in adv_res: st.write(f"• {item['employee'] if item['employee'] else 'Без імені'}: {get_int(item['amount'])} грн")
+    else:
+        st.warning("За цей день звітів не знайдено в хмарі.")
