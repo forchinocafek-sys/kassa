@@ -1,7 +1,8 @@
-import streamlit as st
+Import streamlit as st
 from datetime import datetime
 import requests
 import pandas as pd
+import time  # Импортируем для организации UX-паузы
 
 # Настройки облачного веб-доступа к Supabase
 SUPABASE_URL = "https://ajkprfhuypcamnybqusr.supabase.co"
@@ -49,46 +50,31 @@ def get_previous_advances(date_str):
         pass
     return []
 
-# Функция-callback: срабатывает при изменении даты и гарантирует чистоту данных
+# Функция-callback: теперь только сигнализирует системе, что дата изменилась
 def on_date_change():
-    new_date = st.session_state["form_date"].strftime('%Y-%m-%d')
-    st.session_state["inc_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
-    st.session_state["exp_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
-    
-    prev_adv = get_previous_advances(new_date)
-    if prev_adv:
-        st.session_state["adv_df"] = pd.DataFrame(prev_adv)
-    else:
-        st.session_state["adv_df"] = pd.DataFrame([{"Співробітник": "", "Сума": 0}])
+    st.session_state["current_loaded_date"] = st.session_state["form_date"].strftime('%Y-%m-%d')
+    # Сбрасываем старые таблицы, чтобы вынудить систему переинициализировать их для новой даты
+    if "inc_df" in st.session_state: del st.session_state["inc_df"]
+    if "exp_df" in st.session_state: del st.session_state["exp_df"]
+    if "adv_df" in st.session_state: del st.session_state["adv_df"]
 
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Реактивна версія 4.1 (Стабільна)")
+st.caption("🌐 Хмарна синхронізація | Реактивна версія 4.2 (Фінальний Еталон)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
 with tab1:
-    # 1. Определение текущей даты до инициализации таблиц (Защита от асинхронного сбоя)
+    # 1. Контроль выбранной даты
     if "form_date" in st.session_state:
         selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
     else:
         selected_date = datetime.today().strftime('%Y-%m-%d')
+        st.session_state["current_loaded_date"] = selected_date
 
-    # Первичная базовая инициализация структур данных
-    if "inc_df" not in st.session_state:
-        st.session_state["inc_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
-    if "exp_df" not in st.session_state:
-        st.session_state["exp_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
-    if "adv_df" not in st.session_state:
-        prev_adv = get_previous_advances(selected_date)
-        if prev_adv:
-            st.session_state["adv_df"] = pd.DataFrame(prev_adv)
-        else:
-            st.session_state["adv_df"] = pd.DataFrame([{"Співробітник": "", "Сума": 0}])
-
-    # 2. Выбор даты и автоматический расчет остатка
+    # 2. Инпут даты (Связан с callback-ом)
     col1, col2 = st.columns(2)
     with col1:
         selected_date_raw = st.date_input("Дата", datetime.today(), format="DD/MM/YYYY", key="form_date", on_change=on_date_change)
@@ -99,9 +85,23 @@ with tab1:
         start_balance = get_int(start_balance_raw)
 
     st.divider()
+
+    # 3. Централизованная инициализация таблиц (СТРОГО после фиксации selected_date)
+    if "inc_df" not in st.session_state:
+        st.session_state["inc_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
+    if "exp_df" not in st.session_state:
+        st.session_state["exp_df"] = pd.DataFrame([{"Опис": "", "Сума": 0}])
+    if "adv_df" not in st.session_state:
+        # Сетевой запрос выполняется ровно один раз для конкретной даты
+        prev_adv = get_previous_advances(selected_date)
+        if prev_adv:
+            st.session_state["adv_df"] = pd.DataFrame(prev_adv)
+        else:
+            st.session_state["adv_df"] = pd.DataFrame([{"Співробітник": "", "Сума": 0}])
+
     st.markdown("<p style='color: #888888; font-size: 13px;'>💡 <b>Крок 1:</b> Внесіть дані в таблиці. Рядки додаються кнопкою <b>+ Add row</b> внизу кожної таблиці. Дані зберігаються автоматично.</p>", unsafe_allow_html=True)
     
-    # 3. ТАБЛИЦЫ ДВИЖЕНИЯ СРЕДСТВ
+    # ТАБЛИЦЫ РУХУ КОШТІВ
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         st.subheader("Надходження:")
@@ -113,12 +113,12 @@ with tab1:
     st.subheader("Аванси співробітникам:")
     edited_adv_df = st.data_editor(st.session_state["adv_df"], num_rows="dynamic", use_container_width=True, key="adv_editor")
 
-    # Синхронизация изменений
+    # Синхронизация состояния таблиц для защиты от реранов калькулятора купюр
     st.session_state["inc_df"] = edited_inc_df
     st.session_state["exp_df"] = edited_exp_df
     st.session_state["adv_df"] = edited_adv_df
 
-    # Парсинг для расчетов
+    # Парсинг строк
     inc_rows = []
     for _, row in edited_inc_df.iterrows():
         amt = get_int(row.get("Сума", 0))
@@ -141,19 +141,17 @@ with tab1:
     total_expense = sum(get_int(item["amount"]) for item in exp_rows)
     total_advances = sum(get_int(item["amount"]) for item in adv_rows)
 
-    # 4. БЛОК РАСЧЕТА НАЛИЧНЫХ (С ДИНАМИЧЕСКИМИ КЛЮЧАМИ ПО ДАТЕ)
+    # 4. КАЛЬКУЛЯТОР КУПЮР (Считает мгновенно в реальном времени)
     st.divider()
-    st.subheader("💰 Крок 2: Розрахунок готівки в касі (Ізольовано для кожної дати)")
+    st.markdown("<p style='color: #0066cc; font-size: 14px; font-weight: bold;'>💰 Крок 2: Розрахунок готівки в касі (Автоматичний перерахунок)</p>", unsafe_allow_html=True)
     
     col_f1, col_f2 = st.columns(2)
     with col_f1:
-        # Ключ привязан к выбранной дате. При смене даты поле обнулится.
         m_coins = get_int(st.text_input("Монети (загальна сума в грн):", value="0", key=f"coins_live_{selected_date}"))
         
         def cash_row_live(label, multiplier):
             rc1, rc2 = st.columns([1, 1])
             with rc1:
-                # Динамический key предотвращает перетекание номиналов купюр между датами
                 qty = get_int(st.text_input(f"{label} грн (кількість купюр):", value="0", key=f"qty_{label}_{selected_date}"))
             with rc2:
                 subtotal = qty * multiplier
@@ -172,7 +170,7 @@ with tab1:
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
         st.markdown(f"## 💵 Разом готівки в касі: {cash_pure} грн")
 
-    # 5. ИТОГИ И БЕЗОПАСНАЯ СИНХРОНИЗАЦИЯ
+    # 5. ИТОГИ И СИНХРОНИЗАЦИЯ С БАЗОЙ
     st.divider()
     calculated_end = start_balance + total_income - total_expense
     total_actual = cash_pure + total_advances
@@ -190,14 +188,14 @@ with tab1:
     save_report = st.button("🚀 ЗБЕРЕГТИ ГОТОВИЙ ЗВІТ В ХМАРУ", type="primary", use_container_width=True)
 
     if save_report:
-        with st.spinner("Синхронізація з Supabase..."):
+        with st.spinner("Очищення старих даних та синхронізація..."):
             try:
-                # Атомарное удаление старых данных строго перед записью новых
+                # Очищаем логи за этот день перед чистой записью
                 requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
                 
-                # Чистая запись
+                # Записываем новые данные
                 res_shift = requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={
                     "date": selected_date, "start_balance": str(start_balance), 
                     "calculated_end": str(calculated_end), "actual_end": str(total_actual)
@@ -208,12 +206,14 @@ with tab1:
                     if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
                     if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
                     
-                    st.success(f"🎉 Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно та безпечно збережено в хмарі!")
+                    # Фикс №2: Показываем плашку успеха и замираем на 1.5 секунды для комфорта кассира
+                    st.success(f"🎉 Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно та безпечно записано в систему!")
+                    time.sleep(1.5)
                     st.rerun()
                 else:
-                    st.error(f"❌ Помилка сервера бази даних: {res_shift.status_code}. Дані не збережено.")
+                    st.error(f"❌ Помилка сервера бази даних: {res_shift.status_code}. Спробуйте ще раз.")
             except Exception as e:
-                st.error(f"💥 Помилка мережі: {e}. Перевірте з'єднання з інтернетом.")
+                st.error(f"💥 Помилка мережі: {e}. Перевірте інтернет-з'єднання.")
 
 # --- Архів ---
 with tab2:
