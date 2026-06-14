@@ -204,27 +204,27 @@ with tab1:
             st.subheader("💰 Розрахунок готівки в касі")
             m_coins = get_int(st.text_input("Монети (загальна сума в грн):", key=f"coins_live_{selected_date}"))
             
-def cash_row_live(label, multiplier):
-                # Задаємо пропорцію 3:2 (полі вводу трохи більше місця, ніж сумі)
-                rc1, rc2 = st.columns([3, 2])
-                with rc1:
-                    # Скорочено до (шт), щоб текст гарантовано не переносився на мобільних
-                    qty = get_int(st.text_input(f"{label} грн (шт):", key=f"qty_{label}_{selected_date}"))
-                with rc2:
-                    subtotal = qty * multiplier
-                    # Клас 'cash-sum' слугує маркером для нашого CSS, а padding вирівнює текст по центру інпуту
-                    st.markdown(f"<div class='cash-sum' style='padding-bottom: 6px; font-weight: bold; color: #0066cc; font-size: 16px; white-space: nowrap;'>= {subtotal} грн</div>", unsafe_allow_html=True)
-                return qty, subtotal
-
-            q_20, v_20 = cash_row_live("20", 20)
-            q_50, v_50 = cash_row_live("50", 50)
-            q_100, v_100 = cash_row_live("100", 100)
-            q_200, v_200 = cash_row_live("200", 200)
-            q_500, v_500 = cash_row_live("500", 500)
-            q_1000, v_1000 = cash_row_live("1000", 1000)
-            
-            cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
-            st.markdown(f"## 💵 Разом готівки в касі: {cash_pure} грн")
+        def cash_row_live(label, multiplier):
+                        # Задаємо пропорцію 3:2 (полі вводу трохи більше місця, ніж сумі)
+                        rc1, rc2 = st.columns([3, 2])
+                        with rc1:
+                            # Скорочено до (шт), щоб текст гарантовано не переносився на мобільних
+                            qty = get_int(st.text_input(f"{label} грн (шт):", key=f"qty_{label}_{selected_date}"))
+                        with rc2:
+                            subtotal = qty * multiplier
+                            # Клас 'cash-sum' слугує маркером для нашого CSS, а padding вирівнює текст по центру інпуту
+                            st.markdown(f"<div class='cash-sum' style='padding-bottom: 6px; font-weight: bold; color: #0066cc; font-size: 16px; white-space: nowrap;'>= {subtotal} грн</div>", unsafe_allow_html=True)
+                        return qty, subtotal
+        
+                    q_20, v_20 = cash_row_live("20", 20)
+                    q_50, v_50 = cash_row_live("50", 50)
+                    q_100, v_100 = cash_row_live("100", 100)
+                    q_200, v_200 = cash_row_live("200", 200)
+                    q_500, v_500 = cash_row_live("500", 500)
+                    q_1000, v_1000 = cash_row_live("1000", 1000)
+                    
+                    cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
+                    st.markdown(f"## 💵 Разом готівки в касі: {cash_pure} грн")
 
         # Оновлення сесії
         st.session_state["inc_data"] = edited_inc_df.to_dict('records')
