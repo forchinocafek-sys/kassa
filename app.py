@@ -206,7 +206,7 @@ with tab1:
             
     def cash_row_live(label, multiplier):
     # Задаємо пропорцію 3:2 (полі вводу трохи більше місця, ніж сумі)
-    rc1, rc2 = st.columns([3, 2])
+        rc1, rc2 = st.columns([3, 2])
     with rc1:
         # Скорочено до (шт), щоб текст гарантовано не переносився на мобільних
         qty = get_int(st.text_input(f"{label} грн (шт):", key=f"qty_{label}_{selected_date}"))
