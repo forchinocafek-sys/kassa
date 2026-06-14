@@ -124,7 +124,31 @@ if st.session_state.get("current_loaded_date") != selected_date:
 
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
-
+# --- Фіксація відображення в один рядок для мобільних (вставляти після set_page_config) ---
+st.markdown("""
+<style>
+    /* Забороняємо колонкам каси складатися вертикально на телефонах */
+    div[data-testid="stHorizontalBlock"]:has(.cash-sum) {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: flex-end !important; /* Вирівнюємо суму по нижній лінії поля вводу */
+        gap: 10px !important;
+    }
+    
+    /* Суворі пропорції для телефонів: 60% ширини на поле, 40% на суму */
+    @media (max-width: 768px) {
+        div[data-testid="stHorizontalBlock"]:has(.cash-sum) > div[data-testid="column"] {
+            min-width: 0 !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.cash-sum) > div[data-testid="column"]:nth-child(1) {
+            flex: 3 1 0% !important;
+        }
+        div[data-testid="stHorizontalBlock"]:has(.cash-sum) > div[data-testid="column"]:nth-child(2) {
+            flex: 2 1 0% !important;
+        }
+    }
+</style>
+""", unsafe_allow_html=True)
 st.title("Cafe Forchino")
 st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.5 (Фікс колонок та відновлення даних)")
 
@@ -180,13 +204,16 @@ with tab1:
             st.subheader("💰 Розрахунок готівки в касі")
             m_coins = get_int(st.text_input("Монети (загальна сума в грн):", key=f"coins_live_{selected_date}"))
             
-            def cash_row_live(label, multiplier):
-                rc1, rc2 = st.columns([1, 1])
+def cash_row_live(label, multiplier):
+                # Задаємо пропорцію 3:2 (полі вводу трохи більше місця, ніж сумі)
+                rc1, rc2 = st.columns([3, 2])
                 with rc1:
-                    qty = get_int(st.text_input(f"{label} грн (кількість купюр):", key=f"qty_{label}_{selected_date}"))
+                    # Скорочено до (шт), щоб текст гарантовано не переносився на мобільних
+                    qty = get_int(st.text_input(f"{label} грн (шт):", key=f"qty_{label}_{selected_date}"))
                 with rc2:
                     subtotal = qty * multiplier
-                    st.markdown(f"<div style='padding-top: 32px; font-weight: bold; color: #0066cc;'>= {subtotal} грн</div>", unsafe_allow_html=True)
+                    # Клас 'cash-sum' слугує маркером для нашого CSS, а padding вирівнює текст по центру інпуту
+                    st.markdown(f"<div class='cash-sum' style='padding-bottom: 6px; font-weight: bold; color: #0066cc; font-size: 16px; white-space: nowrap;'>= {subtotal} грн</div>", unsafe_allow_html=True)
                 return qty, subtotal
 
             q_20, v_20 = cash_row_live("20", 20)
