@@ -1,53 +1,35 @@
 import streamlit as st
-import psycopg2
 from datetime import datetime
+import requests
 
-# Наша секретная облачная база
-OBLACHNAYA_BAZA = "postgresql://postgres.ajkprfhuypcamnybqusr:cafe_Forchino@aws-1-eu-central-1.pooler.supabase.com:6543/postgres"
+# Настройки облачного веб-доступа к Supabase
+SUPABASE_URL = "https://ajkprfhuypcamnybqusr.supabase.co"
+SUPABASE_KEY = "sb_publishable_JMxxH6oo3cwsjS09gDe91A_uHL5C90E"
 
-def get_db_connection():
-    return psycopg2.connect(OBLACHNAYA_BAZA)
-
-def init_db():
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute('''CREATE TABLE IF NOT EXISTS shifts (
-                    date TEXT PRIMARY KEY, start_balance TEXT, calculated_end TEXT, actual_end TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS transactions (
-                    id SERIAL PRIMARY KEY, date TEXT, type TEXT, description TEXT, amount TEXT)''')
-    c.execute('''CREATE TABLE IF NOT EXISTS advances (
-                    id SERIAL PRIMARY KEY, date TEXT, employee TEXT, amount TEXT)''')
-    conn.commit()
-    conn.close()
-
-try:
-    init_db()
-except Exception:
-    pass
+headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "application/json",
+    "Prefer": "return=minimal"
+}
 
 def get_start_balance(date_str):
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT actual_end FROM shifts WHERE date < %s ORDER BY date DESC LIMIT 1", (date_str,))
-        res = c.fetchone()
-        conn.close()
-        return float(res[0]) if res else 0.0
+        url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
+        res = requests.get(url, headers=headers).json()
+        return float(res[0]['actual_end']) if res else 0.0
     except Exception:
         return 0.0
 
 def get_previous_advances(date_str):
     try:
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("SELECT date FROM shifts WHERE date < %s ORDER BY date DESC LIMIT 1", (date_str,))
-        last_date = c.fetchone()
-        if last_date:
-            c.execute("SELECT employee, amount FROM advances WHERE date = %s", (last_date[0],))
-            advances = c.fetchall()
-            conn.close()
-            return [(emp, float(amt)) for emp, amt in advances]
-        conn.close()
+        url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
+        res = requests.get(url, headers=headers).json()
+        if res:
+            last_date = res[0]['date']
+            url_adv = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{last_date}"
+            res_adv = requests.get(url_adv, headers=headers).json()
+            return [(item['employee'], float(item['amount'])) for item in res_adv]
     except Exception:
         pass
     return []
@@ -55,6 +37,7 @@ def get_previous_advances(date_str):
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
 st.title("Cafe Forchino")
+st.caption("🌐 Хмарна синхронізація (Всі пристрої)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
@@ -70,39 +53,31 @@ with tab1:
 
     with col_inc:
         st.subheader("Надходження:")
-        if "inc_count" not in st.session_state:
-            st.session_state.inc_count = 1
-            
+        if "inc_count" not in st.session_state: st.session_state.inc_count = 1
         inc_rows = []
         for i in range(st.session_state.inc_count):
             c1, c2 = st.columns([3, 1])
             with c1: desc = st.text_input("Опис приходу", key=f"inc_desc_{i}", label_visibility="collapsed", placeholder="Опис надходження")
             with c2: amt = st.number_input("Сума приходу", min_value=0.0, step=50.0, key=f"inc_amt_{i}", label_visibility="collapsed")
             if amt > 0 or desc: inc_rows.append((desc, amt))
-                
         if st.button("➕ Додати рядок надходження"):
             st.session_state.inc_count += 1
             st.rerun()
-            
         total_income = sum(item[1] for item in inc_rows)
         st.markdown(f"### Загалом прихід: {total_income} грн")
 
     with col_exp:
         st.subheader("Витрати:")
-        if "exp_count" not in st.session_state:
-            st.session_state.exp_count = 1
-            
+        if "exp_count" not in st.session_state: st.session_state.exp_count = 1
         exp_rows = []
         for i in range(st.session_state.exp_count):
             c1, c2 = st.columns([3, 1])
             with c1: desc = st.text_input("Опис витрати", key=f"exp_desc_{i}", label_visibility="collapsed", placeholder="Опис витрати")
             with c2: amt = st.number_input("Сума витрати", min_value=0.0, step=50.0, key=f"exp_amt_{i}", label_visibility="collapsed")
             if amt > 0 or desc: exp_rows.append((desc, amt))
-                
         if st.button("➕ Додати рядок витрати"):
             st.session_state.exp_count += 1
             st.rerun()
-            
         total_expense = sum(item[1] for item in exp_rows)
         st.markdown(f"### Загалом витрати: {total_expense} грн")
 
@@ -125,11 +100,9 @@ with tab1:
             with c1: emp = st.text_input("Співробітник", key=f"emp_{i}", label_visibility="collapsed", placeholder="Ім'я співробітника")
             with c2: amt = st.number_input("Сума авансу", min_value=0.0, step=50.0, key=f"adv_amt_{i}", label_visibility="collapsed")
             if amt > 0 or emp: adv_rows.append((emp, amt))
-                
         if st.button("➕ Додати рядок авансу"):
             st.session_state.adv_count += 1
             st.rerun()
-            
         total_advances = sum(item[1] for item in adv_rows)
         st.markdown(f"### Загалом авансів: {total_advances} грн")
 
@@ -165,24 +138,16 @@ with tab1:
     else: res_c3.error(f"Недостача: {discrepancy} грн")
 
     if st.button("Зберегти звіт за день", type="primary"):
-        conn = get_db_connection()
-        c = conn.cursor()
-        c.execute("DELETE FROM shifts WHERE date = %s", (selected_date,))
-        c.execute("DELETE FROM transactions WHERE date = %s", (selected_date,))
-        c.execute("DELETE FROM advances WHERE date = %s", (selected_date,))
+        requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
+        requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
+        requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
         
-        c.execute("INSERT INTO shifts VALUES (%s, %s, %s, %s)", (selected_date, str(start_balance), str(calculated_end), str(total_actual)))
-        
-        for desc, amt in inc_rows: 
-            if desc or amt > 0: c.execute("INSERT INTO transactions (date, type, description, amount) VALUES (%s, 'income', %s, %s)", (selected_date, desc, str(amt)))
-        for desc, amt in exp_rows: 
-            if desc or amt > 0: c.execute("INSERT INTO transactions (date, type, description, amount) VALUES (%s, 'expense', %s, %s)", (selected_date, desc, str(amt)))
-        for emp, amt in adv_rows: 
-            if emp or amt > 0: c.execute("INSERT INTO advances (date, employee, amount) VALUES (%s, %s, %s)", (selected_date, emp, str(amt)))
+        requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={"date": selected_date, "start_balance": str(start_balance), "calculated_end": str(calculated_end), "actual_end": str(total_actual)})
+        for desc, amt in inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json={"date": selected_date, "type": "income", "description": desc, "amount": str(amt)})
+        for desc, amt in exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json={"date": selected_date, "type": "expense", "description": desc, "amount": str(amt)})
+        for emp, amt in adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json={"date": selected_date, "employee": emp, "amount": str(amt)})
                 
-        conn.commit()
-        conn.close()
-        st.success(f"Звіт за {selected_date} успішно збережено в Облако!")
+        st.success(f"Звіт за {selected_date} успішно збережено в Хмару!")
         st.rerun()
 
 # --- Архів ---
@@ -190,29 +155,25 @@ with tab2:
     st.subheader("🔎 Перегляд історії")
     search_date = st.date_input("Оберіть дату для перевірки", datetime.today(), key="search").strftime('%Y-%m-%d')
     
-    conn = get_db_connection()
-    c = conn.cursor()
-    c.execute("SELECT * FROM shifts WHERE date = %s", (search_date,))
-    shift = c.fetchone()
+    url_shift = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{search_date}"
+    shift_res = requests.get(url_shift, headers=headers).json()
     
-    if shift:
-        st.info(f"**Залишок на початок:** {float(shift[1])} rрн | **Розрахунковий кінець:** {float(shift[2])} грн | **Фактичний залишок (Каса+Аванси):** {float(shift[3])} грн")
+    if shift_res and isinstance(shift_res, list) and len(shift_res) > 0:
+        shift = shift_res[0]
+        st.info(f"**Залишок на початок:** {float(shift['start_balance'])} грн | **Розрахунковий кінець:** {float(shift['calculated_end'])} грн | **Фактичний залишок (Каса+Аванси):** {float(shift['actual_end'])} грн")
         
         ac1, ac2, ac3 = st.columns(3)
         with ac1:
             st.markdown("**Надходження:**")
-            c.execute("SELECT description, amount FROM transactions WHERE date = %s AND type = 'income'", (search_date,))
-            for d, a in c.fetchall(): st.write(f"• {d if d else 'Без опису'}: {float(a)} грн")
-                
+            inc_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.income", headers=headers).json()
+            for item in inc_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {float(item['amount'])} грн")
         with ac2:
             st.markdown("**Витрати:**")
-            c.execute("SELECT description, amount FROM transactions WHERE date = %s AND type = 'expense'", (search_date,))
-            for d, a in c.fetchall(): st.write(f"• {d if d else 'Без опису'}: {float(a)} грн")
-                
+            exp_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.expense", headers=headers).json()
+            for item in exp_res: st.write(f"• {item['description'] if item['description'] else 'Без опису'}: {float(item['amount'])} грн")
         with ac3:
             st.markdown("**Аванси:**")
-            c.execute("SELECT employee, amount FROM advances WHERE date = %s", (search_date,))
-            for e, a in c.fetchall(): st.write(f"• {e if e else 'Без імені'}: {float(a)} грн")
+            adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}", headers=headers).json()
+            for item in adv_res: st.write(f"• {item['employee'] if item['employee'] else 'Без імені'}: {float(item['amount'])} грн")
     else:
-        st.warning("За цей день звітів не знайдено в облаку.")
-    conn.close()
+        st.warning("За цей день звітів не знайдено в хмарі.")
