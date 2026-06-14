@@ -126,48 +126,36 @@ with tab1:
         total_advances = sum(get_int(item["amount"]) for item in adv_rows)
         st.markdown(f"### Загалом авансів: {total_advances} грн")
 
-    # --- ФАКТИЧНИЙ ЗАЛИШОК (ГАРАНТОВАНА СТРОКА НА ТЕЛЕФОНАХ) ---
+    # --- ФАКТИЧНИЙ ЗАЛИШОК (КОМПАКТНЫЙ ВВОД В ОДНУ ЛИНИЮ) ---
     with col_fact:
         st.subheader("Фактичний залишок:")
         
-        # Инпут монет
-        mc1, mc2 = st.columns([1, 3])
+        # Монеты в одну строку
+        mc1, mc2 = st.columns([2, 6])
         with mc1:
             st.markdown("<div style='padding-top: 5px; font-weight: bold;'>Монети:</div>", unsafe_allow_html=True)
         with mc2:
             m_coins = get_int(st.text_input("Сума монет", value="0", label_visibility="collapsed", key="coins_input"))
-            
-        st.write("") 
 
-        # Жесткая верстка таблицы, которая никогда не перенесет элементы на новую строку
-        def cash_row_fixed(label, multiplier):
-            # Создаем стандартный скрытый инпут, чтобы Streamlit зафиксировал значение
-            qty_val = st.text_input(f"скрытый_{label}", value="0", label_visibility="collapsed", key=f"cash_qty_{label}")
-            qty = get_int(qty_val)
-            subtotal = qty * multiplier
-            
-            # Рендерим красивую и компактную строку таблицы
-            st.markdown(
-                f"""
-                <table style='width:100%; border:none; margin-bottom:-10px; background:transparent;'>
-                    <tr style='border:none; background:transparent;'>
-                        <td style='width:25%; border:none; font-weight:bold; vertical-align:middle; padding:5px 0;'>{label} грн</td>
-                        <td style='width:40%; border:none; vertical-align:middle; padding:5px 0; color:#888;'>штук: {qty}</td>
-                        <td style='width:35%; border:none; font-weight:500; text-align:right; vertical-align:middle; padding:5px 0;'>= {subtotal} грн</td>
-                    </tr>
-                </table>
-                """, 
-                unsafe_allow_html=True
-            )
+        # Функция построчного вывода: Номинал | Инпут к-ва | Автосумма
+        def cash_row_safe(label, multiplier):
+            rc1, rc2, rc3 = st.columns([2, 3, 3])
+            with rc1:
+                st.markdown(f"<div style='padding-top: 5px; font-weight: bold;'>{label} грн</div>", unsafe_allow_html=True)
+            with rc2:
+                qty = get_int(st.text_input("К-сть", value="0", key=f"cash_qty_{label}", label_visibility="collapsed", placeholder="0"))
+            with rc3:
+                subtotal = qty * multiplier
+                st.markdown(f"<div style='padding-top: 5px; font-weight: 500;'>= {subtotal} грн</div>", unsafe_allow_html=True)
             return subtotal
 
-        # Вывод номиналов
-        v_20 = cash_row_fixed("20", 20)
-        v_50 = cash_row_fixed("50", 50)
-        v_100 = cash_row_fixed("100", 100)
-        v_200 = cash_row_fixed("200", 200)
-        v_500 = cash_row_fixed("500", 500)
-        v_1000 = cash_row_fixed("1000", 1000)
+        # Номиналы строго в ряд
+        v_20 = cash_row_safe("20", 20)
+        v_50 = cash_row_safe("50", 50)
+        v_100 = cash_row_safe("100", 100)
+        v_200 = cash_row_safe("200", 200)
+        v_500 = cash_row_safe("500", 500)
+        v_1000 = cash_row_safe("1000", 1000)
             
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
         st.divider()
