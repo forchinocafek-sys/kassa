@@ -51,7 +51,7 @@ def get_previous_advances(date_str):
         pass
     return []
 
-# --- Инициализация данных и加载 черновиков ---
+# --- Инициализация данных и загрузка черновиков ---
 def load_draft_or_init(date_str):
     coins_key = f"coins_live_{date_str}"
     keys_cash = [coins_key] + [f"qty_{k}_{date_str}" for k in [20, 50, 100, 200, 500, 1000]]
@@ -84,11 +84,26 @@ def on_date_change():
     st.session_state["current_loaded_date"] = new_date
     load_draft_or_init(new_date)
 
+
+# ==============================================================================
+# 🔥 КРИТИЧЕСКИЙ БЛОК: Инициализация жизненного цикла данных ДО рендеринга интерфейса
+# ==============================================================================
+if "form_date" in st.session_state:
+    selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
+else:
+    selected_date = datetime.today().strftime('%Y-%m-%d')
+
+if st.session_state.get("current_loaded_date") != selected_date:
+    load_draft_or_init(selected_date)
+    st.session_state["current_loaded_date"] = selected_date
+# ==============================================================================
+
+
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.1 (Автозбереження та безпека)")
+st.caption("🌐 Хмарна синхронізація | Реактивна версія 5.2 (Стабільна безпека)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
@@ -97,15 +112,6 @@ with tab1:
     passwd_edit = st.text_input("🔑 Введіть пароль для редагування змін:", type="password", key="pwd_edit")
     
     if passwd_edit == "2000":
-        if "form_date" in st.session_state:
-            selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
-        else:
-            selected_date = datetime.today().strftime('%Y-%m-%d')
-
-        if st.session_state.get("current_loaded_date") != selected_date:
-            load_draft_or_init(selected_date)
-            st.session_state["current_loaded_date"] = selected_date
-
         col1, col2 = st.columns(2)
         with col1:
             selected_date_raw = st.date_input("Дата", datetime.today(), format="DD/MM/YYYY", key="form_date", on_change=on_date_change)
