@@ -126,32 +126,44 @@ with tab1:
         total_advances = sum(get_int(item["amount"]) for item in adv_rows)
         st.markdown(f"### Загалом авансів: {total_advances} грн")
 
-    # --- ФАКТИЧНИЙ ЗАЛИШОК (ПОСТРОЧНЫЙ ВВОД С АВТОСУММОЙ) ---
+    # --- ФАКТИЧНИЙ ЗАЛИШОК (СТРОГО В ОДНУ СТРОКУ) ---
     with col_fact:
         st.subheader("Фактичний залишок:")
         
-        # Монеты в 1 строку
-        m_coins = get_int(st.text_input("Монети (загальна сума):", value="0"))
-        
-        # Вспомогательная функция для генерации аккуратной строки купюры
-        def cash_row(label, multiplier):
-            rc1, rc2 = st.columns([2, 1])
+        # Монеты (компактная строка)
+        mc1, mc2 = st.columns([1, 4])
+        with mc1:
+            st.markdown("<div style='padding-top: 5px; font-weight: bold;'>Монети:</div>", unsafe_allow_html=True)
+        with mc2:
+            m_coins = get_int(st.text_input("Сума монет", value="0", label_visibility="collapsed", key="coins_input"))
+            
+        st.write("") # Небольшой отступ
+
+        # Функция для железного удержания Номинала, К-ва и Суммы в одну линию
+        def cash_row_single_line(label, multiplier):
+            rc1, rc2, rc3 = st.columns([1, 2, 2])
             with rc1:
-                qty = get_int(st.text_input(f"{label} грн (кількість):", value="0", key=f"cash_qty_{label}"))
+                # Текст номинала слева
+                st.markdown(f"<div style='padding-top: 5px; font-weight: bold;'>{label} грн</div>", unsafe_allow_html=True)
             with rc2:
+                # Чистое поле ввода штук по центру
+                qty = get_int(st.text_input("К-сть", value="0", key=f"cash_qty_{label}", label_visibility="collapsed", placeholder="0"))
+            with rc3:
+                # Авто-сумма справа
                 subtotal = qty * multiplier
-                st.markdown(f"<div style='padding-top: 28px; font-weight: 500;'>= {subtotal} грн</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='padding-top: 5px; font-weight: 500; color: #474747;'>= {subtotal} грн</div>", unsafe_allow_html=True)
             return subtotal
 
-        # Купюры строго построчно друг за другом
-        v_20 = cash_row("20", 20)
-        v_50 = cash_row("50", 50)
-        v_100 = cash_row("100", 100)
-        v_200 = cash_row("200", 200)
-        v_500 = cash_row("500", 500)
-        v_1000 = cash_row("1000", 1000)
+        # Генерация строк
+        v_20 = cash_row_single_line("20", 20)
+        v_50 = cash_row_single_line("50", 50)
+        v_100 = cash_row_single_line("100", 100)
+        v_200 = cash_row_single_line("200", 200)
+        v_500 = cash_row_single_line("500", 500)
+        v_1000 = cash_row_single_line("1000", 1000)
             
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
+        st.divider()
         st.markdown(f"### Загалом в касі: {cash_pure} грн")
 
     st.divider()
