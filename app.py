@@ -142,7 +142,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Реактивна версія 6.2 (Пам'ять сесії)")
+st.caption("🌐 Хмарна синхронізація | Stable 1.1.0")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
