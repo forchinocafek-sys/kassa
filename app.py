@@ -3,7 +3,7 @@ import psycopg2
 from datetime import datetime
 
 # Наша секретная облачная база
-OBLACHNAYA_BAZA = "postgresql://postgres.ajkprfhuypcamnybqusr:cafe_Forchino@aws-1-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true"
+OBLACHNAYA_BAZA = "postgresql://postgres.ajkprfhuypcamnybqusr:cafe_Forchino@aws-1-eu-central-1.pooler.supabase.com:6543/postgres"
 
 def get_db_connection():
     return psycopg2.connect(OBLACHNAYA_BAZA)
