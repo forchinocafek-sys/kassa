@@ -153,7 +153,7 @@ with tab1:
         st.session_state["edit_ok"] = True
 
     if not st.session_state.get("edit_ok", False):
-        st.info("🔒 Введите пароль для доступа к вводу данных.")
+        st.info("🔒 Будь ласка, введіть пароль для доступу до форми введення даних.")
         passwd_edit = st.text_input("🔑 Пароль:", type="password", key="pwd_edit")
         if st.button("Увійти", key="btn_login_edit"):
             if passwd_edit == "2000":
@@ -161,15 +161,8 @@ with tab1:
                 st.query_params["edit_auth"] = "1"
                 st.rerun()
             elif passwd_edit != "":
-                st.error("❌ Невірний пароль!")
-    
-    # Показываем контент ТОЛЬКО если авторизованы
-    if st.session_state.get("edit_ok", False):
-        c_lock, _ = st.columns([1, 5])
-        if c_lock.button("🔒 Заблокувати касу"):
-            st.session_state["edit_ok"] = False
-            if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
-            st.stop()
+                st.error("❌ Невірний пароль для редагування!")
+        st.stop() 
 
     c_lock, _ = st.columns([1, 5])
     if c_lock.button("🔒 Заблокувати касу"):
@@ -335,24 +328,25 @@ with tab2:
         st.session_state["archive_ok"] = True
 
     if not st.session_state.get("archive_ok", False):
-        passwd_archive = st.text_input("🔑 Пароль архива:", type="password", key="pwd_archive")
+        st.info("🔒 Будь ласка, введіть пароль для доступу до перегляду історії.")
+        passwd_archive = st.text_input("🔑 Пароль:", type="password", key="pwd_archive")
         if st.button("Доступ до архіву", key="btn_login_arch"):
             if passwd_archive == "2025":
                 st.session_state["archive_ok"] = True
                 st.query_params["archive_auth"] = "1"
                 st.rerun()
             elif passwd_archive != "":
-                st.error("❌ Невірний пароль!")
-        # Здесь мы НЕ делаем st.stop(), поэтому код ниже просто пропустит рендер архива
-    
-    # Показываем архив ТОЛЬКО если авторизованы
-    if st.session_state.get("archive_ok", False):
-        if st.button("🔒 Закрити архів", key="btn_close_arch"):
-            st.session_state["archive_ok"] = False
-            if "archive_auth" in st.query_params: del st.query_params["archive_auth"]
-            st.stop()
+                st.error("❌ Невірний пароль для доступу до архіву!")
+        st.stop()
+
+    c_lock_arch, _ = st.columns([1, 5])
+    if c_lock_arch.button("🔒 Закрити архів"):
+        st.session_state["archive_ok"] = False
+        if "archive_auth" in st.query_params:
+            del st.query_params["archive_auth"]
+        st.rerun()
         
-        st.subheader("🔎 Перегляд історії")
+    st.subheader("🔎 Перегляд історії")
     search_date_raw = st.date_input("Оберіть дату для перевірки", datetime.today(), key="search", format="DD/MM/YYYY")
     search_date = search_date_raw.strftime('%Y-%m-%d')
     
