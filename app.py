@@ -100,12 +100,9 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* -------------------------------------------------------------
-       МАГІЯ ПЛАВАЮЧОЇ КНОПКИ (ДИНАМІЧНА ФІКСАЦІЯ)
-       ------------------------------------------------------------- */
+    /* Магія динамічної фіксації плаваючої кнопки */
     #floating-anchor { display: none; }
     
-    /* Шукаємо контейнер з кнопкою, що йде ОДРАЗУ за нашим якорем */
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
     .element-container:has(#floating-anchor) + .element-container {
         position: fixed !important;
@@ -115,7 +112,6 @@ st.markdown("""
         width: 65px !important;
     }
     
-    /* Стилізуємо саму кнопку */
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button,
     .element-container:has(#floating-anchor) + .element-container button {
         width: 65px !important;
@@ -130,7 +126,6 @@ st.markdown("""
         justify-content: center !important;
     }
     
-    /* Розмір дискети */
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
     .element-container:has(#floating-anchor) + .element-container button p {
         font-size: 32px !important;
@@ -143,18 +138,17 @@ st.markdown("""
 st.title("Cafe Forchino")
 
 # Спливаюче вікно з історією версій
-with st.popover("🚀 Версія: Stable 1.8 (Що нового?)"):
+with st.popover("🚀 Версія: Stable 1.9 (Що нового?)"):
     st.markdown("""
+    **Оновлення 1.9:**
+    - 🗑 Видалено поле вибору адміністратора для уникнення помилок сумісності бази даних.
+    - ⚡️ Спрощено фінальний звіт — збереження працює миттєво.
+    
     **Оновлення 1.8:**
-    - 🛠 Виправлено критичний баг Streamlit `reading 'sticky'` при збереженні звіту.
+    - 🛠 Виправлено критичний баг Streamlit `reading 'sticky'` при збереженні таблиць.
     
     **Оновлення 1.7:**
-    - 💾 Кнопка збереження тепер справді плаваюча (закріплена внизу праворуч).
-    
-    **Оновлення 1.6:**
-    - 👤 Швидкий вибір адміністратора.
-    - 🗓 Навігація по датах стрілочками.
-    - 📜 Спливаюче вікно історії змін.
+    - 💾 Кнопка збереження чернетки зафіксована внизу праворуч і рухається за скролом.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -197,7 +191,7 @@ with tab1:
             if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
             st.rerun()
 
-        # Навігація по датах та Адмін
+        # Навігація по датах (тільки символи)
         nav1, nav2, nav3 = st.columns([1, 2, 1])
         if nav1.button("⬅️", use_container_width=True): 
             st.session_state["form_date"] -= timedelta(days=1)
@@ -210,12 +204,9 @@ with tab1:
         
         selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
         
-        col_adm, col_start = st.columns(2)
-        with col_adm:
-            admin_selected = st.selectbox("Адміністратор:", ["Богдан", "Вероніка"], key=f"admin_{selected_date}")
-        with col_start:
-            db_start = get_start_balance(selected_date)
-            start_balance = get_int(st.text_input("Залишок на початок:", value=str(db_start), key=f"start_balance_{selected_date}"))
+        # Поле залишку на початок
+        db_start = get_start_balance(selected_date)
+        start_balance = get_int(st.text_input("Залишок на початок дня:", value=str(db_start), key=f"start_balance_{selected_date}"))
 
         st.divider()
         
@@ -223,7 +214,6 @@ with tab1:
         with col_t1:
             st.subheader("Надходження:")
             inc_df = prepare_df(st.session_state["inc_data"], ["Опис", "Сума"])
-            # Прибрали column_order для уникнення багу 'sticky'
             edited_inc_df = st.data_editor(inc_df, num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
             subtotal_inc = sum(get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>", unsafe_allow_html=True)
@@ -231,7 +221,6 @@ with tab1:
         with col_t2:
             st.subheader("Витрати:")
             exp_df = prepare_df(st.session_state["exp_data"], ["Опис", "Сума"])
-            # Прибрали column_order
             edited_exp_df = st.data_editor(exp_df, num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
             subtotal_exp = sum(get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {subtotal_exp} грн</p>", unsafe_allow_html=True)
@@ -242,7 +231,6 @@ with tab1:
         with col_b1:
             st.subheader("Аванси:")
             adv_df = prepare_df(st.session_state["adv_data"], ["Співробітник", "Сума"])
-            # Прибрали column_order
             edited_adv_df = st.data_editor(adv_df, num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
             subtotal_adv = sum(get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
@@ -286,8 +274,7 @@ with tab1:
 
         st.write("") 
         
-        # --- ДИНАМІЧНА ПЛАВАЮЧА КНОПКА (ЯКІР + КНОПКА) ---
-        # Схований якір, за яким CSS знайде наступну кнопку
+        # --- ДИНАМІЧНА ПЛАВАЮЧА КНОПКА ЗБЕРЕЖЕННЯ ---
         st.markdown('<div id="floating-anchor"></div>', unsafe_allow_html=True)
         if st.button("💾", key="fab_save"):
             payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
@@ -295,14 +282,22 @@ with tab1:
             requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
             st.toast("✅ Чернетку успішно збережено!", icon="💾")
 
-        # Фінальний звіт
+        # Фінальний звіт (без відправки admin)
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
             with st.spinner("Відправка..."):
                 requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
                 
-                res_shift = requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={"date": selected_date, "start_balance": str(start_balance), "calculated_end": str(calculated_end), "actual_end": str(total_actual), "admin": admin_selected})
+                # Тільки перевірені базою поля
+                shift_payload = {
+                    "date": selected_date, 
+                    "start_balance": str(start_balance), 
+                    "calculated_end": str(calculated_end), 
+                    "actual_end": str(total_actual)
+                }
+                
+                res_shift = requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json=shift_payload)
                 
                 if res_shift.status_code in [200, 201]:
                     inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_inc_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
@@ -313,9 +308,11 @@ with tab1:
                     if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
                     
                     requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
-                    st.success("🎉 Звіт записано!")
+                    st.success("🎉 Звіт записано в архів!")
                     time.sleep(1.5)
                     st.rerun()
+                else:
+                    st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
 # ==========================================
 # ВКЛАДКА 2: АРХІВ
@@ -350,9 +347,7 @@ with tab2:
         
         if isinstance(shift_res, list) and len(shift_res) > 0:
             shift = shift_res[0]
-            admin_history = shift.get("admin", "Не вказано")
             
-            st.markdown(f"<h4 style='color: #666;'>Адміністратор: {admin_history}</h4>", unsafe_allow_html=True)
             st.markdown(f"<h3 style='margin-bottom: 0;'>🌅 Залишок на початок: <span style='color: #0066cc;'>{get_int(shift.get('start_balance'))} грн</span></h3>", unsafe_allow_html=True)
             st.divider()
             
