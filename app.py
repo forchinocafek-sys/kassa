@@ -106,14 +106,19 @@ if st.session_state.get("current_loaded_date") != selected_date:
 # --- Інтерфейс програми ---
 st.set_page_config(layout="wide")
 
-# --- CSS ДЛЯ СТАБІЛЬНОЇ ВЕРСТКИ ---
+# --- CSS ДЛЯ ЖОРСТКОЇ ГОРИЗОНТАЛЬНОЇ ВЕРСТКИ ---
 st.markdown("""
 <style>
-    /* Запрещаем Streamlit переносить колонки внутри Fact-блока */
+    /* Примусово фіксуємо горизонтальну верстку для всіх */
     [data-testid="column"] { flex: 1 !important; }
-    .stHorizontalBlock { flex-direction: row !important; flex-wrap: nowrap !important; }
-    /* Убираем лишние отступы у полей ввода */
-    .stTextInput > div > div { padding-top: 0px !important; padding-bottom: 0px !important; }
+    [data-testid="stHorizontalBlock"] { 
+        display: flex !important; 
+        flex-direction: row !important; 
+        flex-wrap: nowrap !important; 
+    }
+    /* Робимо поле вводу максимально компактним */
+    .stTextInput > div > div { padding: 0px !important; }
+    input { height: 35px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -183,10 +188,14 @@ with tab1:
         st.subheader("💰 | Факт")
         m_coins = get_int(st.text_input("Монети (загальна сума в грн):", key=f"coins_live_{selected_date}"))
         def cash_row_live(label, multiplier):
+            # c1 - номінал, c2 - поле вводу, c3 - сума
             c1, c2, c3 = st.columns([1, 2, 2])
-            with c1: st.markdown(f"<div style='padding-top: 10px;'>{label}</div>", unsafe_allow_html=True)
-            with c2: qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", key=f"qty_{label}_{selected_date}"))
-            with c3: st.markdown(f"<div style='padding-top: 10px;'>= {qty * multiplier}</div>", unsafe_allow_html=True)
+            with c1: 
+                st.markdown(f"<div style='margin-top:10px;'>{label}</div>", unsafe_allow_html=True)
+            with c2: 
+                qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", key=f"qty_{label}_{selected_date}"))
+            with c3: 
+                st.markdown(f"<div style='margin-top:10px;'>= {qty * multiplier}</div>", unsafe_allow_html=True)
             return qty, qty * multiplier
         q_20, v_20 = cash_row_live("20", 20)
         q_50, v_50 = cash_row_live("50", 50)
