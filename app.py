@@ -109,16 +109,15 @@ st.set_page_config(layout="wide")
 # --- CSS ДЛЯ ЖОРСТКОЇ ГОРИЗОНТАЛЬНОЇ ВЕРСТКИ ---
 st.markdown("""
 <style>
-    /* Примусово фіксуємо горизонтальну верстку для всіх */
-    [data-testid="column"] { flex: 1 !important; }
-    [data-testid="stHorizontalBlock"] { 
-        display: flex !important; 
-        flex-direction: row !important; 
-        flex-wrap: nowrap !important; 
+    /* Жестко фиксируем ширину колонок, чтобы они не переносились */
+    [data-testid="column"] {
+        width: 30% !important;
+        flex: 0 0 30% !important;
+        min-width: 30% !important;
     }
-    /* Робимо поле вводу максимально компактним */
+    /* Убираем все отступы, чтобы влезло в строку */
     .stTextInput > div > div { padding: 0px !important; }
-    input { height: 35px !important; }
+    div[data-testid="stHorizontalBlock"] { gap: 5px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -188,14 +187,14 @@ with tab1:
         st.subheader("💰 | Факт")
         m_coins = get_int(st.text_input("Монети (загальна сума в грн):", key=f"coins_live_{selected_date}"))
         def cash_row_live(label, multiplier):
-            # c1 - номінал, c2 - поле вводу, c3 - сума
+            # Используем коэффициенты, чтобы Номинал был узким, а Ввод и Сумма пошире
             c1, c2, c3 = st.columns([1, 2, 2])
             with c1: 
-                st.markdown(f"<div style='margin-top:10px;'>{label}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='margin-top:10px; font-size: 14px;'>{label}</div>", unsafe_allow_html=True)
             with c2: 
                 qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", key=f"qty_{label}_{selected_date}"))
             with c3: 
-                st.markdown(f"<div style='margin-top:10px;'>= {qty * multiplier}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='margin-top:10px; font-size: 14px;'>= {qty * multiplier}</div>", unsafe_allow_html=True)
             return qty, qty * multiplier
         q_20, v_20 = cash_row_live("20", 20)
         q_50, v_50 = cash_row_live("50", 50)
