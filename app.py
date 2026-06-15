@@ -249,6 +249,27 @@ with tab1:
 
 # --- ВКЛАДКА 2: АРХИВ ---
 with tab2:
+    # Забезпечуємо наявність стану входу
+    if "archive_ok" not in st.session_state:
+        st.session_state["archive_ok"] = False
+
+    if not st.session_state["archive_ok"]:
+        pw = st.text_input("🔑 Пароль архіву:", type="password", key="p_arch")
+        if st.button("Увійти", key="login_arch"):
+            if pw == "2025":
+                st.session_state["archive_ok"] = True
+                st.rerun()
+            else:
+                st.error("Невірний пароль")
+        st.stop() # Зупиняє код, поки не ввели пароль
+
+    if st.button("🔒 Закрити архів", key="close_arch"):
+        st.session_state["archive_ok"] = False
+        st.rerun()
+        
+    st.subheader("🔎 Перегляд історії")
+    # Твій старий код пошуку за датою починається тут:
+    search_date_raw = st.date_input("Дата", datetime.today(), key="s_date", format="DD/MM/YYYY")
     if st.query_params.get("archive_auth") == "1": st.session_state["archive_ok"] = True
     if not st.session_state.get("archive_ok", False):
         passwd_archive = st.text_input("🔑 Пароль:", type="password", key="pwd_archive")
