@@ -109,15 +109,18 @@ st.set_page_config(layout="wide")
 # --- CSS ДЛЯ ЖОРСТКОЇ ГОРИЗОНТАЛЬНОЇ ВЕРСТКИ ---
 st.markdown("""
 <style>
-    /* Жестко фиксируем ширину колонок, чтобы они не переносились */
-    [data-testid="column"] {
-        width: 30% !important;
-        flex: 0 0 30% !important;
-        min-width: 30% !important;
+    /* Примусово виставляємо горизонтальну верстку для всіх колонок */
+    [data-testid="column"] { 
+        display: flex !important; 
+        flex-direction: row !important; 
+        align-items: center !important; 
+        width: auto !important; 
     }
-    /* Убираем все отступы, чтобы влезло в строку */
-    .stTextInput > div > div { padding: 0px !important; }
-    div[data-testid="stHorizontalBlock"] { gap: 5px !important; }
+    /* Видаляємо всі зайві відступи для полів вводу */
+    .stTextInput { padding: 0 !important; }
+    input { height: 35px !important; padding: 5px !important; }
+    /* Забороняємо переносити блок фактів */
+    .css-1r6slb0, .css-1698v5h { flex-wrap: nowrap !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -187,14 +190,14 @@ with tab1:
         st.subheader("💰 | Факт")
         m_coins = get_int(st.text_input("Монети (загальна сума в грн):", key=f"coins_live_{selected_date}"))
         def cash_row_live(label, multiplier):
-            # Используем коэффициенты, чтобы Номинал был узким, а Ввод и Сумма пошире
             c1, c2, c3 = st.columns([1, 2, 2])
             with c1: 
-                st.markdown(f"<div style='margin-top:10px; font-size: 14px;'>{label}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='margin-top:10px;'>{label}</div>", unsafe_allow_html=True)
             with c2: 
+                # Використовуємо key, щоб було унікальне поле
                 qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", key=f"qty_{label}_{selected_date}"))
             with c3: 
-                st.markdown(f"<div style='margin-top:10px; font-size: 14px;'>= {qty * multiplier}</div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='margin-top:10px;'>= {qty * multiplier}</div>", unsafe_allow_html=True)
             return qty, qty * multiplier
         q_20, v_20 = cash_row_live("20", 20)
         q_50, v_50 = cash_row_live("50", 50)
