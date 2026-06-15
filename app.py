@@ -142,30 +142,27 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Stable 1.1.0")
+st.caption("🌐 Хмарна синхронізація | Реактивна версія 6.3 (Без фонових оновлень)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
 # --- ВКЛАДКА 1: ВВОД ДАННЫХ (Пароль 2000) ---
 with tab1:
-    # 1. Перевіряємо, чи є мітка авторизації в URL (виживання після F5)
     if st.query_params.get("edit_auth") == "1":
         st.session_state["edit_ok"] = True
 
-    # 2. Якщо доступу немає — показуємо форму пароля і ЗУПИНЯЄМО код
     if not st.session_state.get("edit_ok", False):
         st.info("🔒 Будь ласка, введіть пароль для доступу до форми введення даних.")
         passwd_edit = st.text_input("🔑 Пароль:", type="password", key="pwd_edit")
         if st.button("Увійти", key="btn_login_edit"):
             if passwd_edit == "2000":
                 st.session_state["edit_ok"] = True
-                st.query_params["edit_auth"] = "1" # Ховаємо токен в URL
+                st.query_params["edit_auth"] = "1"
                 st.rerun()
             elif passwd_edit != "":
                 st.error("❌ Невірний пароль для редагування!")
-        st.stop() # Далі цього рядка код не йде, поки немає пароля! Поле вводу зникає після авторизації.
+        st.stop() 
 
-    # 3. Кнопка ручного блокування каси
     c_lock, _ = st.columns([1, 5])
     if c_lock.button("🔒 Заблокувати касу"):
         st.session_state["edit_ok"] = False
@@ -173,7 +170,6 @@ with tab1:
             del st.query_params["edit_auth"]
         st.rerun()
 
-    # --- ДАЛІ ЙДЕ ВЕСЬ ІНТЕРФЕЙС КАБІНЕТУ ---
     col1, col2 = st.columns(2)
     with col1:
         selected_date_raw = st.date_input("Дата", datetime.today(), format="DD/MM/YYYY", key="form_date", on_change=on_date_change)
@@ -184,7 +180,7 @@ with tab1:
         start_balance = get_int(start_balance_raw)
 
     st.divider()
-    st.markdown("<p style='color: #888888; font-size: 13px;'>💡 Всі дані автоматично зберігаються в чернетку на сервері. При оновленні сторінки ви нічого не втратите.</p>", unsafe_allow_html=True)
+    st.markdown("<p style='color: #888888; font-size: 13px;'>💡 Рекомендуємо періодично натискати <b>«Зберегти чернетку»</b> внизу екрана, щоб не втратити дані у разі випадкового закриття сторінки.</p>", unsafe_allow_html=True)
     
     # --- БЛОК 1: НАДХОДЖЕННЯ ТА ВИТРАТИ ---
     col_t1, col_t2 = st.columns(2)
@@ -236,43 +232,10 @@ with tab1:
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
         st.markdown(f"## 💵 Разом готівки в касі: {cash_pure} грн")
 
-    # Оновлення сесії
-    st.session_state["inc_data"] = edited_inc_df.to_dict('records')
-    st.session_state["exp_data"] = edited_exp_df.to_dict('records')
-    st.session_state["adv_data"] = edited_adv_df.to_dict('records')
-
-    # --- СОХРАНЕНИЕ ЧЕРНОВИКА (Через кнопку для скорости) ---
-    st.divider()
-    if st.button("💾 Зберегти чернетку", use_container_width=True):
-        current_payload = {
-            "inc": st.session_state["inc_data"],
-            "exp": st.session_state["exp_data"],
-            "adv": st.session_state["adv_data"],
-            "cash": {
-                "coins": m_coins, "20": q_20, "50": q_50, 
-                "100": q_100, "200": q_200, "500": q_500, "1000": q_1000
-            }
-        }
-        try:
-            # Используем Upsert (обновление или вставка) вместо Delete+Post для скорости
-            # Supabase API поддерживает это, если в таблице drafts стоит уникальный индекс по date
-            url_draft_upsert = f"{SUPABASE_URL}/rest/v1/drafts"
-            # Параметр 'Prefer: resolution=merge-duplicates' (или аналогичный для вашего API)
-            # Если не работает, оставьте просто requests.post
-            headers_upsert = headers.copy()
-            headers_upsert["Prefer"] = "resolution=merge-duplicates"
-            
-            requests.post(url_draft_upsert, headers=headers_upsert, json={
-                "date": selected_date, 
-                "payload": current_payload
-            })
-            st.toast("✅ Чернетку збережено!", icon="💾")
-        except Exception as e:
-            st.error(f"Помилка збереження: {e}")
-
-    inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for r in st.session_state["inc_data"] if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
-    exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for r in st.session_state["exp_data"] if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
-    adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for r in st.session_state["adv_data"] if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
+    # Підготовка даних для розрахунків
+    inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_inc_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
+    exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_exp_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
+    adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_adv_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
 
     total_income = subtotal_inc
     total_expense = subtotal_exp
@@ -293,40 +256,71 @@ with tab1:
     elif discrepancy > 0: res_c3.warning(f"Надлишок: +{discrepancy} грн")
     else: res_c3.error(f"Недостача: {discrepancy} грн")
 
-    save_report = st.button("🚀 ЗБЕРЕГТИ ГОТОВИЙ ЗВІТ В ХМАРУ", type="primary", use_container_width=True)
+    # --- КНОПКИ ЗБЕРЕЖЕННЯ ---
+    st.write("") # Невеличкий відступ
+    col_btn_draft, col_btn_final = st.columns(2)
+    
+    with col_btn_draft:
+        if st.button("💾 ЗБЕРЕГТИ ЧЕРНЕТКУ", use_container_width=True):
+            with st.spinner("Збереження чернетки..."):
+                payload = {
+                    "inc": edited_inc_df.to_dict('records'),
+                    "exp": edited_exp_df.to_dict('records'),
+                    "adv": edited_adv_df.to_dict('records'),
+                    "cash": {
+                        "coins": m_coins, "20": q_20, "50": q_50, 
+                        "100": q_100, "200": q_200, "500": q_500, "1000": q_1000
+                    }
+                }
+                try:
+                    url_draft_del = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}"
+                    url_draft_post = f"{SUPABASE_URL}/rest/v1/drafts"
+                    requests.delete(url_draft_del, headers=headers)
+                    requests.post(url_draft_post, headers=headers, json={"date": selected_date, "payload": payload})
+                    
+                    # Оновлюємо базовий стан, щоб при оновленні сторінки завантажилась остання чернетка
+                    st.session_state["inc_data"] = payload["inc"]
+                    st.session_state["exp_data"] = payload["exp"]
+                    st.session_state["adv_data"] = payload["adv"]
+                    
+                    st.success("✅ Чернетку успішно збережено!")
+                except Exception as e:
+                    st.error(f"Помилка: {e}")
 
-    if save_report:
-        with st.spinner("Збереження фінального звіту..."):
-            try:
-                url_shifts = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}"
-                url_trans = f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}"
-                url_advs = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}"
-                url_drafts = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}"
-                
-                requests.delete(url_shifts, headers=headers)
-                requests.delete(url_trans, headers=headers)
-                requests.delete(url_advs, headers=headers)
-                
-                res_shift = requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={
-                    "date": selected_date, "start_balance": str(start_balance), 
-                    "calculated_end": str(calculated_end), "actual_end": str(total_actual)
-                })
-                
-                if res_shift.status_code in [200, 201]:
-                    if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
-                    if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
-                    if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
+    with col_btn_final:
+        save_report = st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True)
+
+        if save_report:
+            with st.spinner("Збереження фінального звіту..."):
+                try:
+                    url_shifts = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}"
+                    url_trans = f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}"
+                    url_advs = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}"
+                    url_drafts = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}"
                     
-                    requests.delete(url_drafts, headers=headers)
-                    st.session_state.pop(f"last_draft_{selected_date}", None)
+                    requests.delete(url_shifts, headers=headers)
+                    requests.delete(url_trans, headers=headers)
+                    requests.delete(url_advs, headers=headers)
                     
-                    st.success(f"🎉 Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно та безпечно записано в систему!")
-                    time.sleep(1.5)
-                    st.rerun()
-                else:
-                    st.error(f"❌ Помилка сервера бази даних: {res_shift.status_code}.")
-            except Exception as e:
-                st.error(f"💥 Помилка мережі: {e}.")
+                    res_shift = requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json={
+                        "date": selected_date, "start_balance": str(start_balance), 
+                        "calculated_end": str(calculated_end), "actual_end": str(total_actual)
+                    })
+                    
+                    if res_shift.status_code in [200, 201]:
+                        if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
+                        if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
+                        if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
+                        
+                        requests.delete(url_drafts, headers=headers)
+                        
+                        st.success(f"🎉 Звіт за {selected_date_raw.strftime('%d/%m/%Y')} успішно та безпечно записано в систему!")
+                        time.sleep(1.5)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Помилка сервера бази даних: {res_shift.status_code}.")
+                except Exception as e:
+                    st.error(f"💥 Помилка мережі: {e}.")
 
 # --- ВКЛАДКА 2: АРХИВ (Пароль 2025) ---
 with tab2:
