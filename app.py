@@ -109,14 +109,11 @@ st.set_page_config(layout="wide")
 # --- CSS ДЛЯ СТАБІЛЬНОЇ ВЕРСТКИ ---
 st.markdown("""
 <style>
-    /* Примусово виставляємо колонки в стовпчик на екранах до 1024px */
-    @media (max-width: 1024px) {
-        div[data-testid="column"] {
-            width: 100% !important;
-            flex: 1 1 100% !important;
-        }
-    }
-    .cash-sum { font-weight: bold; color: #0066cc; font-size: 16px; white-space: nowrap; }
+    /* Запрещаем Streamlit переносить колонки внутри Fact-блока */
+    [data-testid="column"] { flex: 1 !important; }
+    .stHorizontalBlock { flex-direction: row !important; flex-wrap: nowrap !important; }
+    /* Убираем лишние отступы у полей ввода */
+    .stTextInput > div > div { padding-top: 0px !important; padding-bottom: 0px !important; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -186,13 +183,11 @@ with tab1:
         st.subheader("💰 | Факт")
         m_coins = get_int(st.text_input("Монети (загальна сума в грн):", key=f"coins_live_{selected_date}"))
         def cash_row_live(label, multiplier):
-            rc1, rc2 = st.columns([3, 2])
-            with rc1:
-                qty = get_int(st.text_input(f"{label} грн (шт):", key=f"qty_{label}_{selected_date}"))
-            with rc2:
-                subtotal = qty * multiplier
-                st.markdown(f"<div class='cash-sum' style='padding-top: 30px;'>= {subtotal} грн</div>", unsafe_allow_html=True)
-            return qty, subtotal
+            c1, c2, c3 = st.columns([1, 2, 2])
+            with c1: st.markdown(f"<div style='padding-top: 10px;'>{label}</div>", unsafe_allow_html=True)
+            with c2: qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", key=f"qty_{label}_{selected_date}"))
+            with c3: st.markdown(f"<div style='padding-top: 10px;'>= {qty * multiplier}</div>", unsafe_allow_html=True)
+            return qty, qty * multiplier
         q_20, v_20 = cash_row_live("20", 20)
         q_50, v_50 = cash_row_live("50", 50)
         q_100, v_100 = cash_row_live("100", 100)
