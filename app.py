@@ -143,7 +143,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Stable 1.1.3 (unlimited)")
+st.caption("🌐 Хмарна синхронізація | Stable 1.2 pop-corn")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
@@ -237,6 +237,10 @@ with tab1:
     inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_inc_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
     exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_exp_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
     adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_adv_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
+
+    total_income = subtotal_inc
+    total_expense = subtotal_exp
+    total_advances = subtotal_adv
 
     # 5. ИТОГИ И СИНХРОНИЗАЦИЯ С БАЗОЙ
     st.divider()
@@ -352,7 +356,12 @@ with tab2:
     if isinstance(shift_res, list) and len(shift_res) > 0:
         shift = shift_res[0]
         
-        ac1, ac2, ac3 = st.columns(3)
+        # 1. Залишок на початок (великим шрифтом)
+        st.markdown(f"<h3 style='margin-bottom: 0;'>🌅 Залишок на початок дня: <span style='color: #0066cc;'>{get_int(shift.get('start_balance'))} грн</span></h3>", unsafe_allow_html=True)
+        st.divider()
+        
+        # 2. Надходження та витрати (у дві колонки)
+        ac1, ac2 = st.columns(2)
         with ac1:
             st.subheader("🟢 Надходження")
             url_inc_search = f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.income"
@@ -369,17 +378,21 @@ with tab2:
                 for item in exp_res: st.write(f"• {item.get('description', 'Без опису')}: {get_int(item.get('amount'))} грн")
             else:
                 st.write("Немає записів")
-        with ac3:
-            st.subheader("🟠 Аванси")
-            url_adv_search = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}"
-            adv_res = requests.get(url_adv_search, headers=headers).json()
-            if isinstance(adv_res, list) and adv_res:
-                for item in adv_res: st.write(f"• {item.get('employee', 'Без імені')}: {get_int(item.get('amount'))} грн")
-            else:
-                st.write("Немає записів")
                 
         st.divider()
-        st.info(f"**Залишок на початок:** {get_int(shift.get('start_balance'))} грн &nbsp;&nbsp;|&nbsp;&nbsp; **Залишок на кінець дня:** {get_int(shift.get('calculated_end'))} грн")
+        
+        # 3. Залишок на кінець (великим шрифтом)
+        st.markdown(f"<h3 style='margin-bottom: 0;'>🌇 Залишок на кінець дня: <span style='color: #0066cc;'>{get_int(shift.get('calculated_end'))} грн</span></h3>", unsafe_allow_html=True)
+        st.divider()
+        
+        # 4. Аванси (внизу)
+        st.subheader("🟠 Аванси")
+        url_adv_search = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}"
+        adv_res = requests.get(url_adv_search, headers=headers).json()
+        if isinstance(adv_res, list) and adv_res:
+            for item in adv_res: st.write(f"• {item.get('employee', 'Без імені')}: {get_int(item.get('amount'))} грн")
+        else:
+            st.write("Немає записів")
         
     else:
         st.warning("За цей день звітів не знайдено в хмарі.")
