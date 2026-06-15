@@ -100,35 +100,42 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* Магія динамічної фіксації плаваючої кнопки */
+    /* СУЧАСНА ПЛАВАЮЧА КНОПКА (Лівий верхній кут) */
     #floating-anchor { display: none; }
     
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
     .element-container:has(#floating-anchor) + .element-container {
         position: fixed !important;
-        bottom: 30px !important;
-        right: 20px !important;
+        top: 65px !important;  
+        left: 15px !important; 
         z-index: 1000 !important;
-        width: 65px !important;
+        width: 50px !important;
     }
     
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button,
     .element-container:has(#floating-anchor) + .element-container button {
-        width: 65px !important;
-        height: 65px !important;
-        border-radius: 50% !important;
-        background-color: #4CAF50 !important;
+        width: 50px !important;
+        height: 50px !important;
+        border-radius: 12px !important; 
+        background: linear-gradient(135deg, #10b981, #059669) !important; 
         color: white !important;
         border: none !important;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4) !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        transition: transform 0.2s, box-shadow 0.2s !important;
+    }
+    
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button:hover,
+    .element-container:has(#floating-anchor) + .element-container button:hover {
+        transform: translateY(-2px) !important;
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6) !important;
     }
     
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
     .element-container:has(#floating-anchor) + .element-container button p {
-        font-size: 32px !important;
+        font-size: 26px !important;
         margin: 0 !important;
     }
 </style>
@@ -137,18 +144,15 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-# Спливаюче вікно з історією версій
-with st.popover("🚀 Версія: Stable 1.9 (Що нового?)"):
+with st.popover("🚀 Версія: Stable 2.0 (Що нового?)"):
     st.markdown("""
+    **Оновлення 2.0 (UX/UI):**
+    - 🎨 Кнопка збереження чернетки отримала сучасний дизайн і переміщена у лівий верхній кут.
+    - 🗓 Відновлено стабільну роботу календаря (прибрано конфліктні стрілочки).
+    - 💾 Таблиці більше не очищаються після відправки фінального звіту.
+    
     **Оновлення 1.9:**
-    - 🗑 Видалено поле вибору адміністратора для уникнення помилок сумісності бази даних.
-    - ⚡️ Спрощено фінальний звіт — збереження працює миттєво.
-    
-    **Оновлення 1.8:**
-    - 🛠 Виправлено критичний баг Streamlit `reading 'sticky'` при збереженні таблиць.
-    
-    **Оновлення 1.7:**
-    - 💾 Кнопка збереження чернетки зафіксована внизу праворуч і рухається за скролом.
+    - ⚡️ Стабільне збереження в архів без помилок бази даних.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -184,27 +188,16 @@ with tab1:
             elif passwd_edit != "":
                 st.error("❌ Невірний пароль!")
     else:
-        # Логіка блокування
         c_lock, _ = st.columns([1, 5])
         if c_lock.button("🔒 Заблокувати касу"):
             st.session_state["edit_ok"] = False
             if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
             st.rerun()
 
-        # Навігація по датах (тільки символи)
-        nav1, nav2, nav3 = st.columns([1, 2, 1])
-        if nav1.button("⬅️", use_container_width=True): 
-            st.session_state["form_date"] -= timedelta(days=1)
-            st.rerun()
-        with nav2: 
-            st.session_state["form_date"] = st.date_input("Дата", st.session_state["form_date"], label_visibility="collapsed")
-        if nav3.button("➡️", use_container_width=True): 
-            st.session_state["form_date"] += timedelta(days=1)
-            st.rerun()
-        
+        # Календар
+        st.session_state["form_date"] = st.date_input("Оберіть дату:", st.session_state["form_date"])
         selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
         
-        # Поле залишку на початок
         db_start = get_start_balance(selected_date)
         start_balance = get_int(st.text_input("Залишок на початок дня:", value=str(db_start), key=f"start_balance_{selected_date}"))
 
@@ -280,16 +273,15 @@ with tab1:
             payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
             requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
             requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
-            st.toast("✅ Чернетку успішно збережено!", icon="💾")
+            st.toast("✅ Дані збережено!", icon="💾")
 
-        # Фінальний звіт (без відправки admin)
+        # Фінальний звіт 
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
             with st.spinner("Відправка..."):
                 requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
                 
-                # Тільки перевірені базою поля
                 shift_payload = {
                     "date": selected_date, 
                     "start_balance": str(start_balance), 
@@ -307,8 +299,7 @@ with tab1:
                     if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
                     if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
                     
-                    requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
-                    st.success("🎉 Звіт записано в архів!")
+                    st.success("🎉 Звіт успішно записано в архів!")
                     time.sleep(1.5)
                     st.rerun()
                 else:
