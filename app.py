@@ -295,4 +295,55 @@ with tab2:
         if isinstance(shift_res, list) and len(shift_res) > 0:
             shift = shift_res[0]
             
-            st.markdown(f"<h3 style='margin-bottom: 0;'>🌅 Залишок на початок дня: <span style='color: #0066cc;'>{get_int(shift.get('start_balance'))} грн</span></h3>", unsafe_allow_html=
+            st.markdown(f"<h3 style='margin-bottom: 0;'>🌅 Залишок на початок дня: <span style='color: #0066cc;'>{get_int(shift.get('start_balance'))} грн</span></h3>", unsafe_allow_html=True)
+            st.divider()
+            
+            ac1, ac2 = st.columns(2)
+            with ac1:
+                st.subheader("🟢 Надходження")
+                url_inc_search = f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.income"
+                inc_res = requests.get(url_inc_search, headers=headers).json()
+                total_inc = 0
+                if isinstance(inc_res, list) and inc_res:
+                    for item in inc_res:
+                        amt = get_int(item.get('amount'))
+                        total_inc += amt
+                        st.write(f"• {item.get('description', 'Без опису')}: {amt} грн")
+                else:
+                    st.write("Немає записів")
+                st.markdown(f"<p style='font-weight: bold; color: #2e7d32;'>Загалом: {total_inc} грн</p>", unsafe_allow_html=True)
+                
+            with ac2:
+                st.subheader("🔴 Витрати")
+                url_exp_search = f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.expense"
+                exp_res = requests.get(url_exp_search, headers=headers).json()
+                total_exp = 0
+                if isinstance(exp_res, list) and exp_res:
+                    for item in exp_res:
+                        amt = get_int(item.get('amount'))
+                        total_exp += amt
+                        st.write(f"• {item.get('description', 'Без опису')}: {amt} грн")
+                else:
+                    st.write("Немає записів")
+                st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {total_exp} грн</p>", unsafe_allow_html=True)
+                    
+            st.divider()
+            
+            st.markdown(f"<h3 style='margin-bottom: 0;'>🌇 Залишок на кінець дня: <span style='color: #0066cc;'>{get_int(shift.get('calculated_end'))} грн</span></h3>", unsafe_allow_html=True)
+            st.divider()
+            
+            st.subheader("🟠 Аванси")
+            url_adv_search = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}"
+            adv_res = requests.get(url_adv_search, headers=headers).json()
+            total_adv = 0
+            if isinstance(adv_res, list) and adv_res:
+                for item in adv_res:
+                    amt = get_int(item.get('amount'))
+                    total_adv += amt
+                    st.write(f"• {item.get('employee', 'Без імені')}: {amt} грн")
+            else:
+                st.write("Немає записів")
+            st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {total_adv} грн</p>", unsafe_allow_html=True)
+            
+        else:
+            st.warning("За цей день звітів не знайдено в хмарі.")
