@@ -3,7 +3,6 @@ from datetime import datetime
 import requests
 import pandas as pd
 import time
-import json
 
 # Настройки облачного веб-доступа к Supabase
 SUPABASE_URL = "https://ajkprfhuypcamnybqusr.supabase.co"
@@ -34,6 +33,7 @@ def get_start_balance(date_str):
             return get_int(res[0].get('calculated_end', 0))
     except Exception:
         pass
+        
     return 0
 
 def get_previous_advances(date_str):
@@ -49,6 +49,7 @@ def get_previous_advances(date_str):
                     return [{"Співробітник": item.get('employee', ''), "Сума": get_int(item.get('amount', 0))} for item in res_adv]
     except Exception:
         pass
+        
     return []
 
 # --- ДОПОМІЖНА ФУНКЦІЯ ДЛЯ СТАБІЛІЗАЦІЇ ТАБЛИЦЬ ---
@@ -142,7 +143,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Реактивна версія 6.4 (Оновлений архів)")
+st.caption("🌐 Хмарна синхронізація | Stable 1.1.3 (unlimited)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
@@ -210,7 +211,7 @@ with tab1:
         st.markdown(f"<p style='font-weight: bold; font-size: 15px; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
     with col_b2:
-        st.subheader("💰 Факт")
+        st.subheader("💰 | Факт")
         m_coins = get_int(st.text_input("Монети (загальна сума в грн):", key=f"coins_live_{selected_date}"))
         
         def cash_row_live(label, multiplier):
@@ -232,19 +233,15 @@ with tab1:
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
         st.markdown(f"## 💵 Разом готівки в касі: {cash_pure} грн")
 
-    # Підготовка даних для розрахунків
+    # Формирование строк для отправки в базу напрямую из редакторов
     inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_inc_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
     exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_exp_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
     adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_adv_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
 
-    total_income = subtotal_inc
-    total_expense = subtotal_exp
-    total_advances = subtotal_adv
-
     # 5. ИТОГИ И СИНХРОНИЗАЦИЯ С БАЗОЙ
     st.divider()
-    calculated_end = start_balance + total_income - total_expense
-    total_actual = cash_pure + total_advances
+    calculated_end = start_balance + subtotal_inc - subtotal_exp
+    total_actual = cash_pure + subtotal_adv
     discrepancy = total_actual - calculated_end
 
     st.subheader("🏁 Підсумки зміни")
@@ -257,7 +254,7 @@ with tab1:
     else: res_c3.error(f"Недостача: {discrepancy} грн")
 
     # --- КНОПКИ ЗБЕРЕЖЕННЯ ---
-    st.write("") # Невеличкий відступ
+    st.write("") 
     col_btn_draft, col_btn_final = st.columns(2)
     
     with col_btn_draft:
@@ -355,7 +352,6 @@ with tab2:
     if isinstance(shift_res, list) and len(shift_res) > 0:
         shift = shift_res[0]
         
-        # Виводимо спочатку деталізацію з виділеними заголовками
         ac1, ac2, ac3 = st.columns(3)
         with ac1:
             st.subheader("🟢 Надходження")
@@ -383,8 +379,6 @@ with tab2:
                 st.write("Немає записів")
                 
         st.divider()
-        
-        # Підсумки перенесені вниз
         st.info(f"**Залишок на початок:** {get_int(shift.get('start_balance'))} грн &nbsp;&nbsp;|&nbsp;&nbsp; **Залишок на кінець дня:** {get_int(shift.get('calculated_end'))} грн")
         
     else:
