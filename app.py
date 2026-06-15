@@ -170,6 +170,7 @@ with tab1:
             st.session_state["edit_ok"] = False
             if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
             st.rerun()
+            st.stop()
 
     c_lock, _ = st.columns([1, 5])
     if c_lock.button("🔒 Заблокувати касу"):
@@ -351,6 +352,7 @@ with tab2:
             st.session_state["archive_ok"] = False
             if "archive_auth" in st.query_params: del st.query_params["archive_auth"]
             st.rerun()
+            st.stop()
         
         st.subheader("🔎 Перегляд історії")
     search_date_raw = st.date_input("Оберіть дату для перевірки", datetime.today(), key="search", format="DD/MM/YYYY")
