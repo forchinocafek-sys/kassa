@@ -109,16 +109,18 @@ st.set_page_config(layout="wide")
 # --- CSS ДЛЯ ЖОРСТКОЇ ГОРИЗОНТАЛЬНОЇ ВЕРСТКИ ---
 st.markdown("""
 <style>
-    /* Примусово выставляем горизонтальную верстку для всех колонок */
+    /* Примусово виставляємо горизонтальну верстку для всіх колонок */
     [data-testid="column"] { 
         display: flex !important; 
         flex-direction: row !important; 
         align-items: center !important; 
         width: auto !important; 
     }
-    /* Удаляем все лишние отступы для полей ввода */
+    /* Видаляємо всі зайві відступи для полів вводу */
     .stTextInput { padding: 0 !important; }
     input { height: 35px !important; padding: 5px !important; }
+    /* Забороняємо переносити блок фактів */
+    .css-1r6slb0, .css-1698v5h { flex-wrap: nowrap !important; }
 </style>
 """, unsafe_allow_html=True)
 
