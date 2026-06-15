@@ -107,7 +107,7 @@ st.markdown("""
     .element-container:has(#floating-anchor) + .element-container {
         position: fixed !important;
         top: 65px !important;  
-        right: 20px !important; /* Переміщено праворуч */
+        right: 20px !important; 
         left: auto !important;  
         z-index: 1000 !important;
         width: 50px !important;
@@ -117,11 +117,12 @@ st.markdown("""
     .element-container:has(#floating-anchor) + .element-container button {
         width: 50px !important;
         height: 50px !important;
+        padding: 0 !important; /* Обнуляємо стандартні відступи Streamlit */
         border-radius: 12px !important; 
-        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; /* Світло-сірий нейтральний градієнт */
-        color: #4b5563 !important; /* Темно-сіра дискета, щоб не кидалася в очі */
+        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
+        color: #4b5563 !important; 
         border: 1px solid #d1d5db !important; 
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; /* М'яка тінь */
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; 
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -135,10 +136,18 @@ st.markdown("""
         background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
     }
     
+    /* Ідеальне центрування дискети всередині кнопки */
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button div,
+    .element-container:has(#floating-anchor) + .element-container button div,
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
     .element-container:has(#floating-anchor) + .element-container button p {
         font-size: 26px !important;
         margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -147,9 +156,12 @@ st.markdown("""
 st.title("Cafe Forchino")
 
 # Розширена історія останніх 5 версій
-with st.popover("🚀 Версія: Stable 2.1 (Історія змін)"):
+with st.popover("🚀 Версія: Stable 2.2 (Історія змін)"):
     st.markdown("""
-    **Stable 2.1 (Поточна):**
+    **Stable 2.2 (Поточна):**
+    - 🎯 Ідеально відцентровано іконку дискети (виправлено зсув вправо через стандартні відступи Streamlit).
+    
+    **Stable 2.1:**
     - 🎨 Кнопку збереження чернетки переміщено у *правий верхній кут* та змінено на стриманий світло-сірий колір.
     - 📜 Журнал змін розширено до 5 останніх версій.
     
@@ -161,12 +173,6 @@ with st.popover("🚀 Версія: Stable 2.1 (Історія змін)"):
     **Stable 1.9:**
     - 🗑 Видалено селектор адміністратора для забезпечення 100% сумісності з базою даних.
     - ⚡️ Оптимізовано швидкість надсилання фінального звіту.
-    
-    **Stable 1.8:**
-    - 🛠 Виправлено критичну помилку React фронтенду `reading 'sticky'` при оновленні таблиць.
-    
-    **Stable 1.7:**
-    - 💾 Перша успішна реалізація динамічної плаваючої кнопки (Floating Action Button).
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
