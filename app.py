@@ -142,7 +142,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 st.title("Cafe Forchino")
-st.caption("🌐 Хмарна синхронізація | Реактивна версія 6.3 (Без фонових оновлень)")
+st.caption("🌐 Хмарна синхронізація | Реактивна версія 6.4 (Оновлений архів)")
 
 tab1, tab2 = st.tabs(["📝 Введення даних за день", "🔎 Архів минулих днів"])
 
@@ -278,7 +278,6 @@ with tab1:
                     requests.delete(url_draft_del, headers=headers)
                     requests.post(url_draft_post, headers=headers, json={"date": selected_date, "payload": payload})
                     
-                    # Оновлюємо базовий стан, щоб при оновленні сторінки завантажилась остання чернетка
                     st.session_state["inc_data"] = payload["inc"]
                     st.session_state["exp_data"] = payload["exp"]
                     st.session_state["adv_data"] = payload["adv"]
@@ -355,26 +354,38 @@ with tab2:
     
     if isinstance(shift_res, list) and len(shift_res) > 0:
         shift = shift_res[0]
-        st.info(f"**Залишок на початок: {get_int(shift.get('start_balance'))} грн | Розрахунковий кінець: {get_int(shift.get('calculated_end'))} грн | Фактичний залишок: {get_int(shift.get('actual_end'))} грн**")
         
+        # Виводимо спочатку деталізацію з виділеними заголовками
         ac1, ac2, ac3 = st.columns(3)
         with ac1:
-            st.markdown("Надходження:")
+            st.subheader("🟢 Надходження")
             url_inc_search = f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.income"
             inc_res = requests.get(url_inc_search, headers=headers).json()
-            if isinstance(inc_res, list):
+            if isinstance(inc_res, list) and inc_res:
                 for item in inc_res: st.write(f"• {item.get('description', 'Без опису')}: {get_int(item.get('amount'))} грн")
+            else:
+                st.write("Немає записів")
         with ac2:
-            st.markdown("Витрати:")
+            st.subheader("🔴 Витрати")
             url_exp_search = f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.expense"
             exp_res = requests.get(url_exp_search, headers=headers).json()
-            if isinstance(exp_res, list):
+            if isinstance(exp_res, list) and exp_res:
                 for item in exp_res: st.write(f"• {item.get('description', 'Без опису')}: {get_int(item.get('amount'))} грн")
+            else:
+                st.write("Немає записів")
         with ac3:
-            st.markdown("Аванси:")
+            st.subheader("🟠 Аванси")
             url_adv_search = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}"
             adv_res = requests.get(url_adv_search, headers=headers).json()
-            if isinstance(adv_res, list):
+            if isinstance(adv_res, list) and adv_res:
                 for item in adv_res: st.write(f"• {item.get('employee', 'Без імені')}: {get_int(item.get('amount'))} грн")
+            else:
+                st.write("Немає записів")
+                
+        st.divider()
+        
+        # Підсумки перенесені вниз
+        st.info(f"**Залишок на початок:** {get_int(shift.get('start_balance'))} грн &nbsp;&nbsp;|&nbsp;&nbsp; **Залишок на кінець дня:** {get_int(shift.get('calculated_end'))} грн")
+        
     else:
         st.warning("За цей день звітів не знайдено в хмарі.")
