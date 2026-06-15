@@ -169,7 +169,6 @@ with tab1:
         if c_lock.button("🔒 Заблокувати касу"):
             st.session_state["edit_ok"] = False
             if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
-            st.rerun()
             st.stop()
 
     c_lock, _ = st.columns([1, 5])
@@ -351,7 +350,6 @@ with tab2:
         if st.button("🔒 Закрити архів", key="btn_close_arch"):
             st.session_state["archive_ok"] = False
             if "archive_auth" in st.query_params: del st.query_params["archive_auth"]
-            st.rerun()
             st.stop()
         
         st.subheader("🔎 Перегляд історії")
