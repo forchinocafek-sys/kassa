@@ -100,9 +100,42 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* Плаваюча кнопка */
-    .floating-save { position: fixed; top: 70px; right: 15px; z-index: 1000; }
-    .floating-save button { width: 50px !important; height: 50px !important; border-radius: 50% !important; font-size: 24px !important; box-shadow: 0 4px 6px rgba(0,0,0,0.3) !important; background-color: #4CAF50 !important; color: white !important; }
+    /* -------------------------------------------------------------
+       МАГІЯ ПЛАВАЮЧОЇ КНОПКИ (ДИНАМІЧНА ФІКСАЦІЯ)
+       ------------------------------------------------------------- */
+    #floating-anchor { display: none; }
+    
+    /* Шукаємо контейнер з кнопкою, що йде ОДРАЗУ за нашим якорем */
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
+    .element-container:has(#floating-anchor) + .element-container {
+        position: fixed !important;
+        bottom: 30px !important;
+        right: 20px !important;
+        z-index: 1000 !important;
+        width: 65px !important;
+    }
+    
+    /* Стилізуємо саму кнопку */
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button,
+    .element-container:has(#floating-anchor) + .element-container button {
+        width: 65px !important;
+        height: 65px !important;
+        border-radius: 50% !important;
+        background-color: #4CAF50 !important;
+        color: white !important;
+        border: none !important;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.4) !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+    
+    /* Розмір дискети */
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
+    .element-container:has(#floating-anchor) + .element-container button p {
+        font-size: 32px !important;
+        margin: 0 !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -110,25 +143,22 @@ st.markdown("""
 st.title("Cafe Forchino")
 
 # Спливаюче вікно з історією версій
-with st.popover("🚀 Версія: Stable 1.6 (Що нового?)"):
+with st.popover("🚀 Версія: Stable 1.8 (Що нового?)"):
     st.markdown("""
+    **Оновлення 1.8:**
+    - 🛠 Виправлено критичний баг Streamlit `reading 'sticky'` при збереженні звіту.
+    
+    **Оновлення 1.7:**
+    - 💾 Кнопка збереження тепер справді плаваюча (закріплена внизу праворуч).
+    
     **Оновлення 1.6:**
-    - 👤 Додано швидкий вибір адміністратора.
-    - 🗓 Навігація по датах стрілочками (⬅️ та ➡️).
-    - 📜 Спливаюче вікно історії змін (цей список).
-    - 🧡 Додано підпис розробника.
-    
-    **Оновлення 1.5:**
-    - 💾 Плаваюча кнопка збереження (завжди під рукою).
-    - 💬 Вспливаюче сповіщення про збереження (Toast).
-    
-    **Оновлення 1.4:**
-    - 📱 Ідеальна адаптивна верстка для телефонів.
-    - 🔒 Повністю незалежні паролі каси та архіву.
+    - 👤 Швидкий вибір адміністратора.
+    - 🗓 Навігація по датах стрілочками.
+    - 📜 Спливаюче вікно історії змін.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
-st.write("") # Невеликий відступ
+st.write("") 
 
 # --- ІНІЦІАЛІЗАЦІЯ ДАТИ ---
 if "form_date" not in st.session_state:
@@ -160,14 +190,6 @@ with tab1:
             elif passwd_edit != "":
                 st.error("❌ Невірний пароль!")
     else:
-        # Плаваюча кнопка збереження чернетки
-        st.markdown('<div class="floating-save">', unsafe_allow_html=True)
-        if st.button("💾"):
-            # Збираємо актуальні дані з таблиць (вони тягнуться зі state Streamlit автоматично)
-            # Оскільки data_editor працює в реальному часі, ми зберігаємо поточні сесії
-            pass # Кнопка малюється тут, логіка нижче
-        st.markdown('</div>', unsafe_allow_html=True)
-
         # Логіка блокування
         c_lock, _ = st.columns([1, 5])
         if c_lock.button("🔒 Заблокувати касу"):
@@ -201,14 +223,16 @@ with tab1:
         with col_t1:
             st.subheader("Надходження:")
             inc_df = prepare_df(st.session_state["inc_data"], ["Опис", "Сума"])
-            edited_inc_df = st.data_editor(inc_df, column_order=["Опис", "Сума"], num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
+            # Прибрали column_order для уникнення багу 'sticky'
+            edited_inc_df = st.data_editor(inc_df, num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
             subtotal_inc = sum(get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>", unsafe_allow_html=True)
             
         with col_t2:
             st.subheader("Витрати:")
             exp_df = prepare_df(st.session_state["exp_data"], ["Опис", "Сума"])
-            edited_exp_df = st.data_editor(exp_df, column_order=["Опис", "Сума"], num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
+            # Прибрали column_order
+            edited_exp_df = st.data_editor(exp_df, num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
             subtotal_exp = sum(get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {subtotal_exp} грн</p>", unsafe_allow_html=True)
 
@@ -218,7 +242,8 @@ with tab1:
         with col_b1:
             st.subheader("Аванси:")
             adv_df = prepare_df(st.session_state["adv_data"], ["Співробітник", "Сума"])
-            edited_adv_df = st.data_editor(adv_df, column_order=["Співробітник", "Сума"], num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
+            # Прибрали column_order
+            edited_adv_df = st.data_editor(adv_df, num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
             subtotal_adv = sum(get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
@@ -246,10 +271,6 @@ with tab1:
             cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
             st.markdown(f"## 💵 Разом в касі: {cash_pure} грн")
 
-        # Перехоплюємо натискання плаваючої кнопки збереження
-        if st.session_state.get("FormSubmitter:floating-save-💾", False) or st.button("💾 Невидима кнопка", key="dummy_save", help="Зберегти", disabled=True) == False: # Хак для перевірки натискання
-            pass
-            
         st.divider()
         calculated_end = start_balance + subtotal_inc - subtotal_exp
         total_actual = cash_pure + subtotal_adv
@@ -263,23 +284,18 @@ with tab1:
         elif discrepancy > 0: res_c3.warning(f"+{discrepancy} грн")
         else: res_c3.error(f"{discrepancy} грн")
 
-        # Справжня логіка збереження чернетки прив'язується до перевірки стану або якщо ми вручну хочемо зберегти
-        # Оскільки плаваюча кнопка складно ловить події, обробимо її тут безпосередньо:
-        if "dummy_state" not in st.session_state: st.session_state["dummy_state"] = False # Просто заглушка
-
-        # Відслідковуємо чи була натиснута саме плаваюча кнопка (шляхом читання payload з POST запиту Streamlit не можна, тому використаємо хитрий метод або просто дублюємо логіку)
-        def save_draft_logic():
+        st.write("") 
+        
+        # --- ДИНАМІЧНА ПЛАВАЮЧА КНОПКА (ЯКІР + КНОПКА) ---
+        # Схований якір, за яким CSS знайде наступну кнопку
+        st.markdown('<div id="floating-anchor"></div>', unsafe_allow_html=True)
+        if st.button("💾", key="fab_save"):
             payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
             requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
             requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
-            st.toast("✅ Успішно збережено!", icon="💾")
+            st.toast("✅ Чернетку успішно збережено!", icon="💾")
 
-        # Викликаємо функцію, якщо Streamlit зафіксував натискання плаваючої кнопки "💾"
-        # Перевіряємо всі ключі сесії на наявність натискання кнопки
-        if any(k.startswith("FormSubmitter") and "💾" in k for k in st.session_state) or any(k == "💾" and st.session_state[k] == True for k in st.session_state.keys()):
-            save_draft_logic()
-
-        st.write("") 
+        # Фінальний звіт
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
             with st.spinner("Відправка..."):
                 requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
