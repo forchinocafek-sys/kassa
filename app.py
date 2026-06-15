@@ -100,14 +100,15 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* СУЧАСНА ПЛАВАЮЧА КНОПКА (Лівий верхній кут) */
+    /* МІНІМАЛІСТИЧНА ПЛАВАЮЧА КНОПКА (Правий верхній кут, світло-сіра) */
     #floating-anchor { display: none; }
     
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
     .element-container:has(#floating-anchor) + .element-container {
         position: fixed !important;
         top: 65px !important;  
-        left: 15px !important; 
+        right: 20px !important; /* Переміщено праворуч */
+        left: auto !important;  
         z-index: 1000 !important;
         width: 50px !important;
     }
@@ -117,10 +118,10 @@ st.markdown("""
         width: 50px !important;
         height: 50px !important;
         border-radius: 12px !important; 
-        background: linear-gradient(135deg, #10b981, #059669) !important; 
-        color: white !important;
-        border: none !important;
-        box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4) !important;
+        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; /* Світло-сірий нейтральний градієнт */
+        color: #4b5563 !important; /* Темно-сіра дискета, щоб не кидалася в очі */
+        border: 1px solid #d1d5db !important; 
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; /* М'яка тінь */
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
@@ -130,7 +131,8 @@ st.markdown("""
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button:hover,
     .element-container:has(#floating-anchor) + .element-container button:hover {
         transform: translateY(-2px) !important;
-        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.6) !important;
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important;
+        background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
     }
     
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
@@ -144,15 +146,27 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-with st.popover("🚀 Версія: Stable 2.0 (Що нового?)"):
+# Розширена історія останніх 5 версій
+with st.popover("🚀 Версія: Stable 2.1 (Історія змін)"):
     st.markdown("""
-    **Оновлення 2.0 (UX/UI):**
-    - 🎨 Кнопка збереження чернетки отримала сучасний дизайн і переміщена у лівий верхній кут.
-    - 🗓 Відновлено стабільну роботу календаря (прибрано конфліктні стрілочки).
-    - 💾 Таблиці більше не очищаються після відправки фінального звіту.
+    **Stable 2.1 (Поточна):**
+    - 🎨 Кнопку збереження чернетки переміщено у *правий верхній кут* та змінено на стриманий світло-сірий колір.
+    - 📜 Журнал змін розширено до 5 останніх версій.
     
-    **Оновлення 1.9:**
-    - ⚡️ Стабільне збереження в архів без помилок бази даних.
+    **Stable 2.0:**
+    - 🎨 Новий дизайн кнопки збереження (заокруглений квадрат).
+    - 🗓 Стабільний календар (видалено конфліктні стрілочки навігації).
+    - 💾 Дані в таблицях більше не очищаються після відправки фінального звіту.
+    
+    **Stable 1.9:**
+    - 🗑 Видалено селектор адміністратора для забезпечення 100% сумісності з базою даних.
+    - ⚡️ Оптимізовано швидкість надсилання фінального звіту.
+    
+    **Stable 1.8:**
+    - 🛠 Виправлено критичну помилку React фронтенду `reading 'sticky'` при оновленні таблиць.
+    
+    **Stable 1.7:**
+    - 💾 Перша успішна реалізація динамічної плаваючої кнопки (Floating Action Button).
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
