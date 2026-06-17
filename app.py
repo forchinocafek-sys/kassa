@@ -452,6 +452,8 @@ with tab2:
                     for item in inc_res:
                         amt = get_int(item.get('amount'))
                         total_inc += amt
+                        # Це допоможе побачити, чи є фото в базі
+                        st.write(f"DEBUG: {item}")
                         st.write(f"• {item.get('description', 'Без опису')}: {amt} грн")
                 else:
                     st.write("Немає записів")
