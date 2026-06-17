@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import pandas as pd
 import time
@@ -203,7 +203,7 @@ with st.popover("🚀 Версія: Stable 2.5 Global (Історія змін)"
     st.markdown("""
     **Stable 2.5 Global (Поточна):**
     - 🗓 **Дати:** Жорстко зафіксовано формат дат (ДД/ММ/РРРР).
-    - 📸 **Фото-чеки (LIVE):** Галерея фотографій в архіві (пряме завантаження з бакета).
+    - 📸 **Фото-чеки (LIVE):** Реалізовано повний цикл роботи з чеками. При натисканні "Зберегти фінальний звіт" утиснені фото автоматично відправляються в хмару Supabase Storage у папку відповідної дати зміни.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -482,38 +482,4 @@ with tab2:
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {total_adv} грн</p>", unsafe_allow_html=True)
             
         else:
-            st.warning("За цей день звітів не знайдено в хмарі (таблиця shifts порожня).")
-            
-        # ========================================================
-        # БЛОК 2: ГАЛЕРЕЯ ЧЕКІВ (ВІДОБРАЖАЄТЬСЯ ЗАВЖДИ)
-        # ========================================================
-        st.divider()
-        st.subheader("🖼️ Галерея чеків за обрану дату")
-        
-        list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
-        payload = {
-            "prefix": search_date,
-            "limit": 100,
-            "offset": 0
-        }
-        
-        try:
-            storage_res = requests.post(list_files_url, headers=headers, json=payload)
-            if storage_res.status_code == 200:
-                files_list = storage_res.json()
-                valid_files = [f for f in files_list if f.get('name') and f.get('name') != '.emptyFolderPlaceholder']
-                
-                if valid_files:
-                    img_cols = st.columns(3)
-                    for idx, file_obj in enumerate(valid_files):
-                        file_name = file_obj['name']
-                        # Генеруємо пряме публічне посилання
-                        img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
-                        with img_cols[idx % 3]:
-                            st.image(img_url, use_container_width=True)
-                else:
-                    st.info("📂 В цей день чеки не завантажувались (або папка пуста).")
-            else:
-                st.error(f"Помилка доступу до Storage: {storage_res.text}")
-        except Exception as e:
-            st.error(f"Системна помилка: {e}")
+            st.warning("За цей день звітів не знайдено в хмарі.")
