@@ -434,6 +434,7 @@ with tab2:
         search_date_raw = st.date_input("Оберіть дату", datetime.today(), key="search", format="DD/MM/YYYY")
         search_date = search_date_raw.strftime('%Y-%m-%d')
         
+        # --- БЛОК 1: ТЕКСТОВІ ДАНІ ЗМІНИ ---
         url_shift_search = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{search_date}"
         shift_res = requests.get(url_shift_search, headers=headers).json()
         
@@ -491,45 +492,40 @@ with tab2:
                 st.write("Немає записів")
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {total_adv} грн</p>", unsafe_allow_html=True)
             
-           # ========================================================
-            # ДЕБАГ БЛОК: ГАЛЕРЕЯ ЧЕКОВ ДЛЯ СМЕНЫ
-            # ========================================================
-            st.divider()
-            st.subheader("🖼️ Галерея чеків за зміну")
+        else:
+            st.warning("За цей день звітів не знайдено в хмарі (таблиця shifts порожня).")
             
-            st.info(f"🔍 Шукаємо чеки у папці: '{search_date}'")
+        # --- БЛОК 2: ГАЛЕРЕЯ ЧЕКІВ (НЕЗАЛЕЖНО ВІД ЗМІНИ) ---
+        st.divider()
+        st.subheader("🖼️ Галерея чеків за зміну")
+        st.info(f"🔍 Шукаємо чеки у папці: '{search_date}'")
+        
+        list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
+        payload = {
+            "prefix": search_date,
+            "limit": 100,
+            "offset": 0
+        }
+        
+        try:
+            storage_res = requests.post(list_files_url, headers=headers, json=payload)
+            st.write(f"**HTTP Статус:** {storage_res.status_code}")
+            st.write(f"**Відповідь сервера:** {storage_res.text}")
             
-            list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
-            
-            # Добавили limit и offset — иногда без них Supabase выдает ошибку
-            payload = {
-                "prefix": search_date,
-                "limit": 100,
-                "offset": 0
-            }
-            
-            try:
-                storage_res = requests.post(list_files_url, headers=headers, json=payload)
+            if storage_res.status_code == 200:
+                files_list = storage_res.json()
+                valid_files = [f for f in files_list if f.get('name') != '.emptyFolderPlaceholder']
                 
-                # ВЫВОДИМ ОТВЕТ СЕРВЕРА НА ЭКРАН
-                st.write(f"**HTTP Статус:** {storage_res.status_code}")
-                st.write(f"**Відповідь сервера:** {storage_res.text}")
-                
-                if storage_res.status_code == 200:
-                    files_list = storage_res.json()
-                    valid_files = [f for f in files_list if f.get('name') != '.emptyFolderPlaceholder']
-                    
-                    if valid_files:
-                        img_cols = st.columns(3)
-                        for idx, file_obj in enumerate(valid_files):
-                            file_name = file_obj['name']
-                            img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
-                            with img_cols[idx % 3]:
-                                st.image(img_url, use_container_width=True)
-                    else:
-                        st.warning("Сервер відповів 200 (ОК), але список файлів порожній `[]`.")
+                if valid_files:
+                    img_cols = st.columns(3)
+                    for idx, file_obj in enumerate(valid_files):
+                        file_name = file_obj['name']
+                        img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
+                        with img_cols[idx % 3]:
+                            st.image(img_url, use_container_width=True)
                 else:
-                    st.error("Помилка доступу до Storage.")
-            except Exception as e:
-                st.error(f"Системна помилка: {e}")
-            # ========================================================
+                    st.warning("Сервер відповів 200 (ОК), але список файлів порожній.")
+            else:
+                st.error("Помилка доступу до Storage.")
+        except Exception as e:
+            st.error(f"Системна помилка: {e}")
