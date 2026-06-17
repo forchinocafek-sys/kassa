@@ -409,6 +409,8 @@ with tab1:
 # ВКЛАДКА 2: АРХІВ
 # ==========================================
 with tab2:
+    st.error("🚨 ЯКЩО ТИ ЦЕ БАЧИШ, КОД ОНОВЛЮЄТЬСЯ!")
+    
     if st.query_params.get("archive_auth") == "1":
         st.session_state["archive_ok"] = True
 
