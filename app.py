@@ -3,6 +3,9 @@ from datetime import datetime, timedelta
 import requests
 import pandas as pd
 import time
+import io
+import uuid
+from PIL import Image
 
 # --- НАСТРОЙКИ ДОСТУПУ ДО SUPABASE ---
 SUPABASE_URL = "https://ajkprfhuypcamnybqusr.supabase.co"
@@ -15,6 +18,13 @@ headers = {
     "Content-Profile": "public",
     "Accept-Profile": "public",
     "Prefer": "return=representation"
+}
+
+# Спеціальні заголовки для завантаження файлів (binary)
+upload_headers = {
+    "apikey": SUPABASE_KEY,
+    "Authorization": f"Bearer {SUPABASE_KEY}",
+    "Content-Type": "image/jpeg" 
 }
 
 # --- ДОПОМІЖНІ ФУНКЦІЇ ---
@@ -67,6 +77,30 @@ def get_previous_coins(date_str):
         pass
     return 0
 
+def upload_receipts_to_supabase(date_str, receipts_list):
+    """Відправляє утиснені чеки з пам'яті в Storage Supabase."""
+    if not receipts_list:
+        return True
+        
+    errors = []
+    for r in receipts_list:
+        safe_name = r['name'].replace(" ", "_").replace("/", "-")
+        file_path = f"{date_str}/{r['id']}_{safe_name}"
+        url = f"{SUPABASE_URL}/storage/v1/object/receipts/{file_path}"
+        
+        try:
+            res = requests.post(url, headers=upload_headers, data=r['bytes'])
+            if res.status_code not in [200, 201]:
+                errors.append(f"{r['name']}: {res.text}")
+        except Exception as e:
+            errors.append(f"{r['name']}: {e}")
+            
+    if errors:
+        st.error("❌ Деякі чеки не завантажилися в хмару:")
+        for err in errors: st.write(err)
+        return False
+    return True
+
 def prepare_df(data_list, columns):
     if not data_list:
         data_list = [{col: (0 if col == "Сума" else "") for col in columns}]
@@ -81,6 +115,11 @@ def prepare_df(data_list, columns):
 
 def load_draft_or_init(date_str):
     coins_key = f"coins_live_{date_str}"
+    receipts_key = f"receipts_{date_str}"
+    
+    if receipts_key not in st.session_state:
+        st.session_state[receipts_key] = []
+        
     try:
         url_draft = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{date_str}"
         draft_res = requests.get(url_draft, headers=headers).json()
@@ -114,90 +153,46 @@ st.set_page_config(layout="wide", page_title="Cafe Forchino")
 
 st.markdown("""
 <style>
-    /* -------------------------------------------------------------
-       ФІКСОВАНИЙ ДИЗАЙН: Тема "Льон" та чорний текст
-       ------------------------------------------------------------- */
-    .stApp, header[data-testid="stHeader"] { 
-        background-color: #FAF0E6 !important; 
-    }
-    
-    /* Примусово робимо текст темним */
-    .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li {
-        color: #111827 !important; 
-    }
-
-    /* Захист кольорових підсумків */
+    .stApp, header[data-testid="stHeader"] { background-color: #FAF0E6 !important; }
+    .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
     p[style*="#2e7d32"] { color: #2e7d32 !important; }
     p[style*="#c62828"] { color: #c62828 !important; }
     p[style*="#ef6c00"] { color: #ef6c00 !important; }
     span[style*="#0066cc"] { color: #0066cc !important; }
 
-    /* Поля вводу */
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         border: 1px solid #d1d5db !important;
     }
-    input, .stSelectbox span {
-        color: #111827 !important;
-    }
+    input, .stSelectbox span { color: #111827 !important; }
 
-    /* -------------------------------------------------------------
-       ЕЛЕМЕНТИ ІНТЕРФЕЙСУ
-       ------------------------------------------------------------- */
     .stTextInput div[data-baseweb="input"] { height: 35px !important; }
     .stTextInput input { padding: 5px !important; }
     
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* ПЛАВАЮЧА КНОПКА ЗБЕРЕЖЕННЯ */
     #floating-anchor { display: none; }
-    
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
     .element-container:has(#floating-anchor) + .element-container {
-        position: fixed !important;
-        top: 65px !important;  
-        right: 20px !important; 
-        left: auto !important;  
-        z-index: 1000 !important;
-        width: 50px !important;
+        position: fixed !important; top: 65px !important; right: 20px !important; left: auto !important; z-index: 1000 !important; width: 50px !important;
     }
-    
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button,
     .element-container:has(#floating-anchor) + .element-container button {
-        width: 50px !important;
-        height: 50px !important;
-        padding: 0 !important;
-        border-radius: 12px !important; 
-        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
-        color: #4b5563 !important; 
-        border: 1px solid #d1d5db !important; 
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; 
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        transition: transform 0.2s, box-shadow 0.2s !important;
+        width: 50px !important; height: 50px !important; padding: 0 !important; border-radius: 12px !important; 
+        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; color: #4b5563 !important; 
+        border: 1px solid #d1d5db !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; 
+        display: flex !important; align-items: center !important; justify-content: center !important; transition: transform 0.2s, box-shadow 0.2s !important;
     }
-    
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button:hover,
     .element-container:has(#floating-anchor) + .element-container button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important;
-        background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
+        transform: translateY(-2px) !important; box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
     }
-    
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button div,
     .element-container:has(#floating-anchor) + .element-container button div,
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
     .element-container:has(#floating-anchor) + .element-container button p {
-        font-size: 26px !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        width: 100% !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        color: #4b5563 !important; 
+        font-size: 26px !important; margin: 0 !important; padding: 0 !important; width: 100% !important; display: flex !important; justify-content: center !important; align-items: center !important; color: #4b5563 !important; 
     }
 </style>
 """, unsafe_allow_html=True)
@@ -205,24 +200,11 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-with st.popover("🚀 Версія: Stable 2.4.1 (Історія змін)"):
+with st.popover("🚀 Версія: Stable 2.5 Global (Історія змін)"):
     st.markdown("""
-    **Stable 2.4.1 (Поточна):**
-    - 🔒 **Theme Lock:** Дизайн зафіксовано на кольорі "Льон". Видалено тумблер перемикання тем. Усі тексти примусово чорні.
-    - 🪙 **Монети:** Значення "Монети" тепер автоматично переноситься з попередньої зміни на нову.
-    - 🛠 **Bugfix:** Виправлено помилку `AttributeError` при завантаженні старих звітів в Архіві.
-    
-    **Stable 2.4:**
-    - ➕ У таблицю "Аванси" додано колонку "Примітка" (очищається при перенесенні на новий день).
-    
-    **Stable 2.3:**
-    - 🎨 Встановлено колір "Льон" (#FAF0E6) як основний фон.
-    
-    **Stable 2.2:**
-    - 🎯 Відцентровано іконку дискети у плаваючій кнопці.
-    
-    **Stable 2.1:**
-    - 🎨 Плаваючу кнопку збереження чернетки переміщено у правий верхній кут.
+    **Stable 2.5 Global (Поточна):**
+    - 🗓 **Дати:** Жорстко зафіксовано формат дат (ДД/ММ/РРРР).
+    - 📸 **Фото-чеки (LIVE):** Реалізовано повний цикл роботи з чеками. При натисканні "Зберегти фінальний звіт" утиснені фото автоматично відправляються в хмару Supabase Storage у папку відповідної дати зміни.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -232,10 +214,16 @@ st.write("")
 if "form_date" not in st.session_state:
     st.session_state["form_date"] = datetime.today()
 
+st.session_state["form_date"] = st.date_input("Оберіть дату:", st.session_state["form_date"], format="DD/MM/YYYY")
 selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
+
 if st.session_state.get("current_loaded_date") != selected_date:
     load_draft_or_init(selected_date)
     st.session_state["current_loaded_date"] = selected_date
+
+receipts_key = f"receipts_{selected_date}"
+if receipts_key not in st.session_state:
+    st.session_state[receipts_key] = []
 
 # --- ВКЛАДКИ ---
 tab1, tab2 = st.tabs(["📝 Введення даних", "🔎 Архів"])
@@ -263,9 +251,6 @@ with tab1:
             st.session_state["edit_ok"] = False
             if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
             st.rerun()
-
-        st.session_state["form_date"] = st.date_input("Оберіть дату:", st.session_state["form_date"])
-        selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
         
         db_start = get_start_balance(selected_date)
         start_balance = get_int(st.text_input("Залишок на початок дня:", value=str(db_start), key=f"start_balance_{selected_date}"))
@@ -281,7 +266,38 @@ with tab1:
             st.markdown(f"<p style='font-weight: bold; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>", unsafe_allow_html=True)
             
         with col_t2:
-            st.subheader("Витрати:")
+            c_header, c_btn = st.columns([3, 1])
+            with c_header:
+                st.subheader("Витрати:")
+            with c_btn:
+                with st.popover("📷 Чеки"):
+                    ufs = st.file_uploader("Виберіть файли", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key=f"uploader_{selected_date}")
+                    if st.button("➕ Завантажити вибрані", use_container_width=True) and ufs:
+                        for uf in ufs:
+                            if not any(r['name'] == uf.name for r in st.session_state[receipts_key]):
+                                try:
+                                    img = Image.open(uf)
+                                    if img.mode in ("RGBA", "P"): img = img.convert("RGB")
+                                    img.thumbnail((1024, 1024)) 
+                                    buf = io.BytesIO()
+                                    img.save(buf, format="JPEG", quality=70) 
+                                    st.session_state[receipts_key].append({"id": str(uuid.uuid4()), "name": uf.name, "bytes": buf.getvalue()})
+                                except Exception as e:
+                                    st.error(f"Помилка з файлом {uf.name}: {e}")
+                        st.success("✅ Збережено в пам'ять!")
+                        time.sleep(1)
+                        st.rerun()
+                    
+                    if st.session_state[receipts_key]:
+                        st.write("---")
+                        st.write("📁 Готові до відправки:")
+                        for r in st.session_state[receipts_key]:
+                            col_img, col_del = st.columns([3, 1])
+                            col_img.image(r["bytes"])
+                            if col_del.button("❌", key=f"del_{r['id']}"):
+                                st.session_state[receipts_key] = [x for x in st.session_state[receipts_key] if x["id"] != r["id"]]
+                                st.rerun()
+
             exp_df = prepare_df(st.session_state["exp_data"], ["Опис", "Сума"])
             edited_exp_df = st.data_editor(exp_df, num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
             subtotal_exp = sum(get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows())
@@ -344,7 +360,11 @@ with tab1:
             st.toast("✅ Дані збережено!", icon="💾")
 
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
-            with st.spinner("Відправка..."):
+            with st.spinner("Відправка звіту та чеків..."):
+                files_ok = upload_receipts_to_supabase(selected_date, st.session_state[receipts_key])
+                if not files_ok:
+                    st.stop()
+                
                 requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
@@ -369,7 +389,8 @@ with tab1:
                     if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
                     if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
                     
-                    st.success("🎉 Звіт успішно записано в архів!")
+                    st.success("🎉 Звіт та чеки успішно збережено в хмарі!")
+                    st.session_state[receipts_key] = []
                     time.sleep(1.5)
                     st.rerun()
                 else:
@@ -400,6 +421,7 @@ with tab2:
             st.rerun()
             
         st.subheader("🔎 Перегляд історії")
+        
         search_date_raw = st.date_input("Оберіть дату", datetime.today(), key="search", format="DD/MM/YYYY")
         search_date = search_date_raw.strftime('%Y-%m-%d')
         
