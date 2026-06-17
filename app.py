@@ -491,42 +491,45 @@ with tab2:
                 st.write("Немає записів")
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {total_adv} грн</p>", unsafe_allow_html=True)
             
-            # ========================================================
-            # НОВЫЙ БЛОК: ГАЛЕРЕЯ ЧЕКОВ ДЛЯ СМЕНЫ
+           # ========================================================
+            # ДЕБАГ БЛОК: ГАЛЕРЕЯ ЧЕКОВ ДЛЯ СМЕНЫ
             # ========================================================
             st.divider()
             st.subheader("🖼️ Галерея чеків за зміну")
             
-            # Запрашиваем список файлов в бакете 'receipts', которые лежат в папке выбранной даты
+            st.info(f"🔍 Шукаємо чеки у папці: '{search_date}'")
+            
             list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
+            
+            # Добавили limit и offset — иногда без них Supabase выдает ошибку
+            payload = {
+                "prefix": search_date,
+                "limit": 100,
+                "offset": 0
+            }
+            
             try:
-                # Передаем префикс в виде даты (например, "2026-06-18")
-                storage_res = requests.post(list_files_url, headers=headers, json={"prefix": search_date})
+                storage_res = requests.post(list_files_url, headers=headers, json=payload)
+                
+                # ВЫВОДИМ ОТВЕТ СЕРВЕРА НА ЭКРАН
+                st.write(f"**HTTP Статус:** {storage_res.status_code}")
+                st.write(f"**Відповідь сервера:** {storage_res.text}")
                 
                 if storage_res.status_code == 200:
                     files_list = storage_res.json()
-                    
-                    # Фильтруем системные заглушки, если они есть
                     valid_files = [f for f in files_list if f.get('name') != '.emptyFolderPlaceholder']
                     
                     if valid_files:
-                        # Строим сетку из 3 колонок под картинки
                         img_cols = st.columns(3)
                         for idx, file_obj in enumerate(valid_files):
                             file_name = file_obj['name']
-                            # Собираем прямой публичный URL к файлу
                             img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
-                            
-                            # Распределяем картинки по колонкам
                             with img_cols[idx % 3]:
                                 st.image(img_url, use_container_width=True)
                     else:
-                        st.info("Чеки для цієї зміни не завантажувались.")
+                        st.warning("Сервер відповів 200 (ОК), але список файлів порожній `[]`.")
                 else:
-                    st.warning("Не вдалося отримати список файлів зі сховища.")
+                    st.error("Помилка доступу до Storage.")
             except Exception as e:
-                st.error(f"Помилка при запиті галереї: {e}")
+                st.error(f"Системна помилка: {e}")
             # ========================================================
-            
-        else:
-            st.warning("За цей день звітів не знайдено в хмарі.")
