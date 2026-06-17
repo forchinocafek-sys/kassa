@@ -46,7 +46,6 @@ def get_previous_advances(date_str):
                 url_adv = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{last_date}"
                 res_adv = requests.get(url_adv, headers=headers).json()
                 if isinstance(res_adv, list):
-                    # Повертаємо співробітника та суму, а Примітку ПРИМУСОВО залишаємо порожньою для нового дня
                     return [{"Співробітник": item.get('employee', ''), "Сума": get_int(item.get('amount', 0)), "Примітка": ""} for item in res_adv]
     except Exception:
         pass
@@ -61,6 +60,7 @@ def prepare_df(data_list, columns):
             df[col] = 0 if col == "Сума" else ""
     if "Сума" in df.columns:
         df["Сума"] = pd.to_numeric(df["Сума"], errors='coerce').fillna(0).astype(int)
+    df = df.fillna("")
     return df[columns]
 
 def load_draft_or_init(date_str):
@@ -93,6 +93,36 @@ st.set_page_config(layout="wide", page_title="Cafe Forchino")
 
 st.markdown("""
 <style>
+    /* -------------------------------------------------------------
+       ФІКСОВАНИЙ ДИЗАЙН: Тема "Льон" та чорний текст
+       ------------------------------------------------------------- */
+    .stApp, header[data-testid="stHeader"] { 
+        background-color: #FAF0E6 !important; 
+    }
+    
+    /* Примусово робимо текст темним (ігноруючи темну тему пристрою) */
+    .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li {
+        color: #111827 !important; 
+    }
+
+    /* Захист кольорових підсумків (пріоритет над загальним чорним текстом) */
+    p[style*="#2e7d32"] { color: #2e7d32 !important; } /* Зелений */
+    p[style*="#c62828"] { color: #c62828 !important; } /* Червоний */
+    p[style*="#ef6c00"] { color: #ef6c00 !important; } /* Помаранчевий */
+    span[style*="#0066cc"] { color: #0066cc !important; } /* Синій */
+
+    /* Поля вводу: світлий фон, темний текст */
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+    }
+    input, .stSelectbox span {
+        color: #111827 !important;
+    }
+
+    /* -------------------------------------------------------------
+       ЕЛЕМЕНТИ ІНТЕРФЕЙСУ
+       ------------------------------------------------------------- */
     /* Компактні поля вводу */
     .stTextInput div[data-baseweb="input"] { height: 35px !important; }
     .stTextInput input { padding: 5px !important; }
@@ -101,7 +131,7 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* МІНІМАЛІСТИЧНА ПЛАВАЮЧА КНОПКА (Правий верхній кут) */
+    /* ПЛАВАЮЧА КНОПКА ЗБЕРЕЖЕННЯ (Правий верхній кут) */
     #floating-anchor { display: none; }
     
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
@@ -149,48 +179,31 @@ st.markdown("""
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
+        color: #4b5563 !important; /* Фікс для дискети */
     }
 </style>
 """, unsafe_allow_html=True)
 
-# --- БОКОВА ПАНЕЛЬ (ПЕРЕМИКАЧ СТИЛІВ) ---
-with st.sidebar:
-    st.markdown("### 🎨 Дизайн")
-    app_theme = st.radio("Тема оформлення:", ["Льон (Основна)", "Стандартна Streamlit"], index=0)
-
-if app_theme == "Льон (Основна)":
-    st.markdown("""
-    <style>
-        .stApp {
-            background-color: #FAF0E6 !important;
-        }
-        header[data-testid="stHeader"] {
-            background-color: transparent !important;
-        }
-    </style>
-    """, unsafe_allow_html=True)
-
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-# Розширена історія версій
-with st.popover("🚀 Версія: Stable 2.4 (Історія змін)"):
+with st.popover("🚀 Версія: Stable 2.4.1 (Історія змін)"):
     st.markdown("""
-    **Stable 2.4 (Поточна):**
-    - ➕ У таблицю "Аванси" додано колонку "Примітка".
-    - 🔄 Реалізована розумна логіка: імена і суми авансів переносяться на наступний день, а примітки — автоматично очищаються.
+    **Stable 2.4.1 (Поточна):**
+    - 🔒 **Theme Lock:** Дизайн зафіксовано на кольорі "Льон". Видалено тумблер перемикання тем. Усі системні тексти примусово зроблені чорними для ідеальної читабельності.
+    - 🛠 **Bugfix:** Виправлено помилку `AttributeError` при завантаженні старих звітів з порожніми примітками в Архіві.
+    
+    **Stable 2.4:**
+    - ➕ У таблицю "Аванси" додано колонку "Примітка" з автоматичним очищенням при перенесенні на новий день.
     
     **Stable 2.3:**
-    - 🎨 Додано бокову панель з перемикачем стилів. Встановлено колір "Льон".
+    - 🎨 Встановлено колір "Льон" (#FAF0E6) як основний фон.
     
     **Stable 2.2:**
     - 🎯 Відцентровано іконку дискети у плаваючій кнопці збереження.
     
     **Stable 2.1:**
     - 🎨 Плаваючу кнопку збереження чернетки переміщено у правий верхній кут.
-    
-    **Stable 2.0:**
-    - 🗓 Відновлено стабільну роботу календаря. Дані не очищаються після відправки звіту.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -232,7 +245,6 @@ with tab1:
             if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
             st.rerun()
 
-        # Календар
         st.session_state["form_date"] = st.date_input("Оберіть дату:", st.session_state["form_date"])
         selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
         
@@ -305,7 +317,6 @@ with tab1:
 
         st.write("") 
         
-        # --- ДИНАМІЧНА ПЛАВАЮЧА КНОПКА ЗБЕРЕЖЕННЯ ---
         st.markdown('<div id="floating-anchor"></div>', unsafe_allow_html=True)
         if st.button("💾", key="fab_save"):
             payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
@@ -313,28 +324,28 @@ with tab1:
             requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
             st.toast("✅ Дані збережено!", icon="💾")
 
-        # Фінальний звіт 
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
             with st.spinner("Відправка..."):
                 requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
                 requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
                 
-                shift_payload = {
-                    "date": selected_date, 
-                    "start_balance": str(start_balance), 
-                    "calculated_end": str(calculated_end), 
-                    "actual_end": str(total_actual)
-                }
-                
+                shift_payload = {"date": selected_date, "start_balance": str(start_balance), "calculated_end": str(calculated_end), "actual_end": str(total_actual)}
                 res_shift = requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json=shift_payload)
                 
                 if res_shift.status_code in [200, 201]:
                     inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_inc_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
                     exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_exp_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
-                    # Додали 'note' в payload для таблиці advances
-                    adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0))), "note": str(r.get("Примітка", "")).strip()} for _, r in edited_adv_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
                     
+                    adv_rows = []
+                    for _, r in edited_adv_df.iterrows():
+                        amt = get_int(r.get("Сума", 0))
+                        emp = str(r.get("Співробітник", "")).strip()
+                        raw_note = r.get("Примітка", "")
+                        safe_note = str(raw_note).strip() if pd.notna(raw_note) and str(raw_note).lower() != 'nan' else ""
+                        if amt != 0 or emp:
+                            adv_rows.append({"date": selected_date, "employee": emp, "amount": str(amt), "note": safe_note})
+                            
                     if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
                     if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
                     if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
@@ -420,9 +431,11 @@ with tab2:
                 for item in adv_res:
                     amt = get_int(item.get('amount'))
                     total_adv += amt
-                    # Витягуємо примітку, якщо вона є
-                    note = item.get('note', '').strip()
-                    note_str = f" <i>— {note}</i>" if note else ""
+                    
+                    note_val = item.get('note')
+                    safe_note = str(note_val).strip() if note_val else ""
+                    note_str = f" <i>— {safe_note}</i>" if safe_note else ""
+                    
                     st.markdown(f"• {item.get('employee', 'Без імені')}: {amt} грн{note_str}", unsafe_allow_html=True)
             else:
                 st.write("Немає записів")
