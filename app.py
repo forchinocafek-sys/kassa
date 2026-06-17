@@ -508,3 +508,29 @@ with tab2:
             
         else:
             st.warning("За цей день звітів не знайдено в хмарі.")
+            
+# --- ГАЛЕРЕЯ ФОТО ЗА ЦЕЙ ДЕНЬ ---
+st.subheader("🖼️ Фото чеків за день")
+
+# 1. Запитуємо список файлів у папці, яка названа як дата
+# Шлях: storage/v1/object/list/receipts/{search_date}
+storage_list_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts/{search_date}"
+files_res = requests.get(storage_list_url, headers=headers).json()
+
+# 2. Якщо щось повернулось (список файлів)
+if isinstance(files_res, list) and len(files_res) > 0:
+    # Робимо сітку (наприклад, по 3 фото в рядок)
+    cols = st.columns(3)
+    
+    for i, file in enumerate(files_res):
+        file_name = file['name']
+        # Формуємо пряме посилання на файл
+        public_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
+        
+        # Виводимо у відповідну колонку
+        with cols[i % 3]:
+            st.image(public_url, use_container_width=True)
+            # Можна додати кнопку для відкриття в оригіналі
+            st.markdown(f"[Відкрити]({public_url})", unsafe_allow_html=True)
+else:
+    st.write("📸 За цю дату фото не завантажувалися.")
