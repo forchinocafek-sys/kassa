@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime, timedelta
+from datetime import datetime
 import requests
 import pandas as pd
 import time
@@ -76,8 +76,8 @@ def get_previous_coins(date_str):
         pass
     return 0
 
-def upload_receipts_to_supabase(date_str, receipts_list, supabase_client):
-    """Відправляє утиснені чеки і записує дані в базу transactions."""
+def upload_receipts_to_supabase(date_str, receipts_list):
+    """Відправляє утиснені чеки з пам'яті в Storage Supabase."""
     if not receipts_list:
         return True
         
@@ -85,27 +85,17 @@ def upload_receipts_to_supabase(date_str, receipts_list, supabase_client):
     for r in receipts_list:
         safe_name = r['name'].replace(" ", "_").replace("/", "-")
         file_path = f"{date_str}/{r['id']}_{safe_name}"
-        
-        # 1. Твій існуючий код завантаження в Storage
         url = f"{SUPABASE_URL}/storage/v1/object/receipts/{file_path}"
+        
         try:
             res = requests.post(url, headers=upload_headers, data=r['bytes'])
-            
-            if res.status_code in [200, 201]:
-                # 2. ОДРАЗУ ПІСЛЯ УСПІШНОГО ЗАВАНТАЖЕННЯ пишемо в базу
-                supabase_client.table("transactions").insert({
-                    "date": date_str,
-                    "amount": r['amount'],      # Переконайся, що ці дані є в словнику r
-                    "category_id": r['category'],
-                    "photo_url": file_path      # Зберігаємо шлях!
-                }).execute()
-            else:
+            if res.status_code not in [200, 201]:
                 errors.append(f"{r['name']}: {res.text}")
         except Exception as e:
             errors.append(f"{r['name']}: {e}")
             
     if errors:
-        st.error("❌ Помилки:")
+        st.error("❌ Деякі чеки не завантажилися в хмару:")
         for err in errors: st.write(err)
         return False
     return True
@@ -213,7 +203,7 @@ with st.popover("🚀 Версія: Stable 2.5 Global (Історія змін)"
     st.markdown("""
     **Stable 2.5 Global (Поточна):**
     - 🗓 **Дати:** Жорстко зафіксовано формат дат (ДД/ММ/РРРР).
-    - 📸 **Фото-чеки (LIVE):** Реалізовано повний цикл роботи з чеками. При натисканні "Зберегти фінальний звіт" утиснені фото автоматично відправляються в хмару Supabase Storage у папку відповідної дати зміни.
+    - 📸 **Фото-чеки (LIVE):** Галерея фотографій в архіві (пряме завантаження з бакета).
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -409,8 +399,6 @@ with tab1:
 # ВКЛАДКА 2: АРХІВ
 # ==========================================
 with tab2:
-    st.error("🚨 ЯКЩО ТИ ЦЕ БАЧИШ, КОД ОНОВЛЮЄТЬСЯ!")
-    
     if st.query_params.get("archive_auth") == "1":
         st.session_state["archive_ok"] = True
 
@@ -436,7 +424,6 @@ with tab2:
         search_date_raw = st.date_input("Оберіть дату", datetime.today(), key="search", format="DD/MM/YYYY")
         search_date = search_date_raw.strftime('%Y-%m-%d')
         
-        # --- БЛОК 1: ТЕКСТОВІ ДАНІ ЗМІНИ ---
         url_shift_search = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{search_date}"
         shift_res = requests.get(url_shift_search, headers=headers).json()
         
@@ -497,10 +484,11 @@ with tab2:
         else:
             st.warning("За цей день звітів не знайдено в хмарі (таблиця shifts порожня).")
             
-        # --- БЛОК 2: ГАЛЕРЕЯ ЧЕКІВ (НЕЗАЛЕЖНО ВІД ЗМІНИ) ---
+        # ========================================================
+        # БЛОК 2: ГАЛЕРЕЯ ЧЕКІВ (ВІДОБРАЖАЄТЬСЯ ЗАВЖДИ)
+        # ========================================================
         st.divider()
-        st.subheader("🖼️ Галерея чеків за зміну")
-        st.info(f"🔍 Шукаємо чеки у папці: '{search_date}'")
+        st.subheader("🖼️ Галерея чеків за обрану дату")
         
         list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
         payload = {
@@ -511,23 +499,21 @@ with tab2:
         
         try:
             storage_res = requests.post(list_files_url, headers=headers, json=payload)
-            st.write(f"**HTTP Статус:** {storage_res.status_code}")
-            st.write(f"**Відповідь сервера:** {storage_res.text}")
-            
             if storage_res.status_code == 200:
                 files_list = storage_res.json()
-                valid_files = [f for f in files_list if f.get('name') != '.emptyFolderPlaceholder']
+                valid_files = [f for f in files_list if f.get('name') and f.get('name') != '.emptyFolderPlaceholder']
                 
                 if valid_files:
                     img_cols = st.columns(3)
                     for idx, file_obj in enumerate(valid_files):
                         file_name = file_obj['name']
+                        # Генеруємо пряме публічне посилання
                         img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
                         with img_cols[idx % 3]:
                             st.image(img_url, use_container_width=True)
                 else:
-                    st.warning("Сервер відповів 200 (ОК), але список файлів порожній.")
+                    st.info("📂 В цей день чеки не завантажувались (або папка пуста).")
             else:
-                st.error("Помилка доступу до Storage.")
+                st.error(f"Помилка доступу до Storage: {storage_res.text}")
         except Exception as e:
             st.error(f"Системна помилка: {e}")
