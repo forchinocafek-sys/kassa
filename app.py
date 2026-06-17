@@ -46,7 +46,8 @@ def get_previous_advances(date_str):
                 url_adv = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{last_date}"
                 res_adv = requests.get(url_adv, headers=headers).json()
                 if isinstance(res_adv, list):
-                    return [{"Співробітник": item.get('employee', ''), "Сума": get_int(item.get('amount', 0))} for item in res_adv]
+                    # Повертаємо співробітника та суму, а Примітку ПРИМУСОВО залишаємо порожньою для нового дня
+                    return [{"Співробітник": item.get('employee', ''), "Сума": get_int(item.get('amount', 0)), "Примітка": ""} for item in res_adv]
     except Exception:
         pass
     return []
@@ -71,7 +72,7 @@ def load_draft_or_init(date_str):
             payload = draft_res[0].get('payload', {})
             st.session_state["inc_data"] = payload.get('inc', [{"Опис": "", "Сума": 0}])
             st.session_state["exp_data"] = payload.get('exp', [{"Опис": "", "Сума": 0}])
-            st.session_state["adv_data"] = payload.get('adv', [{"Співробітник": "", "Сума": 0}])
+            st.session_state["adv_data"] = payload.get('adv', [{"Співробітник": "", "Сума": 0, "Примітка": ""}])
             cash_data = payload.get('cash', {})
             st.session_state[coins_key] = str(cash_data.get('coins', 0))
             for k in [20, 50, 100, 200, 500, 1000]:
@@ -82,7 +83,7 @@ def load_draft_or_init(date_str):
     st.session_state["inc_data"] = [{"Опис": "", "Сума": 0}]
     st.session_state["exp_data"] = [{"Опис": "", "Сума": 0}]
     prev_adv = get_previous_advances(date_str)
-    st.session_state["adv_data"] = prev_adv if prev_adv else [{"Співробітник": "", "Сума": 0}]
+    st.session_state["adv_data"] = prev_adv if prev_adv else [{"Співробітник": "", "Сума": 0, "Примітка": ""}]
     st.session_state[coins_key] = "0"
     for k in [20, 50, 100, 200, 500, 1000]:
         st.session_state[f"qty_{k}_{date_str}"] = "0"
@@ -100,7 +101,7 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* МІНІМАЛІСТИЧНА ПЛАВАЮЧА КНОПКА (Правий верхній кут, світло-сіра) */
+    /* МІНІМАЛІСТИЧНА ПЛАВАЮЧА КНОПКА (Правий верхній кут) */
     #floating-anchor { display: none; }
     
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
@@ -117,7 +118,7 @@ st.markdown("""
     .element-container:has(#floating-anchor) + .element-container button {
         width: 50px !important;
         height: 50px !important;
-        padding: 0 !important; /* Обнуляємо стандартні відступи Streamlit */
+        padding: 0 !important;
         border-radius: 12px !important; 
         background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
         color: #4b5563 !important; 
@@ -152,27 +153,44 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# --- БОКОВА ПАНЕЛЬ (ПЕРЕМИКАЧ СТИЛІВ) ---
+with st.sidebar:
+    st.markdown("### 🎨 Дизайн")
+    app_theme = st.radio("Тема оформлення:", ["Льон (Основна)", "Стандартна Streamlit"], index=0)
+
+if app_theme == "Льон (Основна)":
+    st.markdown("""
+    <style>
+        .stApp {
+            background-color: #FAF0E6 !important;
+        }
+        header[data-testid="stHeader"] {
+            background-color: transparent !important;
+        }
+    </style>
+    """, unsafe_allow_html=True)
+
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-# Розширена історія останніх 5 версій
-with st.popover("🚀 Версія: Stable 2.2 (Історія змін)"):
+# Розширена історія версій
+with st.popover("🚀 Версія: Stable 2.4 (Історія змін)"):
     st.markdown("""
-    **Stable 2.2 (Поточна):**
-    - 🎯 Ідеально відцентровано іконку дискети (виправлено зсув вправо через стандартні відступи Streamlit).
+    **Stable 2.4 (Поточна):**
+    - ➕ У таблицю "Аванси" додано колонку "Примітка".
+    - 🔄 Реалізована розумна логіка: імена і суми авансів переносяться на наступний день, а примітки — автоматично очищаються.
+    
+    **Stable 2.3:**
+    - 🎨 Додано бокову панель з перемикачем стилів. Встановлено колір "Льон".
+    
+    **Stable 2.2:**
+    - 🎯 Відцентровано іконку дискети у плаваючій кнопці збереження.
     
     **Stable 2.1:**
-    - 🎨 Кнопку збереження чернетки переміщено у *правий верхній кут* та змінено на стриманий світло-сірий колір.
-    - 📜 Журнал змін розширено до 5 останніх версій.
+    - 🎨 Плаваючу кнопку збереження чернетки переміщено у правий верхній кут.
     
     **Stable 2.0:**
-    - 🎨 Новий дизайн кнопки збереження (заокруглений квадрат).
-    - 🗓 Стабільний календар (видалено конфліктні стрілочки навігації).
-    - 💾 Дані в таблицях більше не очищаються після відправки фінального звіту.
-    
-    **Stable 1.9:**
-    - 🗑 Видалено селектор адміністратора для забезпечення 100% сумісності з базою даних.
-    - ⚡️ Оптимізовано швидкість надсилання фінального звіту.
+    - 🗓 Відновлено стабільну роботу календаря. Дані не очищаються після відправки звіту.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -243,7 +261,7 @@ with tab1:
         col_b1, col_b2 = st.columns(2)
         with col_b1:
             st.subheader("Аванси:")
-            adv_df = prepare_df(st.session_state["adv_data"], ["Співробітник", "Сума"])
+            adv_df = prepare_df(st.session_state["adv_data"], ["Співробітник", "Сума", "Примітка"])
             edited_adv_df = st.data_editor(adv_df, num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
             subtotal_adv = sum(get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
@@ -314,7 +332,9 @@ with tab1:
                 if res_shift.status_code in [200, 201]:
                     inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_inc_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
                     exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_exp_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
-                    adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_adv_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
+                    # Додали 'note' в payload для таблиці advances
+                    adv_rows = [{"date": selected_date, "employee": str(r.get("Співробітник", "")).strip(), "amount": str(get_int(r.get("Сума", 0))), "note": str(r.get("Примітка", "")).strip()} for _, r in edited_adv_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Співробітник", "")).strip()]
+                    
                     if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
                     if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
                     if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
@@ -400,7 +420,10 @@ with tab2:
                 for item in adv_res:
                     amt = get_int(item.get('amount'))
                     total_adv += amt
-                    st.write(f"• {item.get('employee', 'Без імені')}: {amt} грн")
+                    # Витягуємо примітку, якщо вона є
+                    note = item.get('note', '').strip()
+                    note_str = f" <i>— {note}</i>" if note else ""
+                    st.markdown(f"• {item.get('employee', 'Без імені')}: {amt} грн{note_str}", unsafe_allow_html=True)
             else:
                 st.write("Немає записів")
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {total_adv} грн</p>", unsafe_allow_html=True)
