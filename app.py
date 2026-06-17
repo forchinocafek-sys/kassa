@@ -51,6 +51,22 @@ def get_previous_advances(date_str):
         pass
     return []
 
+def get_previous_coins(date_str):
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
+        res = requests.get(url, headers=headers).json()
+        if isinstance(res, list) and len(res) > 0:
+            last_date = res[0].get('date')
+            if last_date:
+                url_draft = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{last_date}"
+                res_draft = requests.get(url_draft, headers=headers).json()
+                if isinstance(res_draft, list) and len(res_draft) > 0:
+                    payload = res_draft[0].get('payload', {})
+                    return get_int(payload.get('cash', {}).get('coins', 0))
+    except Exception:
+        pass
+    return 0
+
 def prepare_df(data_list, columns):
     if not data_list:
         data_list = [{col: (0 if col == "Сума" else "") for col in columns}]
@@ -80,11 +96,16 @@ def load_draft_or_init(date_str):
             return
     except Exception:
         pass
+    
     st.session_state["inc_data"] = [{"Опис": "", "Сума": 0}]
     st.session_state["exp_data"] = [{"Опис": "", "Сума": 0}]
+    
     prev_adv = get_previous_advances(date_str)
     st.session_state["adv_data"] = prev_adv if prev_adv else [{"Співробітник": "", "Сума": 0, "Примітка": ""}]
-    st.session_state[coins_key] = "0"
+    
+    prev_coins = get_previous_coins(date_str)
+    st.session_state[coins_key] = str(prev_coins)
+    
     for k in [20, 50, 100, 200, 500, 1000]:
         st.session_state[f"qty_{k}_{date_str}"] = "0"
 
@@ -100,18 +121,18 @@ st.markdown("""
         background-color: #FAF0E6 !important; 
     }
     
-    /* Примусово робимо текст темним (ігноруючи темну тему пристрою) */
+    /* Примусово робимо текст темним */
     .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li {
         color: #111827 !important; 
     }
 
-    /* Захист кольорових підсумків (пріоритет над загальним чорним текстом) */
-    p[style*="#2e7d32"] { color: #2e7d32 !important; } /* Зелений */
-    p[style*="#c62828"] { color: #c62828 !important; } /* Червоний */
-    p[style*="#ef6c00"] { color: #ef6c00 !important; } /* Помаранчевий */
-    span[style*="#0066cc"] { color: #0066cc !important; } /* Синій */
+    /* Захист кольорових підсумків */
+    p[style*="#2e7d32"] { color: #2e7d32 !important; }
+    p[style*="#c62828"] { color: #c62828 !important; }
+    p[style*="#ef6c00"] { color: #ef6c00 !important; }
+    span[style*="#0066cc"] { color: #0066cc !important; }
 
-    /* Поля вводу: світлий фон, темний текст */
+    /* Поля вводу */
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
         background-color: #ffffff !important;
         border: 1px solid #d1d5db !important;
@@ -123,15 +144,13 @@ st.markdown("""
     /* -------------------------------------------------------------
        ЕЛЕМЕНТИ ІНТЕРФЕЙСУ
        ------------------------------------------------------------- */
-    /* Компактні поля вводу */
     .stTextInput div[data-baseweb="input"] { height: 35px !important; }
     .stTextInput input { padding: 5px !important; }
     
-    /* Верстка блоку Факт */
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* ПЛАВАЮЧА КНОПКА ЗБЕРЕЖЕННЯ (Правий верхній кут) */
+    /* ПЛАВАЮЧА КНОПКА ЗБЕРЕЖЕННЯ */
     #floating-anchor { display: none; }
     
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
@@ -167,7 +186,6 @@ st.markdown("""
         background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
     }
     
-    /* Ідеальне центрування дискети всередині кнопки */
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button div,
     .element-container:has(#floating-anchor) + .element-container button div,
     div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
@@ -179,7 +197,7 @@ st.markdown("""
         display: flex !important;
         justify-content: center !important;
         align-items: center !important;
-        color: #4b5563 !important; /* Фікс для дискети */
+        color: #4b5563 !important; 
     }
 </style>
 """, unsafe_allow_html=True)
@@ -190,17 +208,18 @@ st.title("Cafe Forchino")
 with st.popover("🚀 Версія: Stable 2.4.1 (Історія змін)"):
     st.markdown("""
     **Stable 2.4.1 (Поточна):**
-    - 🔒 **Theme Lock:** Дизайн зафіксовано на кольорі "Льон". Видалено тумблер перемикання тем. Усі системні тексти примусово зроблені чорними для ідеальної читабельності.
-    - 🛠 **Bugfix:** Виправлено помилку `AttributeError` при завантаженні старих звітів з порожніми примітками в Архіві.
+    - 🔒 **Theme Lock:** Дизайн зафіксовано на кольорі "Льон". Видалено тумблер перемикання тем. Усі тексти примусово чорні.
+    - 🪙 **Монети:** Значення "Монети" тепер автоматично переноситься з попередньої зміни на нову.
+    - 🛠 **Bugfix:** Виправлено помилку `AttributeError` при завантаженні старих звітів в Архіві.
     
     **Stable 2.4:**
-    - ➕ У таблицю "Аванси" додано колонку "Примітка" з автоматичним очищенням при перенесенні на новий день.
+    - ➕ У таблицю "Аванси" додано колонку "Примітка" (очищається при перенесенні на новий день).
     
     **Stable 2.3:**
     - 🎨 Встановлено колір "Льон" (#FAF0E6) як основний фон.
     
     **Stable 2.2:**
-    - 🎯 Відцентровано іконку дискети у плаваючій кнопці збереження.
+    - 🎯 Відцентровано іконку дискети у плаваючій кнопці.
     
     **Stable 2.1:**
     - 🎨 Плаваючу кнопку збереження чернетки переміщено у правий верхній кут.
