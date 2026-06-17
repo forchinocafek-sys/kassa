@@ -452,8 +452,6 @@ with tab2:
                     for item in inc_res:
                         amt = get_int(item.get('amount'))
                         total_inc += amt
-                        # Це допоможе побачити, чи є фото в базі
-                        st.write(f"DEBUG: {item}")
                         st.write(f"• {item.get('description', 'Без опису')}: {amt} грн")
                 else:
                     st.write("Немає записів")
@@ -468,19 +466,6 @@ with tab2:
                         amt = get_int(item.get('amount'))
                         total_exp += amt
                         st.write(f"• {item.get('description', 'Без опису')}: {amt} грн")
-                        
-                        # --- ДОДАЙ ЦЕЙ БЛОК ДЛЯ ВІДОБРАЖЕННЯ ФОТО ---
-                        photo_path = item.get('photo_url')
-                        if photo_path:
-                            try:
-                                # Генеруємо посилання за допомогою клієнта supabase
-                                # Переконайся, що змінна `supabase` ініціалізована у твоїх імпортах/на початку файлу
-                                public_url = supabase.storage.from_("receipts").get_public_url(photo_path)
-                                st.image(public_url, width=150)
-                            except Exception:
-                                st.write("⚠️ Фото не вдалося завантажити")
-                        # --------------------------------------------
-
                 else:
                     st.write("Немає записів")
                 st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {total_exp} грн</p>", unsafe_allow_html=True)
@@ -506,31 +491,42 @@ with tab2:
                 st.write("Немає записів")
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {total_adv} грн</p>", unsafe_allow_html=True)
             
+            # ========================================================
+            # НОВЫЙ БЛОК: ГАЛЕРЕЯ ЧЕКОВ ДЛЯ СМЕНЫ
+            # ========================================================
+            st.divider()
+            st.subheader("🖼️ Галерея чеків за зміну")
+            
+            # Запрашиваем список файлов в бакете 'receipts', которые лежат в папке выбранной даты
+            list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
+            try:
+                # Передаем префикс в виде даты (например, "2026-06-18")
+                storage_res = requests.post(list_files_url, headers=headers, json={"prefix": search_date})
+                
+                if storage_res.status_code == 200:
+                    files_list = storage_res.json()
+                    
+                    # Фильтруем системные заглушки, если они есть
+                    valid_files = [f for f in files_list if f.get('name') != '.emptyFolderPlaceholder']
+                    
+                    if valid_files:
+                        # Строим сетку из 3 колонок под картинки
+                        img_cols = st.columns(3)
+                        for idx, file_obj in enumerate(valid_files):
+                            file_name = file_obj['name']
+                            # Собираем прямой публичный URL к файлу
+                            img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
+                            
+                            # Распределяем картинки по колонкам
+                            with img_cols[idx % 3]:
+                                st.image(img_url, use_container_width=True)
+                    else:
+                        st.info("Чеки для цієї зміни не завантажувались.")
+                else:
+                    st.warning("Не вдалося отримати список файлів зі сховища.")
+            except Exception as e:
+                st.error(f"Помилка при запиті галереї: {e}")
+            # ========================================================
+            
         else:
             st.warning("За цей день звітів не знайдено в хмарі.")
-            
-# --- ГАЛЕРЕЯ ФОТО ЗА ЦЕЙ ДЕНЬ ---
-st.subheader("🖼️ Фото чеків за день")
-
-# 1. Запитуємо список файлів у папці, яка названа як дата
-# Шлях: storage/v1/object/list/receipts/{search_date}
-storage_list_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts/{search_date}"
-files_res = requests.get(storage_list_url, headers=headers).json()
-
-# 2. Якщо щось повернулось (список файлів)
-if isinstance(files_res, list) and len(files_res) > 0:
-    # Робимо сітку (наприклад, по 3 фото в рядок)
-    cols = st.columns(3)
-    
-    for i, file in enumerate(files_res):
-        file_name = file['name']
-        # Формуємо пряме посилання на файл
-        public_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
-        
-        # Виводимо у відповідну колонку
-        with cols[i % 3]:
-            st.image(public_url, use_container_width=True)
-            # Можна додати кнопку для відкриття в оригіналі
-            st.markdown(f"[Відкрити]({public_url})", unsafe_allow_html=True)
-else:
-    st.write("📸 За цю дату фото не завантажувалися.")
