@@ -7,9 +7,9 @@ import io
 import uuid
 from PIL import Image
 
-# --- НАСТРОЙКИ ДОСТУПУ ДО SUPABASE ---
-SUPABASE_URL = "https://ajkprfhuypcamnybqusr.supabase.co"
-SUPABASE_KEY = "sb_publishable_JMxxH6oo3cwsjS09gDe91A_uHL5C90E"
+# --- НАЛАШТУВАННЯ БЕЗПЕКИ (КЛЮЧІ ВЗЯТІ З SECRETS) ---
+SUPABASE_URL = st.secrets["SUPABASE_URL"]
+SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 headers = {
     "apikey": SUPABASE_KEY,
@@ -20,7 +20,6 @@ headers = {
     "Prefer": "return=representation"
 }
 
-# Спеціальні заголовки для завантаження файлів (binary)
 upload_headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
