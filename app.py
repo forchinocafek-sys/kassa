@@ -76,8 +76,8 @@ def get_previous_coins(date_str):
         pass
     return 0
 
-def upload_receipts_to_supabase(date_str, receipts_list):
-    """Відправляє утиснені чеки з пам'яті в Storage Supabase."""
+def upload_receipts_to_supabase(date_str, receipts_list, supabase_client):
+    """Відправляє утиснені чеки і записує дані в базу transactions."""
     if not receipts_list:
         return True
         
@@ -85,17 +85,27 @@ def upload_receipts_to_supabase(date_str, receipts_list):
     for r in receipts_list:
         safe_name = r['name'].replace(" ", "_").replace("/", "-")
         file_path = f"{date_str}/{r['id']}_{safe_name}"
-        url = f"{SUPABASE_URL}/storage/v1/object/receipts/{file_path}"
         
+        # 1. Твій існуючий код завантаження в Storage
+        url = f"{SUPABASE_URL}/storage/v1/object/receipts/{file_path}"
         try:
             res = requests.post(url, headers=upload_headers, data=r['bytes'])
-            if res.status_code not in [200, 201]:
+            
+            if res.status_code in [200, 201]:
+                # 2. ОДРАЗУ ПІСЛЯ УСПІШНОГО ЗАВАНТАЖЕННЯ пишемо в базу
+                supabase_client.table("transactions").insert({
+                    "date": date_str,
+                    "amount": r['amount'],      # Переконайся, що ці дані є в словнику r
+                    "category_id": r['category'],
+                    "photo_url": file_path      # Зберігаємо шлях!
+                }).execute()
+            else:
                 errors.append(f"{r['name']}: {res.text}")
         except Exception as e:
             errors.append(f"{r['name']}: {e}")
             
     if errors:
-        st.error("❌ Деякі чеки не завантажилися в хмару:")
+        st.error("❌ Помилки:")
         for err in errors: st.write(err)
         return False
     return True
@@ -456,6 +466,19 @@ with tab2:
                         amt = get_int(item.get('amount'))
                         total_exp += amt
                         st.write(f"• {item.get('description', 'Без опису')}: {amt} грн")
+                        
+                        # --- ДОДАЙ ЦЕЙ БЛОК ДЛЯ ВІДОБРАЖЕННЯ ФОТО ---
+                        photo_path = item.get('photo_url')
+                        if photo_path:
+                            try:
+                                # Генеруємо посилання за допомогою клієнта supabase
+                                # Переконайся, що змінна `supabase` ініціалізована у твоїх імпортах/на початку файлу
+                                public_url = supabase.storage.from_("receipts").get_public_url(photo_path)
+                                st.image(public_url, width=150)
+                            except Exception:
+                                st.write("⚠️ Фото не вдалося завантажити")
+                        # --------------------------------------------
+
                 else:
                     st.write("Немає записів")
                 st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {total_exp} грн</p>", unsafe_allow_html=True)
