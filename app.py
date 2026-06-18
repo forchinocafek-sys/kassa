@@ -176,25 +176,60 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* CSS для плаваючих кнопок меню, календаря та збереження */
+    /* ВИПРАВЛЕНИЙ CSS ДЛЯ ПЛАВАЮЧИХ КНОПОК */
     #floating-anchor { display: none; }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] {
-        position: fixed !important; top: 65px !important; right: 20px !important; z-index: 1000 !important; width: max-content !important; gap: 8px !important;
+    div[data-testid="stElementContainer"]:has(#floating-anchor) { display: none !important; }
+    
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
+    .element-container:has(#floating-anchor) + .element-container {
+        position: fixed !important; 
+        top: 65px !important; 
+        right: 20px !important; 
+        z-index: 1000 !important; 
+        width: auto !important;
     }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] > div {
-        min-width: 50px !important; width: 50px !important; flex: 0 0 50px !important;
+    
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"],
+    .element-container:has(#floating-anchor) + .element-container > div {
+        gap: 10px !important; 
+        justify-content: flex-end !important;
+        width: max-content !important;
     }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] button {
-        width: 50px !important; height: 50px !important; padding: 0 !important; border-radius: 12px !important; 
-        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; color: #4b5563 !important; 
-        border: 1px solid #d1d5db !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; 
-        display: flex !important; align-items: center !important; justify-content: center !important;
+    
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] div[data-testid="column"],
+    .element-container:has(#floating-anchor) + .element-container div[data-testid="column"] {
+        width: 50px !important; 
+        min-width: 50px !important; 
+        flex: 0 0 50px !important;
     }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] button:hover {
-        transform: translateY(-2px) !important; box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
+    
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button,
+    .element-container:has(#floating-anchor) + .element-container button {
+        width: 50px !important; 
+        height: 50px !important; 
+        padding: 0 !important; 
+        border-radius: 12px !important; 
+        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
+        color: #4b5563 !important; 
+        border: 1px solid #d1d5db !important; 
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; 
+        display: flex !important; 
+        align-items: center !important; 
+        justify-content: center !important;
     }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] button p {
-        font-size: 22px !important; margin: 0 !important; padding: 0 !important;
+    
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button:hover,
+    .element-container:has(#floating-anchor) + .element-container button:hover {
+        transform: translateY(-2px) !important; 
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; 
+        background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
+    }
+    
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
+    .element-container:has(#floating-anchor) + .element-container button p {
+        font-size: 22px !important; 
+        margin: 0 !important; 
+        padding: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
