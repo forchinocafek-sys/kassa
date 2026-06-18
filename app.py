@@ -159,9 +159,23 @@ st.markdown("""
 <style>
     .stApp, header[data-testid="stHeader"] { background-color: #FAF0E6 !important; }
     .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
-    
-    /* ... (твій старий CSS для вводу залишаємо без змін) ... */
+    p[style*="#2e7d32"] { color: #2e7d32 !important; }
+    p[style*="#c62828"] { color: #c62828 !important; }
+    p[style*="#ef6c00"] { color: #ef6c00 !important; }
+    span[style*="#0066cc"] { color: #0066cc !important; }
 
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        border: 1px solid #d1d5db !important;
+    }
+    input, .stSelectbox span { color: #111827 !important; }
+
+    .stTextInput div[data-baseweb="input"] { height: 35px !important; }
+    .stTextInput input { padding: 5px !important; }
+    
+    .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
+    .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
+    
     /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ (НА ВСЮ ШИРИНУ) */
     #is-floating { display: none; }
     
