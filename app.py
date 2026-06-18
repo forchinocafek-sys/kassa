@@ -176,35 +176,30 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* ВИПРАВЛЕНИЙ CSS ДЛЯ ПЛАВАЮЧИХ КНОПОК */
-    #floating-anchor { display: none; }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) { display: none !important; }
+    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ */
+    #is-floating { display: none; }
     
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
-    .element-container:has(#floating-anchor) + .element-container {
+    /* Знаходимо контейнер колонок, всередині якого є наш якір, і фіксуємо його */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) {
         position: fixed !important; 
         top: 65px !important; 
         right: 20px !important; 
-        z-index: 1000 !important; 
-        width: auto !important;
+        z-index: 99999 !important; 
+        width: max-content !important; 
+        gap: 10px !important;
+        background: transparent !important;
+        padding: 0 !important;
     }
     
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] > div[data-testid="stHorizontalBlock"],
-    .element-container:has(#floating-anchor) + .element-container > div {
-        gap: 10px !important; 
-        justify-content: flex-end !important;
-        width: max-content !important;
-    }
-    
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] div[data-testid="column"],
-    .element-container:has(#floating-anchor) + .element-container div[data-testid="column"] {
+    /* Стискаємо колонки до розміру кнопок */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
         width: 50px !important; 
         min-width: 50px !important; 
         flex: 0 0 50px !important;
     }
     
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button,
-    .element-container:has(#floating-anchor) + .element-container button {
+    /* Оформлюємо самі кнопки всередині цього блоку */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
         width: 50px !important; 
         height: 50px !important; 
         padding: 0 !important; 
@@ -216,20 +211,20 @@ st.markdown("""
         display: flex !important; 
         align-items: center !important; 
         justify-content: center !important;
+        transition: transform 0.2s, box-shadow 0.2s !important;
     }
     
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button:hover,
-    .element-container:has(#floating-anchor) + .element-container button:hover {
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button:hover {
         transform: translateY(-2px) !important; 
         box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; 
         background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
     }
     
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
-    .element-container:has(#floating-anchor) + .element-container button p {
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button p {
         font-size: 22px !important; 
         margin: 0 !important; 
         padding: 0 !important;
+        line-height: 1 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -428,9 +423,9 @@ if st.session_state["active_tab"] == "Касса":
                     st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
         # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) ---
-        st.markdown('<div id="floating-anchor"></div>', unsafe_allow_html=True)
         fc1, fc2, fc3 = st.columns(3)
         with fc1:
+            st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
             with st.popover("☰"):
                 nav = st.radio("Розділ:", ["Касса", "Архів"], index=0, label_visibility="collapsed")
                 if nav != "Касса":
@@ -566,9 +561,9 @@ elif st.session_state["active_tab"] == "Архів":
             st.error(f"Системна помилка: {e}")
 
         # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ АРХІВУ) ---
-        st.markdown('<div id="floating-anchor"></div>', unsafe_allow_html=True)
         fc1, fc2 = st.columns(2)
         with fc1:
+            st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
             with st.popover("☰"):
                 nav = st.radio("Розділ:", ["Касса", "Архів"], index=1, label_visibility="collapsed")
                 if nav != "Архів":
