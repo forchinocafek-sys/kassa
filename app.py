@@ -7,7 +7,7 @@ import io
 import uuid
 from PIL import Image
 
-# --- НАЛАШТУВАННЯ БЕЗПЕКИ (КЛЮЧІ ВЗЯТІ З SECRETS) ---
+# --- НАЛАШТУВАННЯ БЕЗПЕКИ ---
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
@@ -176,27 +176,25 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
+    /* CSS для плаваючих кнопок меню, календаря та збереження */
     #floating-anchor { display: none; }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"],
-    .element-container:has(#floating-anchor) + .element-container {
-        position: fixed !important; top: 65px !important; right: 20px !important; left: auto !important; z-index: 1000 !important; width: 50px !important;
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] {
+        position: fixed !important; top: 65px !important; right: 20px !important; z-index: 1000 !important; width: max-content !important; gap: 8px !important;
     }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button,
-    .element-container:has(#floating-anchor) + .element-container button {
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] > div {
+        min-width: 50px !important; width: 50px !important; flex: 0 0 50px !important;
+    }
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] button {
         width: 50px !important; height: 50px !important; padding: 0 !important; border-radius: 12px !important; 
         background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; color: #4b5563 !important; 
         border: 1px solid #d1d5db !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; 
-        display: flex !important; align-items: center !important; justify-content: center !important; transition: transform 0.2s, box-shadow 0.2s !important;
+        display: flex !important; align-items: center !important; justify-content: center !important;
     }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button:hover,
-    .element-container:has(#floating-anchor) + .element-container button:hover {
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] button:hover {
         transform: translateY(-2px) !important; box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
     }
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button div,
-    .element-container:has(#floating-anchor) + .element-container button div,
-    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stElementContainer"] button p,
-    .element-container:has(#floating-anchor) + .element-container button p {
-        font-size: 26px !important; margin: 0 !important; padding: 0 !important; width: 100% !important; display: flex !important; justify-content: center !important; align-items: center !important; color: #4b5563 !important; 
+    div[data-testid="stElementContainer"]:has(#floating-anchor) + div[data-testid="stHorizontalBlock"] button p {
+        font-size: 22px !important; margin: 0 !important; padding: 0 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -204,22 +202,23 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-with st.popover("🚀 Версія: Stable 2.6 Global (Історія змін)"):
+with st.popover("🚀 Версія: Stable 2.7 Global (Історія змін)"):
     st.markdown("""
     **Останні оновлення:**
-    
-    * **v2.6 (Чистий ввід):** Прибрали надокучливі нулі в порожніх клітинках таблиць. Тепер клікаєте і відразу вводите суму, не витрачаючи час на стирання.
-    * **v2.5 (Галерея в архіві):** Додали зручний перегляд чеків у вкладці "Архів". Тепер усі фото закритих змін автоматично підтягуються і відображаються сіткою.
+    * **v2.7 (Мобільний UI):** Оновлено навігацію. Вкладки та календар тепер сховані у плаваючих кнопках праворуч зверху (☰ та 📅) для максимальної чистоти екрана.
+    * **v2.6 (Чистий ввід):** Прибрано нулі в порожніх клітинках.
+    * **v2.5 (Галерея в архіві):** Пряме завантаження чеків у вигляді сітки.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
 st.write("") 
 
-# --- ІНІЦІАЛІЗАЦІЯ ДАТИ ---
+# --- ІНІЦІАЛІЗАЦІЯ СТАНУ ---
 if "form_date" not in st.session_state:
     st.session_state["form_date"] = datetime.today()
+if "active_tab" not in st.session_state:
+    st.session_state["active_tab"] = "Касса"
 
-st.session_state["form_date"] = st.date_input("Оберіть дату:", st.session_state["form_date"], format="DD/MM/YYYY")
 selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
 
 if st.session_state.get("current_loaded_date") != selected_date:
@@ -230,13 +229,11 @@ receipts_key = f"receipts_{selected_date}"
 if receipts_key not in st.session_state:
     st.session_state[receipts_key] = []
 
-# --- ВКЛАДКИ ---
-tab1, tab2 = st.tabs(["📝 Введення даних", "🔎 Архів"])
 
 # ==========================================
-# ВКЛАДКА 1: КАСА
+# РОЗДІЛ 1: КАСА
 # ==========================================
-with tab1:
+if st.session_state["active_tab"] == "Касса":
     if st.query_params.get("edit_auth") == "1": 
         st.session_state["edit_ok"] = True
 
@@ -357,13 +354,6 @@ with tab1:
         else: res_c3.error(f"{discrepancy} грн")
 
         st.write("") 
-        
-        st.markdown('<div id="floating-anchor"></div>', unsafe_allow_html=True)
-        if st.button("💾", key="fab_save"):
-            payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
-            requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
-            requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
-            st.toast("✅ Дані збережено!", icon="💾")
 
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
             with st.spinner("Відправка звіту та чеків..."):
@@ -402,10 +392,32 @@ with tab1:
                 else:
                     st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
+        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) ---
+        st.markdown('<div id="floating-anchor"></div>', unsafe_allow_html=True)
+        fc1, fc2, fc3 = st.columns(3)
+        with fc1:
+            with st.popover("☰"):
+                nav = st.radio("Розділ:", ["Касса", "Архів"], index=0, label_visibility="collapsed")
+                if nav != "Касса":
+                    st.session_state["active_tab"] = nav
+                    st.rerun()
+        with fc2:
+            with st.popover("📅"):
+                d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
+                if d != st.session_state["form_date"]:
+                    st.session_state["form_date"] = d
+                    st.rerun()
+        with fc3:
+            if st.button("💾", key="fab_save"):
+                payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
+                requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
+                requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
+                st.toast("✅ Дані збережено!", icon="💾")
+
 # ==========================================
-# ВКЛАДКА 2: АРХІВ
+# РОЗДІЛ 2: АРХІВ
 # ==========================================
-with tab2:
+elif st.session_state["active_tab"] == "Архів":
     if st.query_params.get("archive_auth") == "1":
         st.session_state["archive_ok"] = True
 
@@ -426,12 +438,9 @@ with tab2:
             if "archive_auth" in st.query_params: del st.query_params["archive_auth"]
             st.rerun()
             
-        st.subheader("🔎 Перегляд історії")
+        st.subheader(f"🔎 Перегляд історії: {selected_date}")
         
-        search_date_raw = st.date_input("Оберіть дату", datetime.today(), key="search", format="DD/MM/YYYY")
-        search_date = search_date_raw.strftime('%Y-%m-%d')
-        
-        url_shift_search = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{search_date}"
+        url_shift_search = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}"
         shift_res = requests.get(url_shift_search, headers=headers).json()
         
         if isinstance(shift_res, list) and len(shift_res) > 0:
@@ -443,7 +452,7 @@ with tab2:
             ac1, ac2 = st.columns(2)
             with ac1:
                 st.subheader("🟢 Надходження")
-                inc_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.income", headers=headers).json()
+                inc_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}&type=eq.income", headers=headers).json()
                 total_inc = 0
                 if isinstance(inc_res, list) and inc_res:
                     for item in inc_res:
@@ -456,7 +465,7 @@ with tab2:
                 
             with ac2:
                 st.subheader("🔴 Витрати")
-                exp_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{search_date}&type=eq.expense", headers=headers).json()
+                exp_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}&type=eq.expense", headers=headers).json()
                 total_exp = 0
                 if isinstance(exp_res, list) and exp_res:
                     for item in exp_res:
@@ -472,7 +481,7 @@ with tab2:
             st.divider()
             
             st.subheader("🟠 Аванси")
-            adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{search_date}", headers=headers).json()
+            adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers).json()
             total_adv = 0
             if isinstance(adv_res, list) and adv_res:
                 for item in adv_res:
@@ -491,15 +500,12 @@ with tab2:
         else:
             st.warning("За цей день звітів не знайдено в хмарі (таблиця shifts порожня).")
             
-        # ========================================================
-        # БЛОК 2: ГАЛЕРЕЯ ЧЕКІВ (ВІДОБРАЖАЄТЬСЯ ЗАВЖДИ)
-        # ========================================================
         st.divider()
         st.subheader("🖼️ Галерея чеків за обрану дату")
         
         list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
         payload = {
-            "prefix": search_date,
+            "prefix": selected_date,
             "limit": 100,
             "offset": 0
         }
@@ -514,7 +520,7 @@ with tab2:
                     img_cols = st.columns(3)
                     for idx, file_obj in enumerate(valid_files):
                         file_name = file_obj['name']
-                        img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
+                        img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{selected_date}/{file_name}"
                         with img_cols[idx % 3]:
                             st.image(img_url, use_container_width=True)
                 else:
@@ -523,3 +529,19 @@ with tab2:
                 st.error(f"Помилка доступу до Storage: {storage_res.text}")
         except Exception as e:
             st.error(f"Системна помилка: {e}")
+
+        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ АРХІВУ) ---
+        st.markdown('<div id="floating-anchor"></div>', unsafe_allow_html=True)
+        fc1, fc2 = st.columns(2)
+        with fc1:
+            with st.popover("☰"):
+                nav = st.radio("Розділ:", ["Касса", "Архів"], index=1, label_visibility="collapsed")
+                if nav != "Архів":
+                    st.session_state["active_tab"] = nav
+                    st.rerun()
+        with fc2:
+            with st.popover("📅"):
+                d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
+                if d != st.session_state["form_date"]:
+                    st.session_state["form_date"] = d
+                    st.rerun()
