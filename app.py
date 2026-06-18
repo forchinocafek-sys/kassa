@@ -29,8 +29,10 @@ upload_headers = {
 # --- ДОПОМІЖНІ ФУНКЦІЇ ---
 def get_int(val):
     try:
+        if pd.isna(val): return 0 
         if not val: return 0
         clean_val = str(val).strip().replace(" ", "")
+        if clean_val in ("None", "<NA>", "nan", ""): return 0
         return int(float(clean_val))
     except Exception:
         return 0
@@ -77,7 +79,6 @@ def get_previous_coins(date_str):
     return 0
 
 def upload_receipts_to_supabase(date_str, receipts_list):
-    """Відправляє утиснені чеки з пам'яті в Storage Supabase."""
     if not receipts_list:
         return True
         
@@ -102,14 +103,16 @@ def upload_receipts_to_supabase(date_str, receipts_list):
 
 def prepare_df(data_list, columns):
     if not data_list:
-        data_list = [{col: (0 if col == "Сума" else "") for col in columns}]
+        data_list = [{col: (None if col == "Сума" else "") for col in columns}]
     df = pd.DataFrame(data_list)
     for col in columns:
         if col not in df.columns:
-            df[col] = 0 if col == "Сума" else ""
+            df[col] = None if col == "Сума" else ""
     if "Сума" in df.columns:
-        df["Сума"] = pd.to_numeric(df["Сума"], errors='coerce').fillna(0).astype(int)
-    df = df.fillna("")
+        df["Сума"] = pd.to_numeric(df["Сума"], errors='coerce').astype('Int64')
+    for col in columns:
+        if col != "Сума":
+            df[col] = df[col].fillna("")
     return df[columns]
 
 def load_draft_or_init(date_str):
@@ -124,28 +127,30 @@ def load_draft_or_init(date_str):
         draft_res = requests.get(url_draft, headers=headers).json()
         if isinstance(draft_res, list) and len(draft_res) > 0:
             payload = draft_res[0].get('payload', {})
-            st.session_state["inc_data"] = payload.get('inc', [{"Опис": "", "Сума": 0}])
-            st.session_state["exp_data"] = payload.get('exp', [{"Опис": "", "Сума": 0}])
-            st.session_state["adv_data"] = payload.get('adv', [{"Співробітник": "", "Сума": 0, "Примітка": ""}])
+            st.session_state["inc_data"] = payload.get('inc', [{"Опис": "", "Сума": None}])
+            st.session_state["exp_data"] = payload.get('exp', [{"Опис": "", "Сума": None}])
+            st.session_state["adv_data"] = payload.get('adv', [{"Співробітник": "", "Сума": None, "Примітка": ""}])
             cash_data = payload.get('cash', {})
-            st.session_state[coins_key] = str(cash_data.get('coins', 0))
+            c_coins = cash_data.get('coins', 0)
+            st.session_state[coins_key] = str(c_coins) if c_coins else ""
             for k in [20, 50, 100, 200, 500, 1000]:
-                st.session_state[f"qty_{k}_{date_str}"] = str(cash_data.get(str(k), 0))
+                c_val = cash_data.get(str(k), 0)
+                st.session_state[f"qty_{k}_{date_str}"] = str(c_val) if c_val else ""
             return
     except Exception:
         pass
     
-    st.session_state["inc_data"] = [{"Опис": "", "Сума": 0}]
-    st.session_state["exp_data"] = [{"Опис": "", "Сума": 0}]
+    st.session_state["inc_data"] = [{"Опис": "", "Сума": None}]
+    st.session_state["exp_data"] = [{"Опис": "", "Сума": None}]
     
     prev_adv = get_previous_advances(date_str)
-    st.session_state["adv_data"] = prev_adv if prev_adv else [{"Співробітник": "", "Сума": 0, "Примітка": ""}]
+    st.session_state["adv_data"] = prev_adv if prev_adv else [{"Співробітник": "", "Сума": None, "Примітка": ""}]
     
     prev_coins = get_previous_coins(date_str)
-    st.session_state[coins_key] = str(prev_coins)
+    st.session_state[coins_key] = str(prev_coins) if prev_coins else ""
     
     for k in [20, 50, 100, 200, 500, 1000]:
-        st.session_state[f"qty_{k}_{date_str}"] = "0"
+        st.session_state[f"qty_{k}_{date_str}"] = ""
 
 # --- НАЛАШТУВАННЯ СТОРІНКИ ТА CSS ---
 st.set_page_config(layout="wide", page_title="Cafe Forchino")
@@ -199,11 +204,12 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-with st.popover("🚀 Версія: Stable 2.5 Global (Історія змін)"):
+with st.popover("🚀 Версія: Stable 2.6 Global (Історія змін)"):
     st.markdown("""
-    **Stable 2.5 Global (Поточна):**
-    - 🗓 **Дати:** Жорстко зафіксовано формат дат (ДД/ММ/РРРР).
-    - 📸 **Фото-чеки (LIVE):** Галерея фотографій в архіві (пряме завантаження з бакета).
+    **Останні оновлення:**
+    
+    * **v2.6 (Чистий ввід):** Прибрали надокучливі нулі в порожніх клітинках таблиць. Тепер клікаєте і відразу вводите суму, не витрачаючи час на стирання.
+    * **v2.5 (Галерея в архіві):** Додали зручний перегляд чеків у вкладці "Архів". Тепер усі фото закритих змін автоматично підтягуються і відображаються сіткою.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -252,7 +258,8 @@ with tab1:
             st.rerun()
         
         db_start = get_start_balance(selected_date)
-        start_balance = get_int(st.text_input("Залишок на початок дня:", value=str(db_start), key=f"start_balance_{selected_date}"))
+        start_val_str = str(db_start) if db_start else ""
+        start_balance = get_int(st.text_input("Залишок на початок дня:", value=start_val_str, placeholder="0", key=f"start_balance_{selected_date}"))
 
         st.divider()
         
@@ -314,7 +321,7 @@ with tab1:
 
         with col_b2:
             st.subheader("💰 | Факт")
-            m_coins = get_int(st.text_input("Монети (загальна сума):", key=f"coins_live_{selected_date}"))
+            m_coins = get_int(st.text_input("Монети (загальна сума):", placeholder="0", key=f"coins_live_{selected_date}"))
             
             st.markdown('<div class="fact-block">', unsafe_allow_html=True)
             def cash_row_live(label, multiplier):
@@ -322,7 +329,7 @@ with tab1:
                 with c1: 
                     st.markdown(f"<div style='margin-top: 8px; font-weight: bold; font-size: 16px;'>{label}</div>", unsafe_allow_html=True)
                 with c2: 
-                    qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", key=f"qty_{label}_{selected_date}"))
+                    qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", placeholder="0", key=f"qty_{label}_{selected_date}"))
                 return qty, qty * multiplier
 
             q_20, v_20 = cash_row_live("20", 20)
@@ -507,7 +514,6 @@ with tab2:
                     img_cols = st.columns(3)
                     for idx, file_obj in enumerate(valid_files):
                         file_name = file_obj['name']
-                        # Генеруємо пряме публічне посилання
                         img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{search_date}/{file_name}"
                         with img_cols[idx % 3]:
                             st.image(img_url, use_container_width=True)
