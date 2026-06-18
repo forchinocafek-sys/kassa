@@ -176,45 +176,32 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ (НА ВСЮ ШИРИНУ) */
-    #is-floating { display: none; }
-    
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) {
-        position: fixed !important; 
-        top: 60px !important; 
-        left: 0 !important;
-        width: 100% !important; 
-        padding: 0 20px !important; 
-        z-index: 99999 !important; 
-        box-sizing: border-box !important;
+   /* БРОНЕБІЙНИЙ КОНТЕЙНЕР ДЛЯ КНОПОК */
+    #my-floating-bar {
+        position: fixed !important;
+        top: 70px !important;
+        left: 20px !important;
+        right: 20px !important;
+        z-index: 99999 !important;
         display: flex !important;
-        justify-content: space-between !important; /* Кнопки розсуваються в кути */
+        justify-content: space-between !important;
         background: transparent !important;
+        pointer-events: none !important; /* щоб не перекривав кліки по сторінці */
     }
     
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        flex: 0 0 auto !important;
-        width: auto !important;
-        padding: 0 !important;
+    #my-floating-bar > div {
+        pointer-events: auto !important; /* а кнопки всередині — активні */
     }
 
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
-        width: 50px !important; 
-        height: 50px !important; 
-        padding: 0 !important; 
-        border-radius: 12px !important; 
-        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
-        color: #4b5563 !important; 
-        border: 1px solid #d1d5db !important; 
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; 
-        display: flex !important; 
-        align-items: center !important; 
-        justify-content: center !important;
-    }
-    
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button p {
-        font-size: 22px !important; 
-        margin: 0 !important; 
+    /* Стилі для кнопок всередині */
+    #my-floating-bar button {
+        width: 50px !important;
+        height: 50px !important;
+        border-radius: 12px !important;
+        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important;
+        color: #4b5563 !important;
+        border: 1px solid #d1d5db !important;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -412,9 +399,9 @@ if st.session_state["active_tab"] == "Касса":
                 else:
                     st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
-        # --- ПЛАВАЮЧЕ МЕНЮ (РОЗСУНУТЕ) ---
-        # Важливо: ми залишаємо st.columns(3), CSS вище підхопить його
-        st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
+        # --- ПЛАВАЮЧЕ МЕНЮ (НА ВСЮ ШИРИНУ) ---
+        st.markdown('<div id="my-floating-bar">', unsafe_allow_html=True)
+        # Використовуємо st.columns, але він буде всередині нашого div
         fc1, fc2, fc3 = st.columns(3)
         with fc1:
             with st.popover("☰"):
@@ -424,17 +411,17 @@ if st.session_state["active_tab"] == "Касса":
                     st.rerun()
         with fc2:
             with st.popover("📅"):
-                d = st.date_input("Дата", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
+                d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
                 if d != st.session_state["form_date"]:
                     st.session_state["form_date"] = d
                     st.rerun()
         with fc3:
             if st.button("💾", key=f"fab_save_{st.session_state['active_tab']}"):
-                # Збираємо дані залежно від вкладки, але логіка збереження та сама
                 payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
                 requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
                 requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
                 st.toast("✅ Дані збережено!", icon="💾")
+        st.markdown('</div>', unsafe_allow_html=True)
 
 # ==========================================
 # РОЗДІЛ 2: АРХІВ
@@ -552,9 +539,9 @@ elif st.session_state["active_tab"] == "Архів":
         except Exception as e:
             st.error(f"Системна помилка: {e}")
 
-        # --- ПЛАВАЮЧЕ МЕНЮ (РОЗСУНУТЕ) ---
-        # Важливо: ми залишаємо st.columns(3), CSS вище підхопить його
-        st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
+        # --- ПЛАВАЮЧЕ МЕНЮ (НА ВСЮ ШИРИНУ) ---
+        st.markdown('<div id="my-floating-bar">', unsafe_allow_html=True)
+        # Використовуємо st.columns, але він буде всередині нашого div
         fc1, fc2, fc3 = st.columns(3)
         with fc1:
             with st.popover("☰"):
@@ -564,7 +551,7 @@ elif st.session_state["active_tab"] == "Архів":
                     st.rerun()
         with fc2:
             with st.popover("📅"):
-                d = st.date_input("Дата", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
+                d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
                 if d != st.session_state["form_date"]:
                     st.session_state["form_date"] = d
                     st.rerun()
