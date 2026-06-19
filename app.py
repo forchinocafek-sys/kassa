@@ -176,33 +176,51 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ */
+    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ (ВЕРТИКАЛЬНИЙ СТОВПЕЦЬ) */
     #is-floating { display: none; }
     
-    /* Знаходимо контейнер колонок, всередині якого є наш якір, і фіксуємо його */
+    /* 1. Фіксуємо контейнер у правому верхньому куті і робимо його вертикальним */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) {
         position: fixed !important; 
-        top: 65px !important; 
-        right: 20px !important; 
+        top: 60px !important; 
+        right: 15px !important; /* Притискаємо до правого краю (відступ 15px) */
         z-index: 99999 !important; 
-        width: max-content !important; 
-        gap: 10px !important;
+        width: 50px !important; /* Жорстка ширина рівно під одну кнопку */
+        display: flex !important;
+        flex-direction: column !important; /* Вишиковуємо в стовпець */
+        gap: 12px !important; /* Відстань між кнопками */
         background: transparent !important;
         padding: 0 !important;
     }
     
-    /* Стискаємо колонки до розміру кнопок */
+    /* 2. Кожну колонку всередині перетворюємо на ідеальний квадрат 50х50 */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
         width: 50px !important; 
         min-width: 50px !important; 
+        max-width: 50px !important; 
+        height: 50px !important; 
         flex: 0 0 50px !important;
+        margin: 0 !important; 
+        padding: 0 !important;
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
     }
     
-    /* Оформлюємо самі кнопки всередині цього блоку */
+    /* 3. Центруємо поповери, щоб кнопки не "стрибали" вліво/вправо */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) div[data-testid="stPopover"] {
+        width: 100% !important;
+        display: flex !important;
+        justify-content: center !important;
+    }
+    
+    /* 4. Оформлюємо самі кнопки */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
         width: 50px !important; 
         height: 50px !important; 
+        min-height: 50px !important;
         padding: 0 !important; 
+        margin: 0 !important;
         border-radius: 12px !important; 
         background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
         color: #4b5563 !important; 
@@ -221,7 +239,7 @@ st.markdown("""
     }
     
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button p {
-        font-size: 22px !important; 
+        font-size: 20px !important; 
         margin: 0 !important; 
         padding: 0 !important;
         line-height: 1 !important;
