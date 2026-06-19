@@ -447,7 +447,7 @@ if st.session_state["active_tab"] == "Касса":
                     time.sleep(1.5)
                     st.rerun()
                 else:
-    st.error(f"❌ Помилка бази даних: {res_shift.text}")
+                    st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
 # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) ---
 
