@@ -450,7 +450,7 @@ if st.session_state["active_tab"] == "Касса":
                     st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
                     # --- ПЛАВАЮЩЕ МЕНЮ (ДЛЯ КАСИ) ---
-            
+                    st.write("MENU TEST")
                     fc1, fc2, fc3 = st.columns([1, 1, 1])
                     
                     with fc1:
