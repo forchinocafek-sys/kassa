@@ -176,61 +176,33 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ (АБСОЛЮТНЕ ПОЗИЦІОНУВАННЯ) */
+    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ */
     #is-floating { display: none; }
     
-    /* 1. Робимо загальний контейнер нульовим, щоб він нічого не перекривав (ПОВЕРТАЄ КЛІКАБЕЛЬНІСТЬ) */
+    /* Знаходимо контейнер колонок, всередині якого є наш якір, і фіксуємо його */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) {
         position: fixed !important; 
-        top: 0 !important; 
-        left: 0 !important; 
-        width: 0 !important; 
-        height: 0 !important; 
+        top: 65px !important; 
+        right: 20px !important; 
         z-index: 99999 !important; 
-        overflow: visible !important;
-        gap: 0 !important;
+        width: max-content !important; 
+        gap: 10px !important;
         background: transparent !important;
-    }
-    
-    /* 2. Кожну колонку робимо незалежним квадратом 50х50 і жорстко ставимо на одну лінію (top: 60px) */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        position: fixed !important;
-        top: 60px !important;
-        width: 50px !important;
-        min-width: 50px !important;
-        height: 50px !important;
-        margin: 0 !important;
         padding: 0 !important;
-        z-index: 99999 !important;
-        display: flex !important;
-        align-items: flex-start !important; /* Прибирає кривизну */
-        justify-content: center !important;
     }
     
-    /* 3. Розставляємо їх по кутах */
-    /* Меню (Ліворуч) */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(1) {
-        left: 15px !important;
+    /* Стискаємо колонки до розміру кнопок */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
+        width: 50px !important; 
+        min-width: 50px !important; 
+        flex: 0 0 50px !important;
     }
     
-    /* Календар (Ідеально по центру) */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(2) {
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-    }
-    
-    /* Дискета (Праворуч) */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(3) {
-        right: 15px !important;
-        left: auto !important;
-    }
-    
-    /* 4. Дизайн самих кнопок */
+    /* Оформлюємо самі кнопки всередині цього блоку */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
         width: 50px !important; 
         height: 50px !important; 
         padding: 0 !important; 
-        margin: 0 !important;
         border-radius: 12px !important; 
         background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
         color: #4b5563 !important; 
@@ -263,7 +235,7 @@ st.title("Cafe Forchino")
 with st.popover("🚀 Версія: Stable 2.7 Global (Історія змін)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v2.7 (Мобільний UI):** Оновлено навігацію. Вкладки та календар тепер сховані у плаваючих кнопках (☰ та 📅). Іконки рознесені по всій ширині екрана.
+    * **v2.7 (Мобільний UI):** Оновлено навігацію. Вкладки та календар тепер сховані у плаваючих кнопках праворуч зверху (☰ та 📅) для максимальної чистоти екрана.
     * **v2.6 (Чистий ввід):** Прибрано нулі в порожніх клітинках.
     * **v2.5 (Галерея в архіві):** Пряме завантаження чеків у вигляді сітки.
     """)
@@ -596,7 +568,7 @@ elif st.session_state["active_tab"] == "Архів":
             st.error(f"Системна помилка: {e}")
 
         # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ АРХІВУ) ---
-        fc1, fc2, fc3 = st.columns(3)
+        fc1, fc2 = st.columns(2)
         with fc1:
             st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
             with st.popover("☰"):
@@ -610,5 +582,3 @@ elif st.session_state["active_tab"] == "Архів":
                 if d != st.session_state["form_date"]:
                     st.session_state["form_date"] = d
                     st.rerun()
-        with fc3:
-            pass # Дискеты в Архиве нет
