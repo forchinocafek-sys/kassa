@@ -176,56 +176,76 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ */
-    #is-floating { display: none; }
-    
-    /* Знаходимо контейнер колонок, всередині якого є наш якір, і фіксуємо його */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) {
-        position: fixed !important; 
-        top: 65px !important; 
-        right: 20px !important; 
-        z-index: 99999 !important; 
-        width: max-content !important; 
-        gap: 10px !important;
-        background: transparent !important;
-        padding: 0 !important;
-    }
-    
-    /* Стискаємо колонки до розміру кнопок */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        width: 50px !important; 
-        min-width: 50px !important; 
-        flex: 0 0 50px !important;
-    }
-    
-    /* Оформлюємо самі кнопки всередині цього блоку */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
-        width: 50px !important; 
-        height: 50px !important; 
-        padding: 0 !important; 
-        border-radius: 12px !important; 
-        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
-        color: #4b5563 !important; 
-        border: 1px solid #d1d5db !important; 
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; 
-        display: flex !important; 
-        align-items: center !important; 
-        justify-content: center !important;
-        transition: transform 0.2s, box-shadow 0.2s !important;
-    }
-    
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button:hover {
-        transform: translateY(-2px) !important; 
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; 
-        background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
-    }
-    
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button p {
-        font-size: 22px !important; 
-        margin: 0 !important; 
-        padding: 0 !important;
-        line-height: 1 !important;
-    }
+    /* ===================================== */
+/* ПЛАВАЮЩЕЕ МЕНЮ */
+/* ===================================== */
+
+#floating-menu-anchor {
+    display: none;
+}
+
+/* Контейнер меню */
+div[data-testid="stHorizontalBlock"]:has(#floating-menu-anchor) {
+    position: fixed !important;
+
+    top: 15px !important;
+    left: 0 !important;
+
+    width: 100vw !important;
+
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+
+    padding: 0 15px !important;
+    box-sizing: border-box !important;
+
+    z-index: 999999 !important;
+
+    background: transparent !important;
+
+    pointer-events: none;
+}
+
+/* Колонки */
+div[data-testid="stHorizontalBlock"]:has(#floating-menu-anchor)
+> div[data-testid="column"] {
+    width: auto !important;
+    flex: 0 0 auto !important;
+    pointer-events: all;
+}
+
+/* Кнопки */
+div[data-testid="stHorizontalBlock"]:has(#floating-menu-anchor) button {
+    width: 56px !important;
+    height: 56px !important;
+
+    padding: 0 !important;
+
+    border-radius: 14px !important;
+
+    background: linear-gradient(
+        135deg,
+        #f3f4f6,
+        #e5e7eb
+    ) !important;
+
+    border: 1px solid #d1d5db !important;
+
+    box-shadow:
+        0 4px 12px rgba(0,0,0,.15) !important;
+
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+}
+
+/* Иконки */
+div[data-testid="stHorizontalBlock"]:has(#floating-menu-anchor)
+button p {
+    font-size: 24px !important;
+    margin: 0 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -429,27 +449,73 @@ if st.session_state["active_tab"] == "Касса":
                 else:
                     st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
-        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) ---
-        fc1, fc2, fc3 = st.columns(3)
-        with fc1:
-            st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
-            with st.popover("☰"):
-                nav = st.radio("Розділ:", ["Касса", "Архів"], index=0, label_visibility="collapsed")
-                if nav != "Касса":
-                    st.session_state["active_tab"] = nav
-                    st.rerun()
-        with fc2:
-            with st.popover("📅"):
-                d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
-                if d != st.session_state["form_date"]:
-                    st.session_state["form_date"] = d
-                    st.rerun()
-        with fc3:
-            if st.button("💾", key="fab_save"):
-                payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
-                requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
-                requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
-                st.toast("✅ Дані збережено!", icon="💾")
+        # --- ПЛАВАЮЩЕ МЕНЮ (ДЛЯ КАСИ) ---
+
+fc1, fc2, fc3 = st.columns([1, 1, 1])
+
+with fc1:
+    st.markdown(
+        '<div id="floating-menu-anchor"></div>',
+        unsafe_allow_html=True
+    )
+
+    with st.popover("☰"):
+        nav = st.radio(
+            "Розділ:",
+            ["Касса", "Архів"],
+            index=0,
+            label_visibility="collapsed"
+        )
+
+        if nav != "Касса":
+            st.session_state["active_tab"] = nav
+            st.rerun()
+
+with fc2:
+    with st.popover("📅"):
+        d = st.date_input(
+            "Оберіть дату",
+            st.session_state["form_date"],
+            format="DD/MM/YYYY",
+            label_visibility="collapsed"
+        )
+
+        if d != st.session_state["form_date"]:
+            st.session_state["form_date"] = d
+            st.rerun()
+
+with fc3:
+    if st.button("💾", key="fab_save"):
+        payload = {
+            "inc": edited_inc_df.to_dict('records'),
+            "exp": edited_exp_df.to_dict('records'),
+            "adv": edited_adv_df.to_dict('records'),
+            "cash": {
+                "coins": m_coins,
+                "20": q_20,
+                "50": q_50,
+                "100": q_100,
+                "200": q_200,
+                "500": q_500,
+                "1000": q_1000
+            }
+        }
+
+        requests.delete(
+            f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+            headers=headers
+        )
+
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/drafts",
+            headers=headers,
+            json={
+                "date": selected_date,
+                "payload": payload
+            }
+        )
+
+        st.toast("✅ Дані збережено!", icon="💾")
 
 # ==========================================
 # РОЗДІЛ 2: АРХІВ
@@ -570,7 +636,10 @@ elif st.session_state["active_tab"] == "Архів":
         # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ АРХІВУ) ---
         fc1, fc2 = st.columns(2)
         with fc1:
-            st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
+            st.markdown(
+    '<div id="floating-menu-anchor"></div>',
+    unsafe_allow_html=True
+)
             with st.popover("☰"):
                 nav = st.radio("Розділ:", ["Касса", "Архів"], index=1, label_visibility="collapsed")
                 if nav != "Архів":
