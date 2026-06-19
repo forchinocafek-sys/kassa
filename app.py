@@ -179,26 +179,43 @@ st.markdown("""
     /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ */
     #is-floating { display: none; }
     
-    /* Знаходимо контейнер колонок, всередині якого є наш якір, і фіксуємо його */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) {
         position: fixed !important; 
-        top: 65px !important; 
-        right: 20px !important; 
+        top: 60px !important; /* Отступ от верхнего края */
+        left: 15px !important; 
+        right: 15px !important; 
+        width: auto !important; 
         z-index: 99999 !important; 
-        width: max-content !important; 
-        gap: 10px !important;
+        gap: 0 !important; /* Убираем стандартные отступы */
         background: transparent !important;
-        padding: 0 !important;
+        pointer-events: none !important; /* Пропускаем клики сквозь пустое пространство */
     }
     
-    /* Стискаємо колонки до розміру кнопок */
+    /* Разрешаем кликать по самим кнопкам */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        width: 50px !important; 
+        pointer-events: auto !important;
         min-width: 50px !important; 
-        flex: 0 0 50px !important;
     }
     
-    /* Оформлюємо самі кнопки всередині цього блоку */
+    /* 1 колонка: Меню (прижимаем влево) */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(1) {
+        display: flex !important;
+        justify-content: flex-start !important;
+    }
+    
+    /* 2 колонка: Календарь (центруем) */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(2) {
+        display: flex !important;
+        justify-content: center !important;
+    }
+    
+    /* 3 колонка: Дискета (прижимаем вправо) */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(3) {
+        display: flex !important;
+        justify-content: flex-end !important;
+    }
+    
+    /* Оформление самих кнопок */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
         width: 50px !important; 
         height: 50px !important; 
@@ -235,7 +252,7 @@ st.title("Cafe Forchino")
 with st.popover("🚀 Версія: Stable 2.7 Global (Історія змін)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v2.7 (Мобільний UI):** Оновлено навігацію. Вкладки та календар тепер сховані у плаваючих кнопках праворуч зверху (☰ та 📅) для максимальної чистоти екрана.
+    * **v2.7 (Мобільний UI):** Оновлено навігацію. Вкладки та календар тепер сховані у плаваючих кнопках (☰ та 📅). Іконки рознесені по всій ширині екрана.
     * **v2.6 (Чистий ввід):** Прибрано нулі в порожніх клітинках.
     * **v2.5 (Галерея в архіві):** Пряме завантаження чеків у вигляді сітки.
     """)
@@ -568,7 +585,7 @@ elif st.session_state["active_tab"] == "Архів":
             st.error(f"Системна помилка: {e}")
 
         # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ АРХІВУ) ---
-        fc1, fc2 = st.columns(2)
+        fc1, fc2, fc3 = st.columns(3)
         with fc1:
             st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
             with st.popover("☰"):
@@ -582,3 +599,5 @@ elif st.session_state["active_tab"] == "Архів":
                 if d != st.session_state["form_date"]:
                     st.session_state["form_date"] = d
                     st.rerun()
+        with fc3:
+            pass # Дискеты в Архиве нет
