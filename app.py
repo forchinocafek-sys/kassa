@@ -176,50 +176,61 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
-    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ */
+    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ (АБСОЛЮТНЕ ПОЗИЦІОНУВАННЯ) */
     #is-floating { display: none; }
     
+    /* 1. Робимо загальний контейнер нульовим, щоб він нічого не перекривав (ПОВЕРТАЄ КЛІКАБЕЛЬНІСТЬ) */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) {
         position: fixed !important; 
-        top: 60px !important; /* Отступ от верхнего края */
-        left: 15px !important; 
-        right: 15px !important; 
-        width: auto !important; 
+        top: 0 !important; 
+        left: 0 !important; 
+        width: 0 !important; 
+        height: 0 !important; 
         z-index: 99999 !important; 
-        gap: 0 !important; /* Убираем стандартные отступы */
+        overflow: visible !important;
+        gap: 0 !important;
         background: transparent !important;
-        pointer-events: none !important; /* Пропускаем клики сквозь пустое пространство */
     }
     
-    /* Разрешаем кликать по самим кнопкам */
+    /* 2. Кожну колонку робимо незалежним квадратом 50х50 і жорстко ставимо на одну лінію (top: 60px) */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        pointer-events: auto !important;
-        min-width: 50px !important; 
-    }
-    
-    /* 1 колонка: Меню (прижимаем влево) */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(1) {
+        position: fixed !important;
+        top: 60px !important;
+        width: 50px !important;
+        min-width: 50px !important;
+        height: 50px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        z-index: 99999 !important;
         display: flex !important;
-        justify-content: flex-start !important;
-    }
-    
-    /* 2 колонка: Календарь (центруем) */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(2) {
-        display: flex !important;
+        align-items: flex-start !important; /* Прибирає кривизну */
         justify-content: center !important;
     }
     
-    /* 3 колонка: Дискета (прижимаем вправо) */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(3) {
-        display: flex !important;
-        justify-content: flex-end !important;
+    /* 3. Розставляємо їх по кутах */
+    /* Меню (Ліворуч) */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(1) {
+        left: 15px !important;
     }
     
-    /* Оформление самих кнопок */
+    /* Календар (Ідеально по центру) */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(2) {
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+    }
+    
+    /* Дискета (Праворуч) */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"]:nth-child(3) {
+        right: 15px !important;
+        left: auto !important;
+    }
+    
+    /* 4. Дизайн самих кнопок */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
         width: 50px !important; 
         height: 50px !important; 
         padding: 0 !important; 
+        margin: 0 !important;
         border-radius: 12px !important; 
         background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; 
         color: #4b5563 !important; 
