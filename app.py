@@ -451,71 +451,71 @@ if st.session_state["active_tab"] == "Касса":
 
                     # --- ПЛАВАЮЩЕ МЕНЮ (ДЛЯ КАСИ) ---
             
-            fc1, fc2, fc3 = st.columns([1, 1, 1])
-            
-            with fc1:
-                st.markdown(
-                    '<div id="floating-menu-anchor"></div>',
-                    unsafe_allow_html=True
-                )
-            
-                with st.popover("☰"):
-                    nav = st.radio(
-                        "Розділ:",
-                        ["Касса", "Архів"],
-                        index=0,
-                        label_visibility="collapsed"
-                    )
-            
-                    if nav != "Касса":
-                        st.session_state["active_tab"] = nav
-                        st.rerun()
-            
-            with fc2:
-                with st.popover("📅"):
-                    d = st.date_input(
-                        "Оберіть дату",
-                        st.session_state["form_date"],
-                        format="DD/MM/YYYY",
-                        label_visibility="collapsed"
-                    )
-            
-                    if d != st.session_state["form_date"]:
-                        st.session_state["form_date"] = d
-                        st.rerun()
-            
-            with fc3:
-                if st.button("💾", key="fab_save"):
-                    payload = {
-                        "inc": edited_inc_df.to_dict('records'),
-                        "exp": edited_exp_df.to_dict('records'),
-                        "adv": edited_adv_df.to_dict('records'),
-                        "cash": {
-                            "coins": m_coins,
-                            "20": q_20,
-                            "50": q_50,
-                            "100": q_100,
-                            "200": q_200,
-                            "500": q_500,
-                            "1000": q_1000
-                        }
-                    }
-            
-                    requests.delete(
-                        f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
-                        headers=headers
-                    )
-            
-                    requests.post(
-                        f"{SUPABASE_URL}/rest/v1/drafts",
-                        headers=headers,
-                        json={
-                            "date": selected_date,
-                            "payload": payload
-                        }
-                    )
-            
-                    st.toast("✅ Дані збережено!", icon="💾")
+                    fc1, fc2, fc3 = st.columns([1, 1, 1])
+                    
+                    with fc1:
+                        st.markdown(
+                            '<div id="floating-menu-anchor"></div>',
+                            unsafe_allow_html=True
+                        )
+                    
+                        with st.popover("☰"):
+                            nav = st.radio(
+                                "Розділ:",
+                                ["Касса", "Архів"],
+                                index=0,
+                                label_visibility="collapsed"
+                            )
+                    
+                            if nav != "Касса":
+                                st.session_state["active_tab"] = nav
+                                st.rerun()
+                    
+                    with fc2:
+                        with st.popover("📅"):
+                            d = st.date_input(
+                                "Оберіть дату",
+                                st.session_state["form_date"],
+                                format="DD/MM/YYYY",
+                                label_visibility="collapsed"
+                            )
+                    
+                            if d != st.session_state["form_date"]:
+                                st.session_state["form_date"] = d
+                                st.rerun()
+                    
+                    with fc3:
+                        if st.button("💾", key="fab_save"):
+                            payload = {
+                                "inc": edited_inc_df.to_dict('records'),
+                                "exp": edited_exp_df.to_dict('records'),
+                                "adv": edited_adv_df.to_dict('records'),
+                                "cash": {
+                                    "coins": m_coins,
+                                    "20": q_20,
+                                    "50": q_50,
+                                    "100": q_100,
+                                    "200": q_200,
+                                    "500": q_500,
+                                    "1000": q_1000
+                                }
+                            }
+                    
+                            requests.delete(
+                                f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+                                headers=headers
+                            )
+                    
+                            requests.post(
+                                f"{SUPABASE_URL}/rest/v1/drafts",
+                                headers=headers,
+                                json={
+                                    "date": selected_date,
+                                    "payload": payload
+                                }
+                            )
+                    
+                            st.toast("✅ Дані збережено!", icon="💾")
 
 # ==========================================
 # РОЗДІЛ 2: АРХІВ
