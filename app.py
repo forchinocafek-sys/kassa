@@ -285,8 +285,9 @@ if st.session_state["active_tab"] == "Касса":
             st.rerun()
         
         db_start = get_start_balance(selected_date)
-        start_val_str = str(db_start) if db_start else ""
-        start_balance = get_int(st.text_input("Залишок на початок дня:", value=start_val_str, placeholder="0", key=f"start_balance_{selected_date}"))
+        start_balance = get_int(db_start) # Жорстко прив'язуємо до бази
+        # disabled=True робить поле сірим і забороняє вводити туди текст
+        st.text_input("Залишок на початок дня (автоматично):", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
 
         st.divider()
         
@@ -387,6 +388,12 @@ if st.session_state["active_tab"] == "Касса":
 
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
             with st.spinner("Відправка звіту та чеків..."):
+                # ПРИМУСОВЕ ЗБЕРЕЖЕННЯ: Записуємо таблиці та монети в пам'ять перед відправкою звіту.
+                # Це гарантує, що дані не зникнуть з екрану, а монети 100% перейдуть на завтра.
+                payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
+                requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
+                requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
+
                 files_ok = upload_receipts_to_supabase(selected_date, st.session_state[receipts_key])
                 if not files_ok:
                     st.stop()
