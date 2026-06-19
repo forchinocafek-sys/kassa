@@ -179,16 +179,16 @@ st.markdown("""
     /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ (ВЕРТИКАЛЬНИЙ СТОВПЕЦЬ) */
     #is-floating { display: none; }
     
-    /* 1. Фіксуємо контейнер у правому верхньому куті і робимо його вертикальним */
+    /* 1. Фіксуємо контейнер у правому верхньому куті */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) {
         position: fixed !important; 
         top: 60px !important; 
-        right: 15px !important; /* Притискаємо до правого краю (відступ 15px) */
+        right: 15px !important; 
         z-index: 99999 !important; 
-        width: 50px !important; /* Жорстка ширина рівно під одну кнопку */
+        width: 50px !important; 
         display: flex !important;
-        flex-direction: column !important; /* Вишиковуємо в стовпець */
-        gap: 12px !important; /* Відстань між кнопками */
+        flex-direction: column !important; 
+        gap: 12px !important; 
         background: transparent !important;
         padding: 0 !important;
     }
@@ -207,16 +207,21 @@ st.markdown("""
         align-items: center !important;
     }
     
-    /* 3. Центруємо поповери, щоб кнопки не "стрибали" вліво/вправо */
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) div[data-testid="stPopover"] {
+    /* 3. УНІВЕРСАЛЬНЕ ЦЕНТРУВАННЯ: і для поповерів, і для звичайних кнопок */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] > div {
         width: 100% !important;
+        height: 100% !important;
         display: flex !important;
         justify-content: center !important;
+        align-items: center !important;
+        margin: 0 !important;
+        padding: 0 !important;
     }
     
     /* 4. Оформлюємо самі кнопки */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
         width: 50px !important; 
+        min-width: 50px !important;
         height: 50px !important; 
         min-height: 50px !important;
         padding: 0 !important; 
