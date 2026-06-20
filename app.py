@@ -537,7 +537,8 @@ elif st.session_state["active_tab"] == "Архів":
                 st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {total_exp} грн</p>", unsafe_allow_html=True)
                     
             st.divider()
-            st.markdown(f"<h3 style='margin-bottom: 0;'>🌇 Залишок на кінець: <span style='color: #0066cc;'>{get_int(shift.get('calculated_end'))} грн</span></h3>", unsafe_allow_html=True)
+            calc_end = get_int(shift.get('calculated_end'))
+            st.markdown(f"<h3 style='margin-bottom: 0;'>🌇 Залишок на кінець: <span style='color: #0066cc;'>{calc_end} грн</span></h3>", unsafe_allow_html=True)
             st.divider()
             
             st.subheader("🟠 Аванси")
@@ -556,6 +557,10 @@ elif st.session_state["active_tab"] == "Архів":
             else:
                 st.write("Немає записів")
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {total_adv} грн</p>", unsafe_allow_html=True)
+            
+            st.divider()
+            actual_cash = calc_end - total_adv
+            st.markdown(f"<h3 style='margin-bottom: 0; color: #4b5563;'>💵 Фактично готівки: {actual_cash} грн</h3>", unsafe_allow_html=True)
             
         else:
             st.warning("За цей день звітів не знайдено в хмарі (таблиця shifts порожня).")
