@@ -154,10 +154,13 @@ def load_draft_or_init(date_str):
     for k in [20, 50, 100, 200, 500, 1000]:
         st.session_state[f"qty_{k}_{date_str}"] = ""
 
-# --- НАЛАШТУВАННЯ СТОРІНКИ ТА ПАСПОРТ ДОДАТКУ (PWA) ---
-st.set_page_config(layout="wide", page_title="Cafe Forchino")
+import streamlit.components.v1 as components
 
+# --- НАЛАШТУВАННЯ СТОРІНКИ ТА ПАСПОРТ ДОДАТКУ (PWA) ---
 ICON_URL = "https://ajkprfhuypcamnybqusr.supabase.co/storage/v1/object/public/assets/xHJLUtG-wHDFARC-LtBbXJE_original.png"
+
+# 1. Передаємо іконку безпосередньо в ядро Streamlit (це прибере кораблик)
+st.set_page_config(layout="wide", page_title="Cafe Forchino", page_icon=ICON_URL)
 
 manifest = {
     "name": "Cafe Forchino",
@@ -170,14 +173,30 @@ manifest = {
 }
 manifest_b64 = base64.b64encode(json.dumps(manifest).encode()).decode()
 
-st.markdown(f"""
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Forchino">
-<meta name="mobile-web-app-capable" content="yes">
-<link rel="apple-touch-icon" href="{ICON_URL}">
-<link rel="manifest" href="data:application/manifest+json;base64,{manifest_b64}">
-""", unsafe_allow_html=True)
+# 2. Використовуємо JavaScript для примусового запису налаштувань у <head>
+components.html(f"""
+<script>
+    const doc = window.parent.document;
+    
+    // Додаємо маніфест
+    let manifest = doc.createElement('link');
+    manifest.rel = 'manifest';
+    manifest.href = 'data:application/manifest+json;base64,{manifest_b64}';
+    doc.head.appendChild(manifest);
+
+    // Додаємо іконку для Apple/Android
+    let appleIcon = doc.createElement('link');
+    appleIcon.rel = 'apple-touch-icon';
+    appleIcon.href = '{ICON_URL}';
+    doc.head.appendChild(appleIcon);
+
+    // Задаємо правильну назву для робочого столу
+    let appleTitle = doc.createElement('meta');
+    appleTitle.name = 'apple-mobile-web-app-title';
+    appleTitle.content = 'Forchino';
+    doc.head.appendChild(appleTitle);
+</script>
+""", height=0, width=0)
 
 # --- НАЛАШТУВАННЯ СТИЛІВ CSS ---
 st.markdown("""
