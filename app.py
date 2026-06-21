@@ -5,6 +5,8 @@ import pandas as pd
 import time
 import io
 import uuid
+import base64
+import json
 from PIL import Image
 
 # --- НАЛАШТУВАННЯ БЕЗПЕКИ ---
@@ -152,9 +154,32 @@ def load_draft_or_init(date_str):
     for k in [20, 50, 100, 200, 500, 1000]:
         st.session_state[f"qty_{k}_{date_str}"] = ""
 
-# --- НАЛАШТУВАННЯ СТОРІНКИ ТА CSS ---
+# --- НАЛАШТУВАННЯ СТОРІНКИ ТА ПАСПОРТ ДОДАТКУ (PWA) ---
 st.set_page_config(layout="wide", page_title="Cafe Forchino")
 
+ICON_URL = "https://ajkprfhuypcamnybqusr.supabase.co/storage/v1/object/public/assets/xHJLUtG-wHDFARC-LtBbXJE_original.png"
+
+manifest = {
+    "name": "Cafe Forchino",
+    "short_name": "Forchino",
+    "theme_color": "#FAF0E6",
+    "background_color": "#FAF0E6",
+    "display": "standalone",
+    "orientation": "portrait",
+    "icons": [{"src": ICON_URL, "sizes": "512x512", "type": "image/png"}]
+}
+manifest_b64 = base64.b64encode(json.dumps(manifest).encode()).decode()
+
+st.markdown(f"""
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Forchino">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="{ICON_URL}">
+<link rel="manifest" href="data:application/manifest+json;base64,{manifest_b64}">
+""", unsafe_allow_html=True)
+
+# --- НАЛАШТУВАННЯ СТИЛІВ CSS ---
 st.markdown("""
 <style>
     .stApp, header[data-testid="stHeader"] { background-color: #FAF0E6 !important; }
@@ -255,10 +280,15 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-with st.popover("🚀 Версія: Stable 2.7 Global (Історія змін)"):
+with st.popover("🚀 Версія: fin 1.0.0 (Історія змін)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v2.7 (Мобільний UI):** Оновлено навігацію. Вкладки та календар тепер сховані у плаваючих кнопках праворуч зверху (☰ та 📅) для максимальної чистоти екрана.
+    * **v1.0.0 (Повний фінальний запуск):** * Додано модуль PWA — тепер сайт встановлюється на телефон як повноцінний додаток із фірмовою іконкою.
+        * Повністю заблоковано ручне введення залишку на початок дня (розраховується суворо автоматично).
+        * Додано «тихе» автозбереження поточної форми при надсиланні Фінального звіту. Дані більше не зникають, а монети залізно переносяться на завтра.
+        * В Архів додано окремий підсумок «Фактично готівки» (Залишок на кінець мінус роздані аванси).
+        * Оновлено мобільний інтерфейс: плаваючі кнопки вирівняні у чіткий вертикальний ряд праворуч із повним збереженням клікабельності.
+    * **v2.7 (Мобільний UI):** Оновлено навігацію. Вкладки та календар тепер сховані у плаваючих кнопках (☰ та 📅).
     * **v2.6 (Чистий ввід):** Прибрано нулі в порожніх клітинках.
     * **v2.5 (Галерея в архіві):** Пряме завантаження чеків у вигляді сітки.
     """)
@@ -301,15 +331,14 @@ if st.session_state["active_tab"] == "Касса":
             elif passwd_edit != "":
                 st.error("❌ Невірний пароль!")
     else:
-        c_lock, _ = st.columns([1, 5])
-        if c_lock.button("🔒 Заблокувати касу"):
+        network_lock, _ = st.columns([1, 5])
+        if network_lock.button("🔒 Заблокувати касу"):
             st.session_state["edit_ok"] = False
             if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
             st.rerun()
         
         db_start = get_start_balance(selected_date)
-        start_balance = get_int(db_start) # Жорстко прив'язуємо до бази
-        # disabled=True робить поле сірим і забороняє вводити туди текст
+        start_balance = get_int(db_start)
         st.text_input("Залишок на початок дня (автоматично):", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
 
         st.divider()
@@ -411,8 +440,6 @@ if st.session_state["active_tab"] == "Касса":
 
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
             with st.spinner("Відправка звіту та чеків..."):
-                # ПРИМУСОВЕ ЗБЕРЕЖЕННЯ: Записуємо таблиці та монети в пам'ять перед відправкою звіту.
-                # Це гарантує, що дані не зникнуть з екрану, а монети 100% перейдуть на завтра.
                 payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
                 requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
                 requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
@@ -505,6 +532,7 @@ elif st.session_state["active_tab"] == "Архів":
         
         if isinstance(shift_res, list) and len(shift_res) > 0:
             shift = shift_res[0]
+            calc_end = get_int(shift.get('calculated_end'))
             
             st.markdown(f"<h3 style='margin-bottom: 0;'>🌅 Залишок на початок: <span style='color: #0066cc;'>{get_int(shift.get('start_balance'))} грн</span></h3>", unsafe_allow_html=True)
             st.divider()
@@ -537,7 +565,6 @@ elif st.session_state["active_tab"] == "Архів":
                 st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {total_exp} грн</p>", unsafe_allow_html=True)
                     
             st.divider()
-            calc_end = get_int(shift.get('calculated_end'))
             st.markdown(f"<h3 style='margin-bottom: 0;'>🌇 Залишок на кінець: <span style='color: #0066cc;'>{calc_end} грн</span></h3>", unsafe_allow_html=True)
             st.divider()
             
@@ -596,7 +623,7 @@ elif st.session_state["active_tab"] == "Архів":
             st.error(f"Системна помилка: {e}")
 
         # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ АРХІВУ) ---
-        fc1, fc2 = st.columns(2)
+        fc1, fc2, fc3 = st.columns(3)
         with fc1:
             st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
             with st.popover("☰"):
@@ -610,3 +637,5 @@ elif st.session_state["active_tab"] == "Архів":
                 if d != st.session_state["form_date"]:
                     st.session_state["form_date"] = d
                     st.rerun()
+        with fc3:
+            pass
