@@ -157,7 +157,7 @@ def load_draft_or_init(date_str):
 import streamlit.components.v1 as components
 
 # --- НАЛАШТУВАННЯ СТОРІНКИ ТА ПАСПОРТ ДОДАТКУ (PWA) ---
-ICON_URL = "https://ajkprfhuypcamnybqusr.supabase.co/storage/v1/object/public/assets/xHJLUtG-wHDFARC-LtBbXJE_original.png"
+ICON_URL = "https://ajkprfhuypcamnybqusr.supabase.co/storage/v1/object/public/assets/xHJLUtG-wHDFARC-LtBbXJE_original.png?v=2"
 
 # 1. Передаємо іконку безпосередньо в ядро Streamlit (це прибере кораблик)
 st.set_page_config(layout="wide", page_title="Cafe Forchino", page_icon=ICON_URL)
