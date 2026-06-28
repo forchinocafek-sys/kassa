@@ -665,7 +665,7 @@ elif st.session_state["active_tab"] == "Архів":
                     prefetch_week_window(d)
                     st.rerun()
         with fc3:
-            if st.button("", key="fab_lock_arch"):
+            if st.button("🚫", key="fab_lock_arch"):
                 st.session_state["archive_ok"] = False
                 if "archive_auth" in st.query_params: del st.query_params["archive_auth"]
                 st.rerun()
