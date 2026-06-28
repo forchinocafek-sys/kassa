@@ -85,7 +85,7 @@ def get_int(val):
     except Exception:
         return 0
 
-# ПАКЕТНЕ ЗАВАНТАЖЕННЯ ТИЖНЯ (Один запит до бази замість семи)
+# ПАКЕТНЕ ЗАВАНТАЖЕННЯ ТИЖНЯ
 def prefetch_week_window(center_date_obj):
     if "drafts_cache" not in st.session_state:
         st.session_state["drafts_cache"] = {}
@@ -147,7 +147,6 @@ def load_draft_or_init(date_str):
     if receipts_key not in st.session_state:
         st.session_state[receipts_key] = []
         
-    # МИТТЄВА ЗАВАНТАЖЕННЯ З ОПЕРАТИВНОЇ ПАМ'ЯТІ (Якщо день є в тижневому вікні)
     if "drafts_cache" in st.session_state and date_str in st.session_state["drafts_cache"]:
         payload = st.session_state["drafts_cache"][date_str]
         st.session_state["inc_data"] = payload.get('inc', [{"Опис": "", "Сума": None}])
@@ -161,7 +160,6 @@ def load_draft_or_init(date_str):
             st.session_state[f"qty_{k}_{date_str}"] = str(c_val) if c_val else ""
         return
         
-    # Резервний одиночний запит, якщо вийшли за межі вікна тижня
     try:
         url_draft = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{date_str}"
         draft_res = requests.get(url_draft, headers=headers).json()
@@ -184,7 +182,6 @@ def load_draft_or_init(date_str):
     except Exception:
         pass
     
-    # Ініціалізація порожнього дня, якщо записів взагалі немає ніде
     st.session_state["inc_data"] = [{"Опис": "", "Сума": None}]
     st.session_state["exp_data"] = [{"Опис": "", "Сума": None}]
     
@@ -231,12 +228,10 @@ components.html(f"""
     appleTitle.content = 'Forchino';
     doc.head.appendChild(appleTitle);
 
-    // Розумне авто-перезавантаження при розгортанні (Варіант 1)
     let lastActiveTime = Date.now();
     doc.addEventListener('visibilitychange', function() {{
         if (doc.visibilityState === 'visible') {{
             let timeAway = (Date.now() - lastActiveTime) / 1000;
-            // Якщо додаток був згорнутий довше 45 секунд — м'яко перезавантажуємо сторінку
             if (timeAway > 45) {{
                 window.parent.location.reload();
             }}
@@ -257,10 +252,7 @@ st.markdown("""
     p[style*="#ef6c00"] { color: #ef6c00 !important; }
     span[style*="#0066cc"] { color: #0066cc !important; }
 
-    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        border: 1px solid #d1d5db !important;
-    }
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #ffffff !important; border: 1px solid #d1d5db !important; }
     input, .stSelectbox span { color: #111827 !important; }
 
     .stTextInput div[data-baseweb="input"] { height: 35px !important; }
@@ -270,32 +262,11 @@ st.markdown("""
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
     #is-floating { display: none; }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) {
-        position: fixed !important; 
-        top: 60px !important; 
-        right: 15px !important; 
-        z-index: 99999 !important; 
-        width: 50px !important; 
-        display: flex !important;
-        flex-direction: column !important; 
-        gap: 12px !important; 
-        background: transparent !important;
-        padding: 0 !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        width: 50px !important; min-width: 50px !important; max-width: 50px !important; height: 50px !important; flex: 0 0 50px !important;
-        margin: 0 !important; padding: 0 !important; display: flex !important; justify-content: center !important; align-items: center !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] > div {
-        width: 100% !important; height: 100% !important; display: flex !important; justify-content: center !important; align-items: center !important; margin: 0 !important; padding: 0 !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
-        width: 50px !important; min-width: 50px !important; height: 50px !important; min-height: 50px !important; padding: 0 !important; margin: 0 !important;
-        border-radius: 12px !important; background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; color: #4b5563 !important; border: 1px solid #d1d5db !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: transform 0.2s, box-shadow 0.2s !important;
-    }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button:hover {
-        transform: translateY(-2px) !important; box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
-    }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) { position: fixed !important; top: 60px !important; right: 15px !important; z-index: 99999 !important; width: 50px !important; display: flex !important; flex-direction: column !important; gap: 12px !important; background: transparent !important; padding: 0 !important; }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] { width: 50px !important; min-width: 50px !important; max-width: 50px !important; height: 50px !important; flex: 0 0 50px !important; margin: 0 !important; padding: 0 !important; display: flex !important; justify-content: center !important; align-items: center !important; }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] > div { width: 100% !important; height: 100% !important; display: flex !important; justify-content: center !important; align-items: center !important; margin: 0 !important; padding: 0 !important; }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button { width: 50px !important; min-width: 50px !important; height: 50px !important; min-height: 50px !important; padding: 0 !important; margin: 0 !important; border-radius: 12px !important; background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; color: #4b5563 !important; border: 1px solid #d1d5db !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: transform 0.2s, box-shadow 0.2s !important; }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button:hover { transform: translateY(-2px) !important; box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button p { font-size: 20px !important; margin: 0 !important; padding: 0 !important; line-height: 1 !important; }
 </style>
 """, unsafe_allow_html=True)
@@ -303,12 +274,12 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-with st.popover("🚀 Версія: fin 1.2.0 (Auto-Refresh Update)"):
+with st.popover("🚀 Версія: fin 1.2.1 (Ghost Save Fix)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v1.2.0 (Розумне автообновлення):** * Інтегровано невидимий JS-таймер «анти-засипання». Якщо додаток згорнуто довше 45 секунд, при розгортанні сторінка м'яко перезавантажиться сама, запобігаючи вильоту червоних помилок з'єднання Streamlit.
-    * **v1.1.0 (Миттєве вікно тижня):** Пакетна загрузка 7 днів одночасно при запуску (переключення дат за 0 секунд) та збереження повної історії.
-    * **v1.0.0 (Фінальний запуск):** Додано PWA-модуль, блокування початкового залишку, автозбереження черновика у фінальну кнопку та фактичну готівку в Архів.
+    * **v1.2.1 (Ghost Save):** Впроваджено приховане автозбереження при зміні вкладок та дат. Тепер дані у полі «Факт» ніколи не зникають, навіть якщо ви забули натиснути кнопку збереження перед переходом в Архів.
+    * **v1.2.0 (Анти-засипання):** Невидимий JS-таймер для запобігання помилкам з'єднання при розгортанні схованого додатку.
+    * **v1.1.0 (Вікно тижня):** Пакетна загрузка 7 днів для миттєвого переключення дат без очікування бази.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
@@ -317,7 +288,6 @@ st.write("")
 # --- ІНІЦІАЛІЗАЦІЯ СТАНУ ТА ТИЖНЕВОГО КЕШУ ---
 if "form_date" not in st.session_state:
     st.session_state["form_date"] = datetime.today()
-    # ПЕРШИЙ СТАРТ: Завантажуємо весь тиждень в пам'ять одним махом
     prefetch_week_window(st.session_state["form_date"])
 
 if "active_tab" not in st.session_state:
@@ -325,12 +295,11 @@ if "active_tab" not in st.session_state:
 
 selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
 
-# === [ВИПРАВЛЕННЯ ТУТ: Захист від очищення пам'яті Streamlit] ===
-# Якщо Streamlit видалив поля при переході в Архів, примусово відновлюємо їх з кешу
+# === ЗАХИСТ ВІД ОЧИЩЕННЯ ПАМ'ЯТІ STREAMLIT ===
 coins_key = f"coins_live_{selected_date}"
 if coins_key not in st.session_state:
     st.session_state["current_loaded_date"] = None
-# ================================================================
+# ===============================================
 
 if st.session_state.get("current_loaded_date") != selected_date:
     load_draft_or_init(selected_date)
@@ -428,7 +397,7 @@ if st.session_state["active_tab"] == "Касса":
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
         with col_b2:
-            st.subheader("💰 | Факт")
+            st.subheader("💰 | Fact")
             m_coins = get_int(st.text_input("Монети (загальна сума):", placeholder="0", key=f"coins_live_{selected_date}"))
             
             st.markdown('<div class="fact-block">', unsafe_allow_html=True)
@@ -518,12 +487,22 @@ if st.session_state["active_tab"] == "Касса":
             with st.popover("☰"):
                 nav = st.radio("Розділ:", ["Касса", "Архів"], index=0, label_visibility="collapsed")
                 if nav != "Касса":
+                    # [GHOST SAVE] Робимо тихий бекап перед зміною вкладки
+                    payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
+                    if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
+                    st.session_state["drafts_cache"][selected_date] = payload
+                    
                     st.session_state["active_tab"] = nav
                     st.rerun()
         with fc2:
             with st.popover("📅"):
                 d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
                 if d != st.session_state["form_date"]:
+                    # [GHOST SAVE] Робимо тихий бекап перед зміною дати
+                    payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
+                    if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
+                    st.session_state["drafts_cache"][selected_date] = payload
+                    
                     st.session_state["form_date"] = d
                     prefetch_week_window(d)
                     st.rerun()
