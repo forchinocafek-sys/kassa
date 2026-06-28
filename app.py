@@ -532,7 +532,7 @@ if st.session_state["active_tab"] == "Касса":
                 
                 st.toast("✅ Дані збережено в пам'ять тижня!", icon="💾")
         with fc4:
-            if st.button("🔒", key="fab_lock_edit"):
+            if st.button("🚫", key="fab_lock_edit"):
                 st.session_state["edit_ok"] = False
                 if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
                 st.rerun()
