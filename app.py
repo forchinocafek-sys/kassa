@@ -358,7 +358,7 @@ if st.session_state["active_tab"] == "Касса":
         
         col_t1, col_t2 = st.columns(2)
         with col_t1:
-            st.subheader("Надходження:")
+            st.subheader("📈Надходження:")
             inc_df = prepare_df(st.session_state["inc_data"], ["Опис", "Сума"])
             edited_inc_df = st.data_editor(inc_df, num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
             subtotal_inc = sum(get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows())
@@ -367,7 +367,7 @@ if st.session_state["active_tab"] == "Касса":
         with col_t2:
             c_header, c_btn = st.columns([3, 1])
             with c_header:
-                st.subheader("Витрати:")
+                st.subheader("📉Витрати:")
             with c_btn:
                 with st.popover("📷 Чеки"):
                     ufs = st.file_uploader("Виберіть файли", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key=f"uploader_{selected_date}")
