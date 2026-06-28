@@ -421,7 +421,7 @@ if st.session_state["active_tab"] == "Касса":
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
         with col_b2:
-            st.subheader("💰 | Fact")
+            st.subheader("💰 | Факт")
             m_coins = get_int(st.text_input("Монети (загальна сума):", placeholder="0", key=f"coins_live_{selected_date}"))
             
             st.markdown('<div class="fact-block">', unsafe_allow_html=True)
