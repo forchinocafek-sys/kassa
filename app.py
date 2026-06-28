@@ -325,6 +325,13 @@ if "active_tab" not in st.session_state:
 
 selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
 
+# === [ВИПРАВЛЕННЯ ТУТ: Захист від очищення пам'яті Streamlit] ===
+# Якщо Streamlit видалив поля при переході в Архів, примусово відновлюємо їх з кешу
+coins_key = f"coins_live_{selected_date}"
+if coins_key not in st.session_state:
+    st.session_state["current_loaded_date"] = None
+# ================================================================
+
 if st.session_state.get("current_loaded_date") != selected_date:
     load_draft_or_init(selected_date)
     st.session_state["current_loaded_date"] = selected_date
