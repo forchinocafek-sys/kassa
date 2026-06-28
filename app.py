@@ -245,7 +245,12 @@ components.html(f"""
 # --- НАЛАШТУВАННЯ СТИЛІВ CSS ---
 st.markdown("""
 <style>
-    .stApp, header[data-testid="stHeader"] { background-color: #FAF0E6 !important; }
+    /* ПРИХОВУЄМО СТАНДАРТНЕ МЕНЮ STREAMLIT */
+    header[data-testid="stHeader"] { display: none !important; }
+    #MainMenu { visibility: hidden !important; }
+    footer { display: none !important; }
+
+    .stApp { background-color: #FAF0E6 !important; }
     .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
     p[style*="#2e7d32"] { color: #2e7d32 !important; }
     p[style*="#c62828"] { color: #c62828 !important; }
@@ -262,7 +267,7 @@ st.markdown("""
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
     #is-floating { display: none; }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) { position: fixed !important; top: 60px !important; right: 15px !important; z-index: 99999 !important; width: 50px !important; display: flex !important; flex-direction: column !important; gap: 12px !important; background: transparent !important; padding: 0 !important; }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) { position: fixed !important; top: 30px !important; right: 15px !important; z-index: 99999 !important; width: 50px !important; display: flex !important; flex-direction: column !important; gap: 12px !important; background: transparent !important; padding: 0 !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] { width: 50px !important; min-width: 50px !important; max-width: 50px !important; height: 50px !important; flex: 0 0 50px !important; margin: 0 !important; padding: 0 !important; display: flex !important; justify-content: center !important; align-items: center !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] > div { width: 100% !important; height: 100% !important; display: flex !important; justify-content: center !important; align-items: center !important; margin: 0 !important; padding: 0 !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button { width: 50px !important; min-width: 50px !important; height: 50px !important; min-height: 50px !important; padding: 0 !important; margin: 0 !important; border-radius: 12px !important; background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; color: #4b5563 !important; border: 1px solid #d1d5db !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: transform 0.2s, box-shadow 0.2s !important; }
@@ -272,18 +277,18 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- ШАПКА ДОДАТКУ ---
+# Додаємо трохи відступу зверху, оскільки стандартний header прихований
+st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
 st.title("Cafe Forchino")
 
-with st.popover("🚀 Версія: fin 1.2.1 (Ghost Save Fix)"):
+with st.popover("🚀 Версія: fin 1.3.0 (UI & Styling Update)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v1.2.1 (Ghost Save):** Тепер дані у полі «Факт» ніколи не зникають
-    * **v1.2.0 (Анти-засипання):** Невидимий JS-таймер для запобігання помилкам з'єднання при розгортанні схованого додатку.
-    * **v1.1.0 (Вікно тижня):** Пакетна загрузка 7 днів для миттєвого переключення дат без очікування бази.
+    * **v1.3.0 (UI Update):** Приховано системні кнопки Github, оптимізовано розташування кнопок блокування в плаваючому меню.
+    * **v1.2.1 (Ghost Save):** Впроваджено приховане автозбереження при зміні вкладок.
+    * **v1.2.0 (Анти-засипання):** JS-таймер для запобігання помилкам з'єднання.
+    * **v1.1.0 (Вікно тижня):** Пакетна загрузка 7 днів для швидкого перемикання.
     """)
-
-st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
-st.write("") 
 
 # --- ІНІЦІАЛІЗАЦІЯ СТАНУ ТА ТИЖНЕВОГО КЕШУ ---
 if "form_date" not in st.session_state:
@@ -328,12 +333,7 @@ if st.session_state["active_tab"] == "Касса":
             elif passwd_edit != "":
                 st.error("❌ Невірний пароль!")
     else:
-        network_lock, _ = st.columns([1, 5])
-        if network_lock.button("🔒 Заблокувати касу"):
-            st.session_state["edit_ok"] = False
-            if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
-            st.rerun()
-        
+        # Прибрано стару кнопку блокування, тепер вона у FAB
         db_start = get_start_balance(selected_date)
         start_balance = get_int(db_start)
         st.text_input("Залишок на початок дня (автоматично):", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
@@ -480,14 +480,13 @@ if st.session_state["active_tab"] == "Касса":
                 else:
                     st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
-        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) ---
-        fc1, fc2, fc3 = st.columns(3)
+        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) 4 КНОПКИ ---
+        fc1, fc2, fc3, fc4 = st.columns(4)
         with fc1:
             st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
             with st.popover("☰"):
                 nav = st.radio("Розділ:", ["Касса", "Архів"], index=0, label_visibility="collapsed")
                 if nav != "Касса":
-                    # [GHOST SAVE] Робимо тихий бекап перед зміною вкладки
                     payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
                     if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
                     st.session_state["drafts_cache"][selected_date] = payload
@@ -498,7 +497,6 @@ if st.session_state["active_tab"] == "Касса":
             with st.popover("📅"):
                 d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
                 if d != st.session_state["form_date"]:
-                    # [GHOST SAVE] Робимо тихий бекап перед зміною дати
                     payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
                     if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
                     st.session_state["drafts_cache"][selected_date] = payload
@@ -517,6 +515,11 @@ if st.session_state["active_tab"] == "Касса":
                 st.cache_data.clear()
                 
                 st.toast("✅ Дані збережено в пам'ять тижня!", icon="💾")
+        with fc4:
+            if st.button("🔒", key="fab_lock_edit"):
+                st.session_state["edit_ok"] = False
+                if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
+                st.rerun()
 
 # ==========================================
 # РОЗДІЛ 2: АРХІВ
@@ -536,12 +539,6 @@ elif st.session_state["active_tab"] == "Архів":
             elif passwd_archive != "":
                 st.error("❌ Невірний пароль!")
     else:
-        c_lock_arch, _ = st.columns([1, 5])
-        if c_lock_arch.button("🔒 Закрити архів", key="btn_close_arch"):
-            st.session_state["archive_ok"] = False
-            if "archive_auth" in st.query_params: del st.query_params["archive_auth"]
-            st.rerun()
-            
         st.subheader(f"🔎 Перегляд історії: {selected_date}")
         
         url_shift_search = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}"
@@ -639,7 +636,7 @@ elif st.session_state["active_tab"] == "Архів":
         except Exception as e:
             st.error(f"Системна помилка: {e}")
 
-        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ АРХІВУ) ---
+        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ АРХІВУ) 3 КНОПКИ ---
         fc1, fc2, fc3 = st.columns(3)
         with fc1:
             st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
@@ -656,4 +653,11 @@ elif st.session_state["active_tab"] == "Архів":
                     prefetch_week_window(d)
                     st.rerun()
         with fc3:
-            pass
+            if st.button("🔒", key="fab_lock_arch"):
+                st.session_state["archive_ok"] = False
+                if "archive_auth" in st.query_params: del st.query_params["archive_auth"]
+                st.rerun()
+
+# --- ФІНАЛЬНИЙ ПІДПИС ВНИЗУ СТОРІНКИ ---
+st.write("---")
+st.markdown("<p style='text-align: center; color: #9ca3af; font-size: 14px; font-style: italic; margin-bottom: 30px;'>Розроблено Богданом для cafe forchino з любов'ю 🧡</p>", unsafe_allow_html=True)
