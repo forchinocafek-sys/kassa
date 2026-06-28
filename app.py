@@ -245,6 +245,9 @@ components.html(f"""
 # --- НАЛАШТУВАННЯ СТИЛІВ CSS ---
 st.markdown("""
 <style>
+    /* ПРИЖИМАЕМ ВЕСЬ КОНТЕНТ К ВЕРХУ */
+    .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+    
     /* ПІДКЛЮЧАЄМО ЕЛЕГАНТНИЙ ШРИФТ */
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
     h1 { font-family: 'Permanent Marker', cursive !important; }
@@ -292,8 +295,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- ШАПКА ДОДАТКУ ---
-# Додаємо трохи відступу зверху, оскільки стандартний header прихований
-st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 st.title("Cafe Forchino")
 
 with st.popover("🚀 Версія: fin 1.3.0 (UI & Styling Update)"):
