@@ -245,6 +245,21 @@ components.html(f"""
 # --- НАЛАШТУВАННЯ СТИЛІВ CSS ---
 st.markdown("""
 <style>
+    /* ПІДКЛЮЧАЄМО ЕЛЕГАНТНИЙ ШРИФТ */
+    @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
+    h1 { font-family: 'Permanent Marker', cursive !important; }
+
+    /* ПРИХОВУЄМО СТАНДАРТНЕ МЕНЮ STREAMLIT */
+    header[data-testid="stHeader"] { display: none !important; }
+    #MainMenu { visibility: hidden !important; }
+    footer { display: none !important; }
+
+    /* ЗАСТОСОВУЄМО ШРИФТ ДО ЗАГОЛОВКА */
+    h1 { font-family: 'Playfair Display', serif !important; font-size: 3em !important; }
+
+    .stApp { background-color: #FAF0E6 !important; }
+    .stApp, .stApp p, h2, h3, h4, h5, h6, label, li { color: #111827 !important; }
+    
     /* ПРИХОВУЄМО СТАНДАРТНЕ МЕНЮ STREAMLIT */
     header[data-testid="stHeader"] { display: none !important; }
     #MainMenu { visibility: hidden !important; }
