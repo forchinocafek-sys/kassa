@@ -618,7 +618,7 @@ elif st.session_state["active_tab"] == "Архів":
             st.markdown(f"<h3 style='margin-bottom: 0; color: #4b5563;'>💵 Фактично готівки: {actual_cash} грн</h3>", unsafe_allow_html=True)
             
         else:
-            st.warning("За цей день звітів не знайдено в хмарі (таблиця shifts порожня).")
+            st.warning("За цей день звітів не знайдено в хмарі.")
             
         st.divider()
         st.subheader("🖼️ Галерея чеків за обрану дату")
