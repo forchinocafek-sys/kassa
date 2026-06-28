@@ -233,17 +233,17 @@ components.html(f"""
 
     // Розумне авто-перезавантаження при розгортанні (Варіант 1)
     let lastActiveTime = Date.now();
-    doc.addEventListener('visibilitychange', function() {
-        if (doc.visibilityState === 'visible') {
+    doc.addEventListener('visibilitychange', function() {{
+        if (doc.visibilityState === 'visible') {{
             let timeAway = (Date.now() - lastActiveTime) / 1000;
             // Якщо додаток був згорнутий довше 45 секунд — м'яко перезавантажуємо сторінку
-            if (timeAway > 45) {
+            if (timeAway > 45) {{
                 window.parent.location.reload();
-            }
-        } else {
+            }}
+        }} else {{
             lastActiveTime = Date.now();
-        }
-    });
+        }}
+    }});
 </script>
 """, height=0, width=0)
 
