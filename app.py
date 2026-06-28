@@ -1,5 +1,5 @@
 import streamlit as st
-from datetime import datetime
+from datetime import datetime, timedelta
 import requests
 import pandas as pd
 import time
@@ -8,6 +8,7 @@ import uuid
 import base64
 import json
 from PIL import Image
+import streamlit.components.v1 as components
 
 # --- НАЛАШТУВАННЯ БЕЗПЕКИ ---
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
@@ -25,77 +26,48 @@ headers = {
 upload_headers = {
     "apikey": SUPABASE_KEY,
     "Authorization": f"Bearer {SUPABASE_KEY}",
-    "Content-Type": "image/jpeg"
+    "Content-Type": "image/jpeg" 
 }
 
-REQUEST_TIMEOUT = 10
-UPLOAD_TIMEOUT = 30
+# --- ДОПОМІЖНІ ФУНКЦІЇ ТА РОЗУМНЕ КЕШУВАННЯ ---
 
-
-def api_get_json(url):
-    res = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT)
-    res.raise_for_status()
-    return res.json()
-
-
-def api_post(url, *, json_body=None, data=None, request_headers=None, timeout=None):
-    request_timeout = timeout or (UPLOAD_TIMEOUT if data is not None else REQUEST_TIMEOUT)
-    return requests.post(
-        url,
-        headers=request_headers or headers,
-        json=json_body,
-        data=data,
-        timeout=request_timeout,
-    )
-
-
-def api_delete(url):
-    return requests.delete(url, headers=headers, timeout=REQUEST_TIMEOUT)
-# --- ДОПОМІЖНІ ФУНКЦІЇ ---
-def get_int(val):
-    try:
-        if pd.isna(val): return 0
-        if not val: return 0
-        clean_val = str(val).strip().replace(" ", "")
-        if clean_val in ("None", "<NA>", "nan", ""): return 0
-        return int(float(clean_val))
-    except Exception:
-        return 0
-
+@st.cache_data(ttl=60)
 def get_start_balance(date_str):
     try:
         url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
-        res = api_get_json(url)
+        res = requests.get(url, headers=headers).json()
         if isinstance(res, list) and len(res) > 0:
             return get_int(res[0].get('calculated_end', 0))
     except Exception:
         pass
     return 0
 
+@st.cache_data(ttl=60)
 def get_previous_advances(date_str):
     try:
         url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
-        res = api_get_json(url)
+        res = requests.get(url, headers=headers).json()
         if isinstance(res, list) and len(res) > 0:
             last_date = res[0].get('date')
             if last_date:
                 url_adv = f"{SUPABASE_URL}/rest/v1/advances?date=eq.{last_date}"
-                res_adv = api_get_json(url_adv)
+                res_adv = requests.get(url_adv, headers=headers).json()
                 if isinstance(res_adv, list):
                     return [{"Співробітник": item.get('employee', ''), "Сума": get_int(item.get('amount', 0)), "Примітка": ""} for item in res_adv]
     except Exception:
         pass
     return []
 
+@st.cache_data(ttl=60)
 def get_previous_coins(date_str):
     try:
         url = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{date_str}&order=date.desc&limit=1"
-        res = api_get_json(url)
+        res = requests.get(url, headers=headers).json()
         if isinstance(res, list) and len(res) > 0:
             last_date = res[0].get('date')
             if last_date:
                 url_draft = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{last_date}"
-                res_draft = api_get_json(url_draft)
+                res_draft = requests.get(url_draft, headers=headers).json()
                 if isinstance(res_draft, list) and len(res_draft) > 0:
                     payload = res_draft[0].get('payload', {})
                     return get_int(payload.get('cash', {}).get('coins', 0))
@@ -103,23 +75,51 @@ def get_previous_coins(date_str):
         pass
     return 0
 
+def get_int(val):
+    try:
+        if pd.isna(val): return 0 
+        if not val: return 0
+        clean_val = str(val).strip().replace(" ", "")
+        if clean_val in ("None", "<NA>", "nan", ""): return 0
+        return int(float(clean_val))
+    except Exception:
+        return 0
+
+# ПАКЕТНЕ ЗАВАНТАЖЕННЯ ТИЖНЯ (Один запит до бази замість семи)
+def prefetch_week_window(center_date_obj):
+    if "drafts_cache" not in st.session_state:
+        st.session_state["drafts_cache"] = {}
+    
+    start_date = (center_date_obj - timedelta(days=3)).strftime('%Y-%m-%d')
+    end_date = (center_date_obj + timedelta(days=3)).strftime('%Y-%m-%d')
+    
+    try:
+        url = f"{SUPABASE_URL}/rest/v1/drafts?date=gte.{start_date}&date=lte.{end_date}"
+        res = requests.get(url, headers=headers).json()
+        if isinstance(res, list):
+            for row in res:
+                d = row.get('date')
+                st.session_state["drafts_cache"][d] = row.get('payload', {})
+    except Exception:
+        pass
+
 def upload_receipts_to_supabase(date_str, receipts_list):
     if not receipts_list:
         return True
-
+        
     errors = []
     for r in receipts_list:
         safe_name = r['name'].replace(" ", "_").replace("/", "-")
         file_path = f"{date_str}/{r['id']}_{safe_name}"
         url = f"{SUPABASE_URL}/storage/v1/object/receipts/{file_path}"
-
+        
         try:
-            res = api_post(url, data=r['bytes'], request_headers=upload_headers, timeout=UPLOAD_TIMEOUT)
+            res = requests.post(url, headers=upload_headers, data=r['bytes'])
             if res.status_code not in [200, 201]:
                 errors.append(f"{r['name']}: {res.text}")
         except Exception as e:
             errors.append(f"{r['name']}: {e}")
-
+            
     if errors:
         st.error("❌ Деякі чеки не завантажилися в хмару:")
         for err in errors: st.write(err)
@@ -143,15 +143,34 @@ def prepare_df(data_list, columns):
 def load_draft_or_init(date_str):
     coins_key = f"coins_live_{date_str}"
     receipts_key = f"receipts_{date_str}"
-
+    
     if receipts_key not in st.session_state:
         st.session_state[receipts_key] = []
-
+        
+    # МИТТЄВА ЗАВАНТАЖЕННЯ З ОПЕРАТИВНОЇ ПАМ'ЯТІ (Якщо день є в тижневому вікні)
+    if "drafts_cache" in st.session_state and date_str in st.session_state["drafts_cache"]:
+        payload = st.session_state["drafts_cache"][date_str]
+        st.session_state["inc_data"] = payload.get('inc', [{"Опис": "", "Сума": None}])
+        st.session_state["exp_data"] = payload.get('exp', [{"Опис": "", "Сума": None}])
+        st.session_state["adv_data"] = payload.get('adv', [{"Співробітник": "", "Сума": None, "Примітка": ""}])
+        cash_data = payload.get('cash', {})
+        c_coins = cash_data.get('coins', 0)
+        st.session_state[coins_key] = str(c_coins) if c_coins else ""
+        for k in [20, 50, 100, 200, 500, 1000]:
+            c_val = cash_data.get(str(k), 0)
+            st.session_state[f"qty_{k}_{date_str}"] = str(c_val) if c_val else ""
+        return
+        
+    # Резервний одиночний запит, якщо вийшли за межі вікна тижня
     try:
         url_draft = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{date_str}"
-        draft_res = api_get_json(url_draft)
+        draft_res = requests.get(url_draft, headers=headers).json()
         if isinstance(draft_res, list) and len(draft_res) > 0:
             payload = draft_res[0].get('payload', {})
+            if "drafts_cache" not in st.session_state:
+                st.session_state["drafts_cache"] = {}
+            st.session_state["drafts_cache"][date_str] = payload
+            
             st.session_state["inc_data"] = payload.get('inc', [{"Опис": "", "Сума": None}])
             st.session_state["exp_data"] = payload.get('exp', [{"Опис": "", "Сума": None}])
             st.session_state["adv_data"] = payload.get('adv', [{"Співробітник": "", "Сума": None, "Примітка": ""}])
@@ -164,25 +183,23 @@ def load_draft_or_init(date_str):
             return
     except Exception:
         pass
-
+    
+    # Ініціалізація порожнього дня, якщо записів взагалі немає ніде
     st.session_state["inc_data"] = [{"Опис": "", "Сума": None}]
     st.session_state["exp_data"] = [{"Опис": "", "Сума": None}]
-
+    
     prev_adv = get_previous_advances(date_str)
     st.session_state["adv_data"] = prev_adv if prev_adv else [{"Співробітник": "", "Сума": None, "Примітка": ""}]
-
+    
     prev_coins = get_previous_coins(date_str)
     st.session_state[coins_key] = str(prev_coins) if prev_coins else ""
-
+    
     for k in [20, 50, 100, 200, 500, 1000]:
         st.session_state[f"qty_{k}_{date_str}"] = ""
-
-import streamlit.components.v1 as components
 
 # --- НАЛАШТУВАННЯ СТОРІНКИ ТА ПАСПОРТ ДОДАТКУ (PWA) ---
 ICON_URL = "https://ajkprfhuypcamnybqusr.supabase.co/storage/v1/object/public/assets/xHJLUtG-wHDFARC-LtBbXJE_original.png?v=2"
 
-# 1. Передаємо іконку безпосередньо в ядро Streamlit (це прибере кораблик)
 st.set_page_config(layout="wide", page_title="Cafe Forchino", page_icon=ICON_URL)
 
 manifest = {
@@ -196,28 +213,37 @@ manifest = {
 }
 manifest_b64 = base64.b64encode(json.dumps(manifest).encode()).decode()
 
-# 2. Використовуємо JavaScript для примусового запису налаштувань у <head>
 components.html(f"""
 <script>
     const doc = window.parent.document;
-
-    // Додаємо маніфест
     let manifest = doc.createElement('link');
     manifest.rel = 'manifest';
     manifest.href = 'data:application/manifest+json;base64,{manifest_b64}';
     doc.head.appendChild(manifest);
 
-    // Додаємо іконку для Apple/Android
     let appleIcon = doc.createElement('link');
     appleIcon.rel = 'apple-touch-icon';
     appleIcon.href = '{ICON_URL}';
     doc.head.appendChild(appleIcon);
 
-    // Задаємо правильну назву для робочого столу
     let appleTitle = doc.createElement('meta');
     appleTitle.name = 'apple-mobile-web-app-title';
     appleTitle.content = 'Forchino';
     doc.head.appendChild(appleTitle);
+
+    // Розумне авто-перезавантаження при розгортанні (Варіант 1)
+    let lastActiveTime = Date.now();
+    doc.addEventListener('visibilitychange', function() {
+        if (doc.visibilityState === 'visible') {
+            let timeAway = (Date.now() - lastActiveTime) / 1000;
+            // Якщо додаток був згорнутий довше 45 секунд — м'яко перезавантажуємо сторінку
+            if (timeAway > 45) {
+                window.parent.location.reload();
+            }
+        } else {
+            lastActiveTime = Date.now();
+        }
+    });
 </script>
 """, height=0, width=0)
 
@@ -239,108 +265,61 @@ st.markdown("""
 
     .stTextInput div[data-baseweb="input"] { height: 35px !important; }
     .stTextInput input { padding: 5px !important; }
-
+    
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
-
-    /* БРОНЕБІЙНИЙ CSS ДЛЯ ПЛАВАЮЧОГО МЕНЮ (ВЕРТИКАЛЬНИЙ СТОВПЕЦЬ) */
+    
     #is-floating { display: none; }
-
-    /* 1. Фіксуємо контейнер у правому верхньому куті */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) {
-        position: fixed !important;
-        top: 60px !important;
-        right: 15px !important;
-        z-index: 99999 !important;
-        width: 50px !important;
+        position: fixed !important; 
+        top: 60px !important; 
+        right: 15px !important; 
+        z-index: 99999 !important; 
+        width: 50px !important; 
         display: flex !important;
-        flex-direction: column !important;
-        gap: 12px !important;
+        flex-direction: column !important; 
+        gap: 12px !important; 
         background: transparent !important;
         padding: 0 !important;
     }
-
-    /* 2. Кожну колонку всередині перетворюємо на ідеальний квадрат 50х50 */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        width: 50px !important;
-        min-width: 50px !important;
-        max-width: 50px !important;
-        height: 50px !important;
-        flex: 0 0 50px !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
+        width: 50px !important; min-width: 50px !important; max-width: 50px !important; height: 50px !important; flex: 0 0 50px !important;
+        margin: 0 !important; padding: 0 !important; display: flex !important; justify-content: center !important; align-items: center !important;
     }
-
-    /* 3. УНІВЕРСАЛЬНЕ ЦЕНТРУВАННЯ: і для поповерів, і для звичайних кнопок */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] > div {
-        width: 100% !important;
-        height: 100% !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        margin: 0 !important;
-        padding: 0 !important;
+        width: 100% !important; height: 100% !important; display: flex !important; justify-content: center !important; align-items: center !important; margin: 0 !important; padding: 0 !important;
     }
-
-    /* 4. Оформлюємо самі кнопки */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
-        width: 50px !important;
-        min-width: 50px !important;
-        height: 50px !important;
-        min-height: 50px !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        border-radius: 12px !important;
-        background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important;
-        color: #4b5563 !important;
-        border: 1px solid #d1d5db !important;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        transition: transform 0.2s, box-shadow 0.2s !important;
+        width: 50px !important; min-width: 50px !important; height: 50px !important; min-height: 50px !important; padding: 0 !important; margin: 0 !important;
+        border-radius: 12px !important; background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; color: #4b5563 !important; border: 1px solid #d1d5db !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: transform 0.2s, box-shadow 0.2s !important;
     }
-
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button:hover {
-        transform: translateY(-2px) !important;
-        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important;
-        background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
+        transform: translateY(-2px) !important; box-shadow: 0 6px 15px rgba(0, 0, 0, 0.2) !important; background: linear-gradient(135deg, #e5e7eb, #d1d5db) !important;
     }
-
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button p {
-        font-size: 20px !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        line-height: 1 !important;
-    }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button p { font-size: 20px !important; margin: 0 !important; padding: 0 !important; line-height: 1 !important; }
 </style>
 """, unsafe_allow_html=True)
 
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino")
 
-with st.popover("🚀 Версія: fin 1.0.0 (Історія змін)"):
+with st.popover("🚀 Версія: fin 1.2.0 (Auto-Refresh Update)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v1.0.0 (Повний фінальний запуск):** * Додано модуль PWA — тепер сайт встановлюється на телефон як повноцінний додаток із фірмовою іконкою.
-        * Повністю заблоковано ручне введення залишку на початок дня (розраховується суворо автоматично).
-        * Додано «тихе» автозбереження поточної форми при надсиланні Фінального звіту. Дані більше не зникають, а монети залізно переносяться на завтра.
-        * В Архів додано окремий підсумок «Фактично готівки» (Залишок на кінець мінус роздані аванси).
-        * Оновлено мобільний інтерфейс: плаваючі кнопки вирівняні у чіткий вертикальний ряд праворуч із повним збереженням клікабельності.
-    * **v2.7 (Мобільний UI):** Оновлено навігацію. Вкладки та календар тепер сховані у плаваючих кнопках (☰ та 📅).
-    * **v2.6 (Чистий ввід):** Прибрано нулі в порожніх клітинках.
-    * **v2.5 (Галерея в архіві):** Пряме завантаження чеків у вигляді сітки.
+    * **v1.2.0 (Розумне автообновлення):** * Інтегровано невидимий JS-таймер «анти-засипання». Якщо додаток згорнуто довше 45 секунд, при розгортанні сторінка м'яко перезавантажиться сама, запобігаючи вильоту червоних помилок з'єднання Streamlit.
+    * **v1.1.0 (Миттєве вікно тижня):** Пакетна загрузка 7 днів одночасно при запуску (переключення дат за 0 секунд) та збереження повної історії для аудиту напарника.
+    * **v1.0.0 (Фінальний запуск):** Додано PWA-модуль, блокування початкового залишку, автозбереження черновика у фінальну кнопку та фактичну готівку в Архів.
     """)
 
 st.markdown("*Розроблено Богданом для cafe forchino з любов'ю 🧡*")
-st.write("")
+st.write("") 
 
-# --- ІНІЦІАЛІЗАЦІЯ СТАНУ ---
+# --- ІНІЦІАЛІЗАЦІЯ СТАНУ ТА ТИЖНЕВОГО КЕШУ ---
 if "form_date" not in st.session_state:
     st.session_state["form_date"] = datetime.today()
+    # ПЕРШИЙ СТАРТ: Завантажуємо весь тиждень в пам'ять одним махом
+    prefetch_week_window(st.session_state["form_date"])
+
 if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Касса"
 
@@ -359,7 +338,7 @@ if receipts_key not in st.session_state:
 # РОЗДІЛ 1: КАСА
 # ==========================================
 if st.session_state["active_tab"] == "Касса":
-    if st.query_params.get("edit_auth") == "1":
+    if st.query_params.get("edit_auth") == "1": 
         st.session_state["edit_ok"] = True
 
     if not st.session_state.get("edit_ok", False):
@@ -378,13 +357,13 @@ if st.session_state["active_tab"] == "Касса":
             st.session_state["edit_ok"] = False
             if "edit_auth" in st.query_params: del st.query_params["edit_auth"]
             st.rerun()
-
+        
         db_start = get_start_balance(selected_date)
         start_balance = get_int(db_start)
         st.text_input("Залишок на початок дня (автоматично):", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
 
         st.divider()
-
+        
         col_t1, col_t2 = st.columns(2)
         with col_t1:
             st.subheader("Надходження:")
@@ -392,7 +371,7 @@ if st.session_state["active_tab"] == "Касса":
             edited_inc_df = st.data_editor(inc_df, num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
             subtotal_inc = sum(get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>", unsafe_allow_html=True)
-
+            
         with col_t2:
             c_header, c_btn = st.columns([3, 1])
             with c_header:
@@ -406,16 +385,16 @@ if st.session_state["active_tab"] == "Касса":
                                 try:
                                     img = Image.open(uf)
                                     if img.mode in ("RGBA", "P"): img = img.convert("RGB")
-                                    img.thumbnail((1024, 1024))
+                                    img.thumbnail((1024, 1024)) 
                                     buf = io.BytesIO()
-                                    img.save(buf, format="JPEG", quality=70)
+                                    img.save(buf, format="JPEG", quality=70) 
                                     st.session_state[receipts_key].append({"id": str(uuid.uuid4()), "name": uf.name, "bytes": buf.getvalue()})
                                 except Exception as e:
                                     st.error(f"Помилка з файлом {uf.name}: {e}")
                         st.success("✅ Збережено в пам'ять!")
                         time.sleep(1)
                         st.rerun()
-
+                    
                     if st.session_state[receipts_key]:
                         st.write("---")
                         st.write("📁 Готові до відправки:")
@@ -442,15 +421,15 @@ if st.session_state["active_tab"] == "Касса":
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
         with col_b2:
-            st.subheader("💰 | Факт")
+            st.subheader("💰 | Fact")
             m_coins = get_int(st.text_input("Монети (загальна сума):", placeholder="0", key=f"coins_live_{selected_date}"))
-
+            
             st.markdown('<div class="fact-block">', unsafe_allow_html=True)
             def cash_row_live(label, multiplier):
                 c1, c2 = st.columns([1, 4])
-                with c1:
+                with c1: 
                     st.markdown(f"<div style='margin-top: 8px; font-weight: bold; font-size: 16px;'>{label}</div>", unsafe_allow_html=True)
-                with c2:
+                with c2: 
                     qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", placeholder="0", key=f"qty_{label}_{selected_date}"))
                 return qty, qty * multiplier
 
@@ -461,7 +440,7 @@ if st.session_state["active_tab"] == "Касса":
             q_500, v_500 = cash_row_live("500", 500)
             q_1000, v_1000 = cash_row_live("1000", 1000)
             st.markdown('</div>', unsafe_allow_html=True)
-
+            
             cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
             st.markdown(f"## 💵 Разом в касі: {cash_pure} грн")
 
@@ -478,29 +457,33 @@ if st.session_state["active_tab"] == "Касса":
         elif discrepancy > 0: res_c3.warning(f"+{discrepancy} грн")
         else: res_c3.error(f"{discrepancy} грн")
 
-        st.write("")
+        st.write("") 
 
         if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
             with st.spinner("Відправка звіту та чеків..."):
                 payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
-                api_delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}")
-                api_post(f"{SUPABASE_URL}/rest/v1/drafts", json_body={"date": selected_date, "payload": payload})
+                requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
+                requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
+
+                if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
+                st.session_state["drafts_cache"][selected_date] = payload
+                st.cache_data.clear() 
 
                 files_ok = upload_receipts_to_supabase(selected_date, st.session_state[receipts_key])
                 if not files_ok:
                     st.stop()
-
-                api_delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}")
-                api_delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}")
-                api_delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}")
-
+                
+                requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
+                requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
+                requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
+                
                 shift_payload = {"date": selected_date, "start_balance": str(start_balance), "calculated_end": str(calculated_end), "actual_end": str(total_actual)}
-                res_shift = api_post(f"{SUPABASE_URL}/rest/v1/shifts", json_body=shift_payload)
-
+                res_shift = requests.post(f"{SUPABASE_URL}/rest/v1/shifts", headers=headers, json=shift_payload)
+                
                 if res_shift.status_code in [200, 201]:
                     inc_rows = [{"date": selected_date, "type": "income", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_inc_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
                     exp_rows = [{"date": selected_date, "type": "expense", "description": str(r.get("Опис", "")).strip(), "amount": str(get_int(r.get("Сума", 0)))} for _, r in edited_exp_df.iterrows() if get_int(r.get("Сума", 0)) != 0 or str(r.get("Опис", "")).strip()]
-
+                    
                     adv_rows = []
                     for _, r in edited_adv_df.iterrows():
                         amt = get_int(r.get("Сума", 0))
@@ -509,11 +492,11 @@ if st.session_state["active_tab"] == "Касса":
                         safe_note = str(raw_note).strip() if pd.notna(raw_note) and str(raw_note).lower() != 'nan' else ""
                         if amt != 0 or emp:
                             adv_rows.append({"date": selected_date, "employee": emp, "amount": str(amt), "note": safe_note})
-
-                    if inc_rows: api_post(f"{SUPABASE_URL}/rest/v1/transactions", json_body=inc_rows)
-                    if exp_rows: api_post(f"{SUPABASE_URL}/rest/v1/transactions", json_body=exp_rows)
-                    if adv_rows: api_post(f"{SUPABASE_URL}/rest/v1/advances", json_body=adv_rows)
-
+                            
+                    if inc_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=inc_rows)
+                    if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
+                    if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
+                    
                     st.success("🎉 Звіт та чеки успішно збережено в хмарі!")
                     st.session_state[receipts_key] = []
                     time.sleep(1.5)
@@ -535,13 +518,19 @@ if st.session_state["active_tab"] == "Касса":
                 d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
                 if d != st.session_state["form_date"]:
                     st.session_state["form_date"] = d
+                    prefetch_week_window(d)
                     st.rerun()
         with fc3:
             if st.button("💾", key="fab_save"):
                 payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
-                api_delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}")
-                api_post(f"{SUPABASE_URL}/rest/v1/drafts", json_body={"date": selected_date, "payload": payload})
-                st.toast("✅ Дані збережено!", icon="💾")
+                requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
+                requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
+                
+                if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
+                st.session_state["drafts_cache"][selected_date] = payload
+                st.cache_data.clear()
+                
+                st.toast("✅ Дані збережено в пам'ять тижня!", icon="💾")
 
 # ==========================================
 # РОЗДІЛ 2: АРХІВ
@@ -566,23 +555,23 @@ elif st.session_state["active_tab"] == "Архів":
             st.session_state["archive_ok"] = False
             if "archive_auth" in st.query_params: del st.query_params["archive_auth"]
             st.rerun()
-
+            
         st.subheader(f"🔎 Перегляд історії: {selected_date}")
-
+        
         url_shift_search = f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}"
-        shift_res = api_get_json(url_shift_search)
-
+        shift_res = requests.get(url_shift_search, headers=headers).json()
+        
         if isinstance(shift_res, list) and len(shift_res) > 0:
             shift = shift_res[0]
             calc_end = get_int(shift.get('calculated_end'))
-
+            
             st.markdown(f"<h3 style='margin-bottom: 0;'>🌅 Залишок на початок: <span style='color: #0066cc;'>{get_int(shift.get('start_balance'))} грн</span></h3>", unsafe_allow_html=True)
             st.divider()
-
+            
             ac1, ac2 = st.columns(2)
             with ac1:
                 st.subheader("🟢 Надходження")
-                inc_res = api_get_json(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}&type=eq.income")
+                inc_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}&type=eq.income", headers=headers).json()
                 total_inc = 0
                 if isinstance(inc_res, list) and inc_res:
                     for item in inc_res:
@@ -592,10 +581,10 @@ elif st.session_state["active_tab"] == "Архів":
                 else:
                     st.write("Немає записів")
                 st.markdown(f"<p style='font-weight: bold; color: #2e7d32;'>Загалом: {total_inc} грн</p>", unsafe_allow_html=True)
-
+                
             with ac2:
                 st.subheader("🔴 Витрати")
-                exp_res = api_get_json(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}&type=eq.expense")
+                exp_res = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}&type=eq.expense", headers=headers).json()
                 total_exp = 0
                 if isinstance(exp_res, list) and exp_res:
                     for item in exp_res:
@@ -605,51 +594,51 @@ elif st.session_state["active_tab"] == "Архів":
                 else:
                     st.write("Немає записів")
                 st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {total_exp} грн</p>", unsafe_allow_html=True)
-
+                    
             st.divider()
             st.markdown(f"<h3 style='margin-bottom: 0;'>🌇 Залишок на кінець: <span style='color: #0066cc;'>{calc_end} грн</span></h3>", unsafe_allow_html=True)
             st.divider()
-
+            
             st.subheader("🟠 Аванси")
-            adv_res = api_get_json(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}")
+            adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers).json()
             total_adv = 0
             if isinstance(adv_res, list) and adv_res:
                 for item in adv_res:
                     amt = get_int(item.get('amount'))
                     total_adv += amt
-
+                    
                     note_val = item.get('note')
                     safe_note = str(note_val).strip() if note_val else ""
                     note_str = f" <i>— {safe_note}</i>" if safe_note else ""
-
+                    
                     st.markdown(f"• {item.get('employee', 'Без імені')}: {amt} грн{note_str}", unsafe_allow_html=True)
             else:
                 st.write("Немає записів")
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {total_adv} грн</p>", unsafe_allow_html=True)
-
+            
             st.divider()
             actual_cash = calc_end - total_adv
             st.markdown(f"<h3 style='margin-bottom: 0; color: #4b5563;'>💵 Фактично готівки: {actual_cash} грн</h3>", unsafe_allow_html=True)
-
+            
         else:
             st.warning("За цей день звітів не знайдено в хмарі (таблиця shifts порожня).")
-
+            
         st.divider()
         st.subheader("🖼️ Галерея чеків за обрану дату")
-
+        
         list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
         payload = {
             "prefix": selected_date,
             "limit": 100,
             "offset": 0
         }
-
+        
         try:
-            storage_res = api_post(list_files_url, json_body=payload)
+            storage_res = requests.post(list_files_url, headers=headers, json=payload)
             if storage_res.status_code == 200:
                 files_list = storage_res.json()
                 valid_files = [f for f in files_list if f.get('name') and f.get('name') != '.emptyFolderPlaceholder']
-
+                
                 if valid_files:
                     img_cols = st.columns(3)
                     for idx, file_obj in enumerate(valid_files):
@@ -678,6 +667,7 @@ elif st.session_state["active_tab"] == "Архів":
                 d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
                 if d != st.session_state["form_date"]:
                     st.session_state["form_date"] = d
+                    prefetch_week_window(d)
                     st.rerun()
         with fc3:
             pass
