@@ -293,7 +293,7 @@ st.markdown("""
 
 # --- ШАПКА ДОДАТКУ ---
 # Додаємо трохи відступу зверху, оскільки стандартний header прихований
-st.markdown("<div style='margin-top: 15px;'></div>", unsafe_allow_html=True)
+st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
 st.title("Cafe Forchino")
 
 with st.popover("🚀 Версія: fin 1.3.0 (UI & Styling Update)"):
