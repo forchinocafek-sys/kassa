@@ -295,7 +295,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- ШАПКА ДОДАТКУ ---
-st.title("Cafe Forchino")
+st.title("Cafe Forchino 🍋")
 
 with st.popover("🚀 Версія: fin 1.3.0 (UI & Styling Update)"):
     st.markdown("""
@@ -598,7 +598,7 @@ elif st.session_state["active_tab"] == "Архів":
             st.markdown(f"<h3 style='margin-bottom: 0;'>🌇 Залишок на кінець: <span style='color: #0066cc;'>{calc_end} грн</span></h3>", unsafe_allow_html=True)
             st.divider()
             
-            st.subheader("🟠 Аванси")
+            st.subheader("🪙 Аванси")
             adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers).json()
             total_adv = 0
             if isinstance(adv_res, list) and adv_res:
