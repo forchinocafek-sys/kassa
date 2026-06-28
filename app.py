@@ -250,7 +250,6 @@ st.markdown("""
     
     /* ПІДКЛЮЧАЄМО ЕЛЕГАНТНИЙ ШРИФТ */
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
-    h1 { font-family: 'Permanent Marker', cursive !important; }
 
     /* ПРИХОВУЄМО СТАНДАРТНЕ МЕНЮ STREAMLIT */
     header[data-testid="stHeader"] { display: none !important; }
@@ -258,15 +257,7 @@ st.markdown("""
     footer { display: none !important; }
 
     /* ЗАСТОСОВУЄМО ШРИФТ ДО ЗАГОЛОВКА */
-    h1 { font-family: 'Playfair Display', serif !important; font-size: 3em !important; }
-
-    .stApp { background-color: #FAF0E6 !important; }
-    .stApp, .stApp p, h2, h3, h4, h5, h6, label, li { color: #111827 !important; }
-    
-    /* ПРИХОВУЄМО СТАНДАРТНЕ МЕНЮ STREAMLIT */
-    header[data-testid="stHeader"] { display: none !important; }
-    #MainMenu { visibility: hidden !important; }
-    footer { display: none !important; }
+    h1 { font-family: 'Permanent Marker', cursive !important; font-size: 3em !important; margin-top: 0 !important; padding-top: 0 !important; }
 
     .stApp { background-color: #FAF0E6 !important; }
     .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
@@ -284,8 +275,17 @@ st.markdown("""
     .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
     .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
     
+    /* ПРОЗОРЕ ПЛАВАЮЧЕ МЕНЮ (GHOST MENU) */
     #is-floating { display: none; }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) { position: fixed !important; top: 30px !important; right: 15px !important; z-index: 99999 !important; width: 50px !important; display: flex !important; flex-direction: column !important; gap: 12px !important; background: transparent !important; padding: 0 !important; }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) { 
+        position: fixed !important; top: 30px !important; right: 15px !important; 
+        z-index: 99999 !important; width: 50px !important; display: flex !important; 
+        flex-direction: column !important; gap: 12px !important; background: transparent !important; 
+        padding: 0 !important; opacity: 0.35 !important; transition: opacity 0.3s ease !important; 
+    }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating):hover,
+    div[data-testid="stHorizontalBlock"]:has(#is-floating):active,
+    div[data-testid="stHorizontalBlock"]:has(#is-floating):focus-within { opacity: 1 !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] { width: 50px !important; min-width: 50px !important; max-width: 50px !important; height: 50px !important; flex: 0 0 50px !important; margin: 0 !important; padding: 0 !important; display: flex !important; justify-content: center !important; align-items: center !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] > div { width: 100% !important; height: 100% !important; display: flex !important; justify-content: center !important; align-items: center !important; margin: 0 !important; padding: 0 !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button { width: 50px !important; min-width: 50px !important; height: 50px !important; min-height: 50px !important; padding: 0 !important; margin: 0 !important; border-radius: 12px !important; background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; color: #4b5563 !important; border: 1px solid #d1d5db !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; display: flex !important; align-items: center !important; justify-content: center !important; transition: transform 0.2s, box-shadow 0.2s !important; }
@@ -297,10 +297,11 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino🍋")
 
-with st.popover("🚀 Версія: fin 1.3.0 (UI & Styling Update)"):
+with st.popover("🚀 Версія: fin 1.3.1 (Ghost Menu UX)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v1.3.0 (UI Update):** Приховано системні кнопки Github, оптимізовано розташування кнопок блокування в плаваючому меню.
+    * **v1.3.1 (Ghost Menu UX):** Плаваюче меню тепер напівпрозоре (щоб не перекривати текст) і з'являється при натисканні. Швидкий перехід Каса/Архів в один клік.
+    * **v1.3.0 (UI Update):** Приховано системні кнопки Github, встановлено крафтовий шрифт, вирівняні відступи.
     * **v1.2.1 (Ghost Save):** Впроваджено приховане автозбереження при зміні вкладок.
     * **v1.2.0 (Анти-засипання):** JS-таймер для запобігання помилкам з'єднання.
     * **v1.1.0 (Вікно тижня):** Пакетна загрузка 7 днів для швидкого перемикання.
@@ -496,7 +497,7 @@ if st.session_state["active_tab"] == "Касса":
                 else:
                     st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
-# --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) 4 КНОПКИ ---
+        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) 4 КНОПКИ ---
         fc1, fc2, fc3, fc4 = st.columns(4)
         with fc1:
             st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
