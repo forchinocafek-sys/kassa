@@ -295,7 +295,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- ШАПКА ДОДАТКУ ---
-st.title("Cafe Forchino 🍋")
+st.title("Cafe Forchino🍋")
 
 with st.popover("🚀 Версія: fin 1.3.0 (UI & Styling Update)"):
     st.markdown("""
@@ -406,14 +406,14 @@ if st.session_state["active_tab"] == "Касса":
 
         col_b1, col_b2 = st.columns(2)
         with col_b1:
-            st.subheader("Аванси:")
+            st.subheader("💸Аванси:")
             adv_df = prepare_df(st.session_state["adv_data"], ["Співробітник", "Сума", "Примітка"])
             edited_adv_df = st.data_editor(adv_df, num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
             subtotal_adv = sum(get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
         with col_b2:
-            st.subheader("💰 | Факт")
+            st.subheader("💰Факт")
             m_coins = get_int(st.text_input("Монети (загальна сума):", placeholder="0", key=f"coins_live_{selected_date}"))
             
             st.markdown('<div class="fact-block">', unsafe_allow_html=True)
@@ -434,7 +434,7 @@ if st.session_state["active_tab"] == "Касса":
             st.markdown('</div>', unsafe_allow_html=True)
             
             cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
-            st.markdown(f"## 💵 Разом в касі: {cash_pure} грн")
+            st.markdown(f"## 💵Разом в касі: {cash_pure} грн")
 
         st.divider()
         calculated_end = start_balance + subtotal_inc - subtotal_exp
@@ -598,7 +598,7 @@ elif st.session_state["active_tab"] == "Архів":
             st.markdown(f"<h3 style='margin-bottom: 0;'>🌇 Залишок на кінець: <span style='color: #0066cc;'>{calc_end} грн</span></h3>", unsafe_allow_html=True)
             st.divider()
             
-            st.subheader("🪙 Аванси")
+            st.subheader("🟠 Аванси")
             adv_res = requests.get(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers).json()
             total_adv = 0
             if isinstance(adv_res, list) and adv_res:
