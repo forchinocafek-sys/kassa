@@ -529,7 +529,7 @@ if st.session_state["active_tab"] == "Касса":
                 st.session_state["drafts_cache"][selected_date] = payload
                 st.cache_data.clear()
                 
-                st.toast("✅ Дані збережено в пам'ять тижня!", icon="💾")
+                st.toast("✅ Дані збережено!", icon="💾")
         with fc4:
             if st.button("🚫", key="fab_lock_edit"):
                 st.session_state["edit_ok"] = False
@@ -622,7 +622,7 @@ elif st.session_state["active_tab"] == "Архів":
             st.warning("За цей день звітів не знайдено в хмарі.")
             
         st.divider()
-        st.subheader("🖼️ Галерея чеків за обрану дату")
+        st.subheader("🖼️ Чеки")
         
         list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
         payload = {
