@@ -130,6 +130,7 @@ components.html(f"""<script>
 </script>""", height=0, width=0)
 
 st.markdown("""<style>
+    .stApp { visibility: hidden; }
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; }
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
     header[data-testid="stHeader"], #MainMenu, footer { display: none !important; }
@@ -351,4 +352,5 @@ elif st.session_state["active_tab"] == "Архів" and check_auth("archive_ok",
         if st.button("🚫", key="f_lock2"): st.session_state["archive_ok"] = False; st.query_params.pop("archive_auth", None); st.rerun()
 
 st.write("---")
+st.markdown("<p style='text-align: center; ...'>Розроблено Богданом...</p>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #9ca3af; font-size: 14px; font-style: italic; margin-bottom: 30px;'>Розроблено Богданом для cafe forchino з любов'ю 🧡</p>", unsafe_allow_html=True)
