@@ -130,7 +130,6 @@ components.html(f"""<script>
 </script>""", height=0, width=0)
 
 st.markdown("""<style>
-    .stApp { visibility: hidden; }
     .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; }
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
     header[data-testid="stHeader"], #MainMenu, footer { display: none !important; }
@@ -168,6 +167,24 @@ receipts_key = f"receipts_{selected_date}"
 # ==================== РОЗДІЛ 1: КАСА ====================
 if st.session_state["active_tab"] == "Касса" and check_auth("edit_ok", "edit_auth", "2000"):
     if is_frozen: st.warning("🔒 Цей день закрито для редагування (доступні лише сьогодні та вчора).")
+    
+    # --- FAB MENU (КАССА) ---
+    fc1, fc2, fc3, fc4 = st.columns(4)
+    with fc1:
+        st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
+        if st.button("🗃️", key="f_arch"):
+            if not is_frozen: save_current_draft(selected_date, payload)
+            st.session_state["active_tab"] = "Архів"; st.rerun()
+    with fc2:
+        with st.popover("📅"):
+            if (d := st.date_input("Дата", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")) != st.session_state["form_date"]:
+                if not is_frozen: save_current_draft(selected_date, payload)
+                st.session_state["form_date"] = d; prefetch_week_window(d); st.rerun()
+    with fc3:
+        if st.button("💾", key="f_save", disabled=is_frozen):
+            save_current_draft(selected_date, payload); st.toast("✅ Збережено!", icon="💾")
+    with fc4:
+        if st.button("🚫", key="f_lock"): st.session_state["edit_ok"] = False; st.query_params.pop("edit_auth", None); st.rerun()
 
     start_balance = get_int(get_start_balance(selected_date))
     st.text_input("Залишок на початок дня:", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
@@ -264,25 +281,6 @@ if st.session_state["active_tab"] == "Касса" and check_auth("edit_ok", "edi
                 st.success("🎉 Збережено в хмарі!"); st.session_state[receipts_key] = []; time.sleep(1.5); st.cache_data.clear(); st.rerun()
             else: st.error("❌ Помилка бази даних")
 
-    # --- FAB MENU (КАССА) ---
-    fc1, fc2, fc3, fc4 = st.columns(4)
-    with fc1:
-        st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
-        if st.button("🗃️", key="f_arch"):
-            if not is_frozen: save_current_draft(selected_date, payload)
-            st.session_state["active_tab"] = "Архів"; st.rerun()
-    with fc2:
-        with st.popover("📅"):
-            if (d := st.date_input("Дата", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")) != st.session_state["form_date"]:
-                if not is_frozen: save_current_draft(selected_date, payload)
-                st.session_state["form_date"] = d; prefetch_week_window(d); st.rerun()
-    with fc3:
-        if st.button("💾", key="f_save", disabled=is_frozen):
-            save_current_draft(selected_date, payload); st.toast("✅ Збережено!", icon="💾")
-    with fc4:
-        if st.button("🚫", key="f_lock"): st.session_state["edit_ok"] = False; st.query_params.pop("edit_auth", None); st.rerun()
-
-
 # ==================== РОЗДІЛ 2: АРХІВ ====================
 elif st.session_state["active_tab"] == "Архів" and check_auth("archive_ok", "archive_auth", "2025"):
     st.subheader(f"🔎 Історія: {selected_date}")
@@ -352,5 +350,4 @@ elif st.session_state["active_tab"] == "Архів" and check_auth("archive_ok",
         if st.button("🚫", key="f_lock2"): st.session_state["archive_ok"] = False; st.query_params.pop("archive_auth", None); st.rerun()
 
 st.write("---")
-st.markdown("<p style='text-align: center; ...'>Розроблено Богданом...</p>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #9ca3af; font-size: 14px; font-style: italic; margin-bottom: 30px;'>Розроблено Богданом для cafe forchino з любов'ю 🧡</p>", unsafe_allow_html=True)
