@@ -300,11 +300,9 @@ st.title("Cafe Forchino🍋")
 with st.popover("🚀 Версія: fin 1.3.1 (Ghost Menu UX)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v1.3.1 (Ghost Menu UX):** Плаваюче меню тепер напівпрозоре (щоб не перекривати текст) і з'являється при натисканні. Швидкий перехід Каса/Архів в один клік.
-    * **v1.3.0 (UI Update):** Приховано системні кнопки Github, встановлено крафтовий шрифт, вирівняні відступи.
-    * **v1.2.1 (Ghost Save):** Впроваджено приховане автозбереження при зміні вкладок.
-    * **v1.2.0 (Анти-засипання):** JS-таймер для запобігання помилкам з'єднання.
-    * **v1.1.0 (Вікно тижня):** Пакетна загрузка 7 днів для швидкого перемикання.
+    * Заморозка даних: заборона редагування днів, старіших за "вчора".
+    * Hardened Auth: посилене збереження пароля у сесії та URL.
+    * Mobile Save Fix: виправлено скидання даних каси при збереженні з телефону.
     """)
 
 # --- ІНІЦІАЛІЗАЦІЯ СТАНУ ТА ТИЖНЕВОГО КЕШУ ---
@@ -316,6 +314,13 @@ if "active_tab" not in st.session_state:
     st.session_state["active_tab"] = "Касса"
 
 selected_date = st.session_state["form_date"].strftime('%Y-%m-%d')
+
+# === ЛОГІКА ЗАМОРОЗКИ (FREEZE LOGIC) ===
+limit_date = (datetime.today() - timedelta(days=1)).date()
+current_fd = st.session_state["form_date"]
+date_obj = current_fd.date() if hasattr(current_fd, 'date') else current_fd
+is_frozen = date_obj < limit_date
+# ===============================================
 
 # === ЗАХИСТ ВІД ОЧИЩЕННЯ ПАМ'ЯТІ STREAMLIT ===
 coins_key = f"coins_live_{selected_date}"
@@ -336,8 +341,11 @@ if receipts_key not in st.session_state:
 # РОЗДІЛ 1: КАСА
 # ==========================================
 if st.session_state["active_tab"] == "Касса":
+    # Посилення авторизації для мобільних
     if st.query_params.get("edit_auth") == "1": 
         st.session_state["edit_ok"] = True
+    elif st.session_state.get("edit_ok", False):
+        st.query_params["edit_auth"] = "1"
 
     if not st.session_state.get("edit_ok", False):
         st.info("🔒 Введіть пароль для доступу до форми введення даних.")
@@ -350,7 +358,9 @@ if st.session_state["active_tab"] == "Касса":
             elif passwd_edit != "":
                 st.error("❌ Невірний пароль!")
     else:
-        # Прибрано стару кнопку блокування, тепер вона у FAB
+        if is_frozen:
+            st.warning("🔒 Цей день закрито для редагування (доступні лише сьогодні та вчора).")
+
         db_start = get_start_balance(selected_date)
         start_balance = get_int(db_start)
         st.text_input("Залишок на початок дня (автоматично):", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
@@ -361,7 +371,7 @@ if st.session_state["active_tab"] == "Касса":
         with col_t1:
             st.subheader("📈Надходження:")
             inc_df = prepare_df(st.session_state["inc_data"], ["Опис", "Сума"])
-            edited_inc_df = st.data_editor(inc_df, num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}")
+            edited_inc_df = st.data_editor(inc_df, num_rows="dynamic", use_container_width=True, key=f"inc_editor_{selected_date}", disabled=is_frozen)
             subtotal_inc = sum(get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>", unsafe_allow_html=True)
             
@@ -371,8 +381,8 @@ if st.session_state["active_tab"] == "Касса":
                 st.subheader("📉Витрати:")
             with c_btn:
                 with st.popover("📷 Чеки"):
-                    ufs = st.file_uploader("Виберіть файли", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key=f"uploader_{selected_date}")
-                    if st.button("➕ Завантажити вибрані", use_container_width=True) and ufs:
+                    ufs = st.file_uploader("Виберіть файли", type=["jpg", "jpeg", "png"], accept_multiple_files=True, key=f"uploader_{selected_date}", disabled=is_frozen)
+                    if st.button("➕ Завантажити вибрані", use_container_width=True, disabled=is_frozen) and ufs:
                         for uf in ufs:
                             if not any(r['name'] == uf.name for r in st.session_state[receipts_key]):
                                 try:
@@ -394,12 +404,12 @@ if st.session_state["active_tab"] == "Касса":
                         for r in st.session_state[receipts_key]:
                             col_img, col_del = st.columns([3, 1])
                             col_img.image(r["bytes"])
-                            if col_del.button("❌", key=f"del_{r['id']}"):
+                            if col_del.button("❌", key=f"del_{r['id']}", disabled=is_frozen):
                                 st.session_state[receipts_key] = [x for x in st.session_state[receipts_key] if x["id"] != r["id"]]
                                 st.rerun()
 
             exp_df = prepare_df(st.session_state["exp_data"], ["Опис", "Сума"])
-            edited_exp_df = st.data_editor(exp_df, num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}")
+            edited_exp_df = st.data_editor(exp_df, num_rows="dynamic", use_container_width=True, key=f"exp_editor_{selected_date}", disabled=is_frozen)
             subtotal_exp = sum(get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #c62828;'>Загалом: {subtotal_exp} грн</p>", unsafe_allow_html=True)
 
@@ -409,13 +419,13 @@ if st.session_state["active_tab"] == "Касса":
         with col_b1:
             st.subheader("💸Аванси:")
             adv_df = prepare_df(st.session_state["adv_data"], ["Співробітник", "Сума", "Примітка"])
-            edited_adv_df = st.data_editor(adv_df, num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}")
+            edited_adv_df = st.data_editor(adv_df, num_rows="dynamic", use_container_width=True, key=f"adv_editor_{selected_date}", disabled=is_frozen)
             subtotal_adv = sum(get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows())
             st.markdown(f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>", unsafe_allow_html=True)
 
         with col_b2:
             st.subheader("💰Факт")
-            m_coins = get_int(st.text_input("Монети (загальна сума):", placeholder="0", key=f"coins_live_{selected_date}"))
+            m_coins = get_int(st.text_input("Монети (загальна сума):", placeholder="0", key=f"coins_live_{selected_date}", disabled=is_frozen))
             
             st.markdown('<div class="fact-block">', unsafe_allow_html=True)
             def cash_row_live(label, multiplier):
@@ -423,7 +433,7 @@ if st.session_state["active_tab"] == "Касса":
                 with c1: 
                     st.markdown(f"<div style='margin-top: 8px; font-weight: bold; font-size: 16px;'>{label}</div>", unsafe_allow_html=True)
                 with c2: 
-                    qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", placeholder="0", key=f"qty_{label}_{selected_date}"))
+                    qty = get_int(st.text_input(f"q{label}", label_visibility="collapsed", placeholder="0", key=f"qty_{label}_{selected_date}", disabled=is_frozen))
                 return qty, qty * multiplier
 
             q_20, v_20 = cash_row_live("20", 20)
@@ -452,15 +462,15 @@ if st.session_state["active_tab"] == "Касса":
 
         st.write("") 
 
-        if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
+        if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True, disabled=is_frozen):
             with st.spinner("Відправка звіту та чеків..."):
+                # Примусове збереження чорнетки ДО важких операцій, щоб мобільний браузер не скинув стан
                 payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
                 requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
                 requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
 
                 if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
                 st.session_state["drafts_cache"][selected_date] = payload
-                st.cache_data.clear() 
 
                 files_ok = upload_receipts_to_supabase(selected_date, st.session_state[receipts_key])
                 if not files_ok:
@@ -493,6 +503,8 @@ if st.session_state["active_tab"] == "Касса":
                     st.success("🎉 Звіт та чеки успішно збережено в хмарі!")
                     st.session_state[receipts_key] = []
                     time.sleep(1.5)
+                    # Перемістили очистку кешу в самий кінець, щоб уникнути скидання UI на мобільних
+                    st.cache_data.clear() 
                     st.rerun()
                 else:
                     st.error(f"❌ Помилка бази даних: {res_shift.text}")
@@ -502,9 +514,10 @@ if st.session_state["active_tab"] == "Касса":
         with fc1:
             st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
             if st.button("🗃️", key="fab_nav_arch"):
-                payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
-                if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
-                st.session_state["drafts_cache"][selected_date] = payload
+                if not is_frozen:
+                    payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
+                    if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
+                    st.session_state["drafts_cache"][selected_date] = payload
                 
                 st.session_state["active_tab"] = "Архів"
                 st.rerun()
@@ -512,22 +525,22 @@ if st.session_state["active_tab"] == "Касса":
             with st.popover("📅"):
                 d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
                 if d != st.session_state["form_date"]:
-                    payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
-                    if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
-                    st.session_state["drafts_cache"][selected_date] = payload
+                    if not is_frozen:
+                        payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
+                        if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
+                        st.session_state["drafts_cache"][selected_date] = payload
                     
                     st.session_state["form_date"] = d
                     prefetch_week_window(d)
                     st.rerun()
         with fc3:
-            if st.button("💾", key="fab_save"):
+            if st.button("💾", key="fab_save", disabled=is_frozen):
                 payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
                 requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
                 requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
                 
                 if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
                 st.session_state["drafts_cache"][selected_date] = payload
-                st.cache_data.clear()
                 
                 st.toast("✅ Дані збережено!", icon="💾")
         with fc4:
@@ -540,8 +553,11 @@ if st.session_state["active_tab"] == "Касса":
 # РОЗДІЛ 2: АРХІВ
 # ==========================================
 elif st.session_state["active_tab"] == "Архів":
+    # Посилення авторизації для архіву
     if st.query_params.get("archive_auth") == "1":
         st.session_state["archive_ok"] = True
+    elif st.session_state.get("archive_ok", False):
+        st.query_params["archive_auth"] = "1"
 
     if not st.session_state.get("archive_ok", False):
         st.info("🔒 Введіть пароль для доступу до архіву.")
