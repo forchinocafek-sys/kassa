@@ -572,23 +572,21 @@ elif st.session_state["active_tab"] == "Архів":
                     with img_cols[idx % 3]:
                         st.image(img_url, use_container_width=True)
                         # Кнопка удаления файла
-                        if st.button("🗑️ Видалити", key=f"del_cloud_{file_name}", use_container_width=True):
-                            delete_url = f"{SUPABASE_URL}/storage/v1/object/receipts/{selected_date}/{file_name}"
-                            
-                            # Создаем отдельные заголовки для удаления без Content-Type
-                            delete_headers = {
-                                "apikey": SUPABASE_KEY,
-                                "Authorization": f"Bearer {SUPABASE_KEY}"
-                            }
-                            
-                            del_res = requests.delete(delete_url, headers=delete_headers)
-                            
-                            if del_res.status_code in [200, 204]:
-                                st.success("Видалено!")
-                                time.sleep(0.5)
-                                st.rerun()
-                            else:
-                                st.error(f"Помилка видалення: {del_res.text}")
+                        with st.popover("🗑️ Видалити", use_container_width=True):
+                            st.warning(f"Видалити {file_name}?")
+                            if st.button("Так, видалити", key=f"del_confirm_{file_name}", type="primary"):
+                                delete_url = f"{SUPABASE_URL}/storage/v1/object/receipts/{selected_date}/{file_name}"
+                                delete_headers = {
+                                    "apikey": SUPABASE_KEY,
+                                    "Authorization": f"Bearer {SUPABASE_KEY}"
+                                }
+                                del_res = requests.delete(delete_url, headers=delete_headers)
+                                if del_res.status_code in [200, 204]:
+                                    st.success("Видалено!")
+                                    time.sleep(0.5)
+                                    st.rerun()
+                                else:
+                                    st.error(f"Помилка: {del_res.text}")
             else:
                 st.info("📂 В цей день чеки не завантажувались (або папка пуста).")
         else:
