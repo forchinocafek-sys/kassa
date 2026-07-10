@@ -574,7 +574,15 @@ elif st.session_state["active_tab"] == "Архів":
                         # Кнопка удаления файла
                         if st.button("🗑️ Видалити", key=f"del_cloud_{file_name}", use_container_width=True):
                             delete_url = f"{SUPABASE_URL}/storage/v1/object/receipts/{selected_date}/{file_name}"
-                            del_res = requests.delete(delete_url, headers=headers)
+                            
+                            # Создаем отдельные заголовки для удаления без Content-Type
+                            delete_headers = {
+                                "apikey": SUPABASE_KEY,
+                                "Authorization": f"Bearer {SUPABASE_KEY}"
+                            }
+                            
+                            del_res = requests.delete(delete_url, headers=delete_headers)
+                            
                             if del_res.status_code in [200, 204]:
                                 st.success("Видалено!")
                                 time.sleep(0.5)
