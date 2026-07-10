@@ -206,7 +206,6 @@ manifest = {
 }
 manifest_b64 = base64.b64encode(json.dumps(manifest).encode()).decode()
 
-# Изменен скрипт PWA: убрана агрессивная перезагрузка страницы, которая стирала данные
 components.html(f"""
 <script>
     const doc = window.parent.document;
@@ -271,9 +270,10 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino🍋")
 
-with st.popover("🚀 Версія: fin 1.4.0 (Global Auth & Stability)"):
+with st.popover("🚀 Версія: fin 1.4.1 (Receipt Deletion)"):
     st.markdown("""
     **Останні оновлення:**
+    * **v1.4.1:** Додано кнопку видалення фотографій чеків прямо з галереї архіву.
     * **v1.4.0:** Введено єдиний пароль для всієї системи. Заборонено стирання даних після збереження. Чеки миттєво завантажуються в архіві.
     * **v1.3.1:** Ghost Menu UX.
     """)
@@ -285,7 +285,7 @@ if st.query_params.get("auth") == "1":
     st.session_state["authenticated"] = True
 
 if not st.session_state.get("authenticated", False):
-    st.info("🔒 Введіть єдиний пароль для доступу до системи (Каса та Архів).")
+    st.info("🔒 Введіть пароль для доступу до системи.")
     master_pwd = st.text_input("🔑 Пароль:", type="password", key="master_pwd_input")
     if st.button("Увійти", key="btn_login_master"):
         if master_pwd == "2000":
@@ -294,7 +294,7 @@ if not st.session_state.get("authenticated", False):
             st.rerun()
         elif master_pwd != "":
             st.error("❌ Невірний пароль!")
-    st.stop() # Зупиняє виконання коду, якщо пароль не введено
+    st.stop()
 
 # --- ІНІЦІАЛІЗАЦІЯ СТАНУ ТА ТИЖНЕВОГО КЕШУ ---
 if "form_date" not in st.session_state:
@@ -322,7 +322,7 @@ if st.session_state["active_tab"] == "Касса":
     
     db_start = get_start_balance(selected_date)
     start_balance = get_int(db_start)
-    st.text_input("Залишок на початок дня (автоматично):", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
+    st.text_input("Залишок на початок дня:", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
 
     st.divider()
     
@@ -424,7 +424,6 @@ if st.session_state["active_tab"] == "Касса":
                 if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
                 if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
                 
-                # БОЛЬШЕ НИКАКОГО st.rerun() или стирания кеша! Данные остаются на экране.
                 st.success("🎉 Звіт успішно збережено в хмарі! Всі дані залишились на екрані.")
             else:
                 st.error(f"❌ Помилка бази даних: {res_shift.text}")
@@ -550,7 +549,7 @@ elif st.session_state["active_tab"] == "Архів":
                     if upload_receipts_to_supabase(selected_date, receipts_to_upload):
                         st.success("✅ Завантажено успішно!")
                         time.sleep(1)
-                        st.rerun() # Перезагрузит только для того, чтобы чек сразу появился в галерее ниже
+                        st.rerun() 
     
     list_files_url = f"{SUPABASE_URL}/storage/v1/object/list/receipts"
     payload = {
@@ -572,6 +571,16 @@ elif st.session_state["active_tab"] == "Архів":
                     img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{selected_date}/{file_name}"
                     with img_cols[idx % 3]:
                         st.image(img_url, use_container_width=True)
+                        # Кнопка удаления файла
+                        if st.button("🗑️ Видалити", key=f"del_cloud_{file_name}", use_container_width=True):
+                            delete_url = f"{SUPABASE_URL}/storage/v1/object/receipts/{selected_date}/{file_name}"
+                            del_res = requests.delete(delete_url, headers=headers)
+                            if del_res.status_code in [200, 204]:
+                                st.success("Видалено!")
+                                time.sleep(0.5)
+                                st.rerun()
+                            else:
+                                st.error(f"Помилка видалення: {del_res.text}")
             else:
                 st.info("📂 В цей день чеки не завантажувались (або папка пуста).")
         else:
