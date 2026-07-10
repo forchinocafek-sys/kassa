@@ -428,7 +428,7 @@ if st.session_state["active_tab"] == "Касса":
             else:
                 st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
-    # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) ---
+        # --- ПЛАВАЮЧЕ МЕНЮ (ДЛЯ КАСИ) ---
         fc1, fc2, fc3, fc4 = st.columns(4)
         with fc1:
             st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
