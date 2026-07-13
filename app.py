@@ -85,6 +85,22 @@ def get_int(val):
     except Exception:
         return 0
 
+# --- СТЕРИЛІЗАЦІЯ ДАНИХ (ЗАХИСТ ВІД ПАДІННЯ JSON) ---
+def sanitize_df(df):
+    records = df.to_dict('records')
+    clean_records = []
+    for row in records:
+        clean_row = {}
+        for k, v in row.items():
+            if pd.isna(v):
+                clean_row[k] = None
+            elif isinstance(v, (int, float)):
+                clean_row[k] = v
+            else:
+                clean_row[k] = str(v).strip() if v else ""
+        clean_records.append(clean_row)
+    return clean_records
+
 # ПАКЕТНЕ ЗАВАНТАЖЕННЯ ТИЖНЯ
 def prefetch_week_window(center_date_obj):
     if "drafts_cache" not in st.session_state:
@@ -270,12 +286,12 @@ st.markdown("""
 # --- ШАПКА ДОДАТКУ ---
 st.title("Cafe Forchino🍋")
 
-with st.popover("🚀 Версія: fin 1.4.1 (Receipt Deletion)"):
+with st.popover("🚀 Версія: fin 1.5.0 (Bulletproof Save)"):
     st.markdown("""
     **Останні оновлення:**
+    * **v1.5.0:** Повністю переписано алгоритм збереження. Впроваджено санітаризацію даних (захист від InvalidJSONError) та безпечне оновлення (PATCH замість DELETE).
     * **v1.4.1:** Додано кнопку видалення фотографій чеків прямо з галереї архіву.
-    * **v1.4.0:** Введено єдиний пароль для всієї системи. Заборонено стирання даних після збереження. Чеки миттєво завантажуються в архіві.
-    * **v1.3.1:** Ghost Menu UX.
+    * **v1.4.0:** Введено єдиний пароль для всієї системи. Заборонено стирання даних після збереження.
     """)
 
 # ==========================================
@@ -285,7 +301,7 @@ if st.query_params.get("auth") == "1":
     st.session_state["authenticated"] = True
 
 if not st.session_state.get("authenticated", False):
-    st.info("🔒 Введіть пароль для доступу до системи.")
+    st.info("🔒 Введіть єдиний пароль для доступу до системи (Каса та Архів).")
     master_pwd = st.text_input("🔑 Пароль:", type="password", key="master_pwd_input")
     if st.button("Увійти", key="btn_login_master"):
         if master_pwd == "2000":
@@ -322,7 +338,7 @@ if st.session_state["active_tab"] == "Касса":
     
     db_start = get_start_balance(selected_date)
     start_balance = get_int(db_start)
-    st.text_input("Залишок на початок дня:", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
+    st.text_input("Залишок на початок дня (автоматично):", value=str(start_balance), disabled=True, key=f"start_balance_{selected_date}")
 
     st.divider()
     
@@ -391,15 +407,35 @@ if st.session_state["active_tab"] == "Касса":
     st.write("") 
 
     if st.button("🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ", type="primary", use_container_width=True):
-        with st.spinner("Відправка звіту..."):
-            payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
-            requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
-            requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
+        with st.spinner("Стерилізація та відправка звіту..."):
+            
+            # ФОРМУЄМО PAYLOAD ЗІ СТЕРИЛІЗОВАНИМИ ДАНИМИ
+            payload = {
+                "inc": sanitize_df(edited_inc_df),
+                "exp": sanitize_df(edited_exp_df),
+                "adv": sanitize_df(edited_adv_df),
+                "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}
+            }
+            
+            # PRE-FLIGHT CHECK: Тестуємо JSON перед тим, як лізти в базу
+            try:
+                json.dumps(payload)
+            except Exception as e:
+                st.error(f"❌ Зупинено! Знайдено недопустимі символи в таблиці. Виправте дані. Деталі: {e}")
+                st.stop() # ЖОДНОГО ВИДАЛЕННЯ не відбудеться
+
+            # БЕЗПЕЧНЕ ЗБЕРЕЖЕННЯ ЧЕРНЕТКИ (PATCH АБО POST)
+            check_draft = requests.get(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers).json()
+            if isinstance(check_draft, list) and len(check_draft) > 0:
+                requests.patch(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers, json={"payload": payload})
+            else:
+                requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
 
             if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
             st.session_state["drafts_cache"][selected_date] = payload
             st.cache_data.clear() 
             
+            # ЗБЕРЕЖЕННЯ ОСНОВНИХ ДАНИХ (Видаляємо тільки після успішної стерилізації)
             requests.delete(f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}", headers=headers)
             requests.delete(f"{SUPABASE_URL}/rest/v1/transactions?date=eq.{selected_date}", headers=headers)
             requests.delete(f"{SUPABASE_URL}/rest/v1/advances?date=eq.{selected_date}", headers=headers)
@@ -424,7 +460,7 @@ if st.session_state["active_tab"] == "Касса":
                 if exp_rows: requests.post(f"{SUPABASE_URL}/rest/v1/transactions", headers=headers, json=exp_rows)
                 if adv_rows: requests.post(f"{SUPABASE_URL}/rest/v1/advances", headers=headers, json=adv_rows)
                 
-                st.success("🎉 Звіт успішно збережено в хмарі! Всі дані залишились на екрані.")
+                st.success("🎉 Звіт успішно та БЕЗПЕЧНО збережено в хмарі!")
             else:
                 st.error(f"❌ Помилка бази даних: {res_shift.text}")
 
@@ -433,7 +469,12 @@ if st.session_state["active_tab"] == "Касса":
     with fc1:
         st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
         if st.button("🗃️", key="fab_nav_arch"):
-            payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
+            payload = {
+                "inc": sanitize_df(edited_inc_df),
+                "exp": sanitize_df(edited_exp_df),
+                "adv": sanitize_df(edited_adv_df),
+                "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}
+            }
             if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
             st.session_state["drafts_cache"][selected_date] = payload
             st.session_state["active_tab"] = "Архів"
@@ -442,7 +483,12 @@ if st.session_state["active_tab"] == "Касса":
         with st.popover("📅"):
             d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
             if d != st.session_state["form_date"]:
-                payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
+                payload = {
+                    "inc": sanitize_df(edited_inc_df),
+                    "exp": sanitize_df(edited_exp_df),
+                    "adv": sanitize_df(edited_adv_df),
+                    "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}
+                }
                 if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
                 st.session_state["drafts_cache"][selected_date] = payload
                 st.session_state["form_date"] = d
@@ -450,12 +496,26 @@ if st.session_state["active_tab"] == "Касса":
                 st.rerun()
     with fc3:
         if st.button("💾", key="fab_save"):
-            payload = {"inc": edited_inc_df.to_dict('records'), "exp": edited_exp_df.to_dict('records'), "adv": edited_adv_df.to_dict('records'), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
-            requests.delete(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers)
-            requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
-            if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
-            st.session_state["drafts_cache"][selected_date] = payload
-            st.toast("✅ Чернетку збережено!", icon="💾")
+            payload = {
+                "inc": sanitize_df(edited_inc_df),
+                "exp": sanitize_df(edited_exp_df),
+                "adv": sanitize_df(edited_adv_df),
+                "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}
+            }
+            try:
+                json.dumps(payload)
+                
+                check_draft = requests.get(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers).json()
+                if isinstance(check_draft, list) and len(check_draft) > 0:
+                    requests.patch(f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}", headers=headers, json={"payload": payload})
+                else:
+                    requests.post(f"{SUPABASE_URL}/rest/v1/drafts", headers=headers, json={"date": selected_date, "payload": payload})
+                
+                if "drafts_cache" not in st.session_state: st.session_state["drafts_cache"] = {}
+                st.session_state["drafts_cache"][selected_date] = payload
+                st.toast("✅ Чернетку безпечно збережено!", icon="💾")
+            except Exception as e:
+                st.error(f"Помилка даних. Перевірте введені значення.")
     with fc4:
         if st.button("🚫", key="fab_lock"):
             st.session_state["authenticated"] = False
@@ -579,7 +639,6 @@ elif st.session_state["active_tab"] == "Архів":
                     img_url = f"{SUPABASE_URL}/storage/v1/object/public/receipts/{selected_date}/{file_name}"
                     with img_cols[idx % 3]:
                         st.image(img_url, use_container_width=True)
-                        # Кнопка удаления файла
                         with st.popover("🗑️ Видалити", use_container_width=True):
                             st.warning(f"Видалити {file_name}?")
                             if st.button("Так, видалити", key=f"del_confirm_{file_name}", type="primary"):
