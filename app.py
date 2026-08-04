@@ -660,30 +660,30 @@ elif st.session_state["active_tab"] == "Сличительная":
                 report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["sum"] = day_total
                 if day_total > 0: report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["set"] = True
 
-            # ФОРМУВАННЯ МАТРИЦЬ ДЛЯ ЗНАЧЕНЬ ТА TOOLTIPS
-            df_rows, tt_rows = [], []
+            # ФОРМУВАННЯ МАТРИЦІ
+            df_rows = []
             for r in order_full:
                 row_dict = {"Стаття": r}
-                tt_dict = {"Стаття": ""}
                 for d in range(1, num_days + 1):
                     cell = report_data[r][str(d)]
                     
                     if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"]:
-                        row_dict[str(d)], tt_dict[str(d)] = "", ""
+                        row_dict[str(d)] = ""
                     elif r in ["Касса на начало дня", "Касса на конец дня", "🔴 ВСЬОГО ВИТРАТ"]:
                         row_dict[str(d)] = str(cell["sum"]) if cell["set"] else ""
-                        tt_dict[str(d)] = ""
                     else:
-                        if cell["sum"] == 0:
-                            row_dict[str(d)], tt_dict[str(d)] = "", ""
+                        if cell["sum"] == 0 and not cell["notes"]:
+                            row_dict[str(d)] = ""
                         else:
-                            row_dict[str(d)] = str(cell["sum"]) # Тільки чиста цифра
-                            tt_dict[str(d)] = " | ".join([n for n in cell["notes"] if n]) # Всі деталі йдуть в tooltip
+                            valid_notes = [n for n in cell["notes"] if n]
+                            if valid_notes:
+                                notes_str = ", ".join(valid_notes)
+                                row_dict[str(d)] = f"{cell['sum']} ({notes_str})"
+                            else:
+                                row_dict[str(d)] = str(cell["sum"])
                 df_rows.append(row_dict)
-                tt_rows.append(tt_dict)
                 
             df_report = pd.DataFrame(df_rows)
-            df_tooltips = pd.DataFrame(tt_rows)
             
             # --- ФУНКЦІЯ СТИЛІЗАЦІЇ (КОЛЬОРИ) ---
             def style_pnl(row):
@@ -693,11 +693,11 @@ elif st.session_state["active_tab"] == "Сличительная":
                 elif row['Стаття'] in ['Касса на начало дня', 'Касса на конец дня']: return ['background-color: #e2e3e5; font-weight: bold; color: #383d41'] * len(row)
                 return [''] * len(row)
 
-            # Накладаємо кольори та підказки (tooltips)
-            styled_df = df_report.style.apply(style_pnl, axis=1).set_tooltips(df_tooltips)
+            # Накладаємо тільки кольори (без tooltips)
+            styled_df = df_report.style.apply(style_pnl, axis=1)
             
             st.dataframe(styled_df, use_container_width=True, hide_index=True)
-            st.success("✅ Матрицю PnL успішно зведено! Наведіть курсор на суму, щоб побачити деталі витрат.")
+            st.success("✅ Матрицю PnL успішно зведено!")
 
     # --- ПЛАВАЮЧЕ МЕНЮ ---
     fc1, fc2, fc3, fc4, fc5 = st.columns(5)
