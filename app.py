@@ -276,10 +276,10 @@ st.markdown("""
 
 st.title("Cafe Forchino🍋")
 
-with st.popover("🚀 Версія: 2.6.0 (Compact Matrix)"):
+with st.popover("🚀 Версія: 2.7.0 (Detailed Breakdown)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v2.6.0:** Супер-компактна матриця PnL. Коментарі сховані під міткою 📌 і виведені в окрему таблицю розшифровки знизу. Додано стовпець "Всього" (Підсумок за місяць).
+    * **v2.7.0:** Деталізована розшифровка витрат у PnL. Тепер у нижній таблиці видно суму кожної окремої транзакції з її приміткою (наприклад: *300 (вино), 200 (сир)*).
     """)
 
 # --- АВТОРИЗАЦІЯ ---
@@ -594,7 +594,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             num_days = calendar.monthrange(sel_y, m_num)[1]
             
             expense_groups_list = list(EXPENSE_TREE.keys())
-            # Виключили "АВАНСЫ"
+            
             order_full = [
                 "Касса на начало дня", 
                 "🟢 НАДХОДЖЕННЯ"
@@ -632,8 +632,13 @@ elif st.session_state["active_tab"] == "Сличительная":
                     if t.get('type') == 'income':
                         target_inc = left_part if left_part in INCOME_CATEGORIES else "Разное"
                         report_data[target_inc][day]["sum"] += amt
-                        if note: report_data[target_inc][day]["notes"].append(note)
-                        elif target_inc == "Разное" and left_part: report_data[target_inc][day]["notes"].append(left_part)
+                        
+                        # Додаємо суму до тексту для розшифровки
+                        note_text = note if note else (left_part if target_inc == "Разное" else "")
+                        if note_text:
+                            report_data[target_inc][day]["notes"].append(f"{amt} ({note_text})")
+                        else:
+                            report_data[target_inc][day]["notes"].append(f"{amt}")
                     else:
                         if ' ➔ ' in left_part: group_name = left_part.split(' ➔ ')[0].strip()
                         elif ' >> ' in left_part: group_name = left_part.split(' >> ')[0].strip()
@@ -647,8 +652,13 @@ elif st.session_state["active_tab"] == "Сличительная":
                         elif ' >> ' in left_part: sub_cat = left_part.split(' >> ')[1].strip()
                         
                         full_note_parts = [p for p in [sub_cat, note] if p]
-                        if full_note_parts: report_data[target_cat][day]["notes"].append(" - ".join(full_note_parts))
-                        elif target_cat == "Інші (старі ручні записи)" and group_name: report_data[target_cat][day]["notes"].append(group_name)
+                        if full_note_parts: 
+                            note_str = " - ".join(full_note_parts)
+                            report_data[target_cat][day]["notes"].append(f"{amt} ({note_str})")
+                        elif target_cat == "Інші (старі ручні записи)" and group_name: 
+                            report_data[target_cat][day]["notes"].append(f"{amt} ({group_name})")
+                        else:
+                            report_data[target_cat][day]["notes"].append(f"{amt}")
 
             # Підрахунок ВСЬОГО ВИТРАТ
             for d in range(1, num_days + 1):
@@ -659,11 +669,11 @@ elif st.session_state["active_tab"] == "Сличительная":
 
             # ФОРМУВАННЯ МАТРИЦІ ТА ПІДРАХУНОК "ІТОГО"
             df_rows = []
-            month_notes = [] # Збираємо всі примітки для нижньої таблиці
+            month_notes = [] 
             
             for r in order_full:
                 row_dict = {"Стаття": r}
-                row_total = 0 # Сума за місяць для рядка
+                row_total = 0 
                 
                 for d in range(1, num_days + 1):
                     cell = report_data[r][str(d)]
@@ -679,19 +689,19 @@ elif st.session_state["active_tab"] == "Сличительная":
                         else:
                             row_total += cell["sum"]
                             valid_notes = [n for n in cell["notes"] if n]
+                            
                             if valid_notes:
-                                # Ставимо компактну позначку 📌 замість довгого тексту
                                 row_dict[str(d)] = f"{cell['sum']} 📌"
                                 month_notes.append({
                                     "🗓 День": f"{d} {sel_m.lower()}",
                                     "🗂 Стаття": r,
-                                    "💰 Сума": f"{cell['sum']} грн",
-                                    "📝 Примітка": ", ".join(valid_notes)
+                                    "💰 Загальна сума": f"{cell['sum']} грн",
+                                    "📝 Деталізація": ", ".join(valid_notes)
                                 })
                             else:
                                 row_dict[str(d)] = str(cell["sum"])
                 
-                # ДОДАЄМО СТОВПЕЦЬ "Всього" (Итого)
+                # ДОДАЄМО СТОВПЕЦЬ "Всього"
                 if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"]:
                     row_dict["Всього"] = ""
                 else:
@@ -704,7 +714,6 @@ elif st.session_state["active_tab"] == "Сличительная":
             # --- ФУНКЦІЯ СТИЛІЗАЦІЇ (КОЛЬОРИ) ---
             def style_pnl(row):
                 styles = [''] * len(row)
-                # Виділяємо останній стовпець "Всього" жирним шрифтом та сірим фоном
                 styles[-1] = 'background-color: #f3f4f6; font-weight: bold; border-left: 2px solid #d1d5db;'
                 
                 if row['Стаття'] == '🟢 НАДХОДЖЕННЯ': return ['background-color: #d1e7dd; font-weight: bold; color: #0f5132'] * len(row)
