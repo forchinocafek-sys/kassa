@@ -276,10 +276,10 @@ st.markdown("""
 
 st.title("Cafe Forchino🍋")
 
-with st.popover("🚀 Версія: 2.7.1 (Expense Only Details)"):
+with st.popover("🚀 Версія: 2.8.0 (In-Cell Details)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v2.7.1:** Прибрано відображення доходів у нижній таблиці розшифровки. Тепер мітка 📌 та деталізація формується виключно для статей витрат, щоб уникнути зайвого візуального шуму.
+    * **v2.8.0:** Розшифровки витрат і доходів повернені всередину клітинок. Тепер у комірці відображається загальна сума, а в дужках — детальний розподіл (сума і примітка кожної операції), щоб все було видно відразу без додаткових таблиць.
     """)
 
 # --- АВТОРИЗАЦІЯ ---
@@ -634,10 +634,9 @@ elif st.session_state["active_tab"] == "Сличительная":
                         report_data[target_inc][day]["sum"] += amt
                         
                         note_text = note if note else (left_part if target_inc == "Разное" else "")
+                        # Записуємо текст тільки якщо він дійсно є
                         if note_text:
-                            report_data[target_inc][day]["notes"].append(f"{amt} ({note_text})")
-                        else:
-                            report_data[target_inc][day]["notes"].append(f"{amt}")
+                            report_data[target_inc][day]["notes"].append(f"{amt} {note_text}")
                     else:
                         if ' ➔ ' in left_part: group_name = left_part.split(' ➔ ')[0].strip()
                         elif ' >> ' in left_part: group_name = left_part.split(' >> ')[0].strip()
@@ -651,13 +650,12 @@ elif st.session_state["active_tab"] == "Сличительная":
                         elif ' >> ' in left_part: sub_cat = left_part.split(' >> ')[1].strip()
                         
                         full_note_parts = [p for p in [sub_cat, note] if p]
+                        # Записуємо текст тільки якщо він дійсно є
                         if full_note_parts: 
                             note_str = " - ".join(full_note_parts)
-                            report_data[target_cat][day]["notes"].append(f"{amt} ({note_str})")
+                            report_data[target_cat][day]["notes"].append(f"{amt} {note_str}")
                         elif target_cat == "Інші (старі ручні записи)" and group_name: 
-                            report_data[target_cat][day]["notes"].append(f"{amt} ({group_name})")
-                        else:
-                            report_data[target_cat][day]["notes"].append(f"{amt}")
+                            report_data[target_cat][day]["notes"].append(f"{amt} {group_name}")
 
             # Підрахунок ВСЬОГО ВИТРАТ
             for d in range(1, num_days + 1):
@@ -668,7 +666,6 @@ elif st.session_state["active_tab"] == "Сличительная":
 
             # ФОРМУВАННЯ МАТРИЦІ ТА ПІДРАХУНОК "ІТОГО"
             df_rows = []
-            month_notes = [] 
             
             for r in order_full:
                 row_dict = {"Стаття": r}
@@ -689,16 +686,11 @@ elif st.session_state["active_tab"] == "Сличительная":
                             row_total += cell["sum"]
                             valid_notes = [n for n in cell["notes"] if n]
                             
-                            # ДОДАНА УМОВА ФІЛЬТРАЦІЇ: Ігнорувати доходи для мітки 📌 та нижньої таблиці
-                            if valid_notes and r not in INCOME_CATEGORIES:
-                                row_dict[str(d)] = f"{cell['sum']} 📌"
-                                month_notes.append({
-                                    "🗓 День": f"{d} {sel_m.lower()}",
-                                    "🗂 Стаття": r,
-                                    "💰 Загальна сума": f"{cell['sum']} грн",
-                                    "📝 Деталізація": ", ".join(valid_notes)
-                                })
+                            if valid_notes:
+                                # Формуємо комірку: "Загальна_Сума (сума1 примітка, сума2 примітка)"
+                                row_dict[str(d)] = f"{cell['sum']} ({', '.join(valid_notes)})"
                             else:
+                                # Якщо приміток не було взагалі — просто гола цифра
                                 row_dict[str(d)] = str(cell["sum"])
                 
                 # ДОДАЄМО СТОВПЕЦЬ "Всього"
@@ -725,13 +717,6 @@ elif st.session_state["active_tab"] == "Сличительная":
             styled_df = df_report.style.apply(style_pnl, axis=1)
             
             st.dataframe(styled_df, use_container_width=True, hide_index=True)
-            
-            # ВИВЕДЕННЯ ДЕТАЛЕЙ ПІД ТАБЛИЦЕЮ
-            if month_notes:
-                st.markdown("##### 📌 Розшифровка деталей (записи з позначкою 📌)")
-                notes_df = pd.DataFrame(month_notes)
-                st.dataframe(notes_df, use_container_width=True, hide_index=True)
-                
             st.success("✅ Матрицю PnL успішно зведено!")
 
     # --- ПЛАВАЮЧЕ МЕНЮ ---
