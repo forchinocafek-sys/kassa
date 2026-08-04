@@ -276,10 +276,10 @@ st.markdown("""
 
 st.title("Cafe Forchino🍋")
 
-with st.popover("🚀 Версія: 2.7.0 (Detailed Breakdown)"):
+with st.popover("🚀 Версія: 2.7.1 (Expense Only Details)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v2.7.0:** Деталізована розшифровка витрат у PnL. Тепер у нижній таблиці видно суму кожної окремої транзакції з її приміткою (наприклад: *300 (вино), 200 (сир)*).
+    * **v2.7.1:** Прибрано відображення доходів у нижній таблиці розшифровки. Тепер мітка 📌 та деталізація формується виключно для статей витрат, щоб уникнути зайвого візуального шуму.
     """)
 
 # --- АВТОРИЗАЦІЯ ---
@@ -633,7 +633,6 @@ elif st.session_state["active_tab"] == "Сличительная":
                         target_inc = left_part if left_part in INCOME_CATEGORIES else "Разное"
                         report_data[target_inc][day]["sum"] += amt
                         
-                        # Додаємо суму до тексту для розшифровки
                         note_text = note if note else (left_part if target_inc == "Разное" else "")
                         if note_text:
                             report_data[target_inc][day]["notes"].append(f"{amt} ({note_text})")
@@ -690,7 +689,8 @@ elif st.session_state["active_tab"] == "Сличительная":
                             row_total += cell["sum"]
                             valid_notes = [n for n in cell["notes"] if n]
                             
-                            if valid_notes:
+                            # ДОДАНА УМОВА ФІЛЬТРАЦІЇ: Ігнорувати доходи для мітки 📌 та нижньої таблиці
+                            if valid_notes and r not in INCOME_CATEGORIES:
                                 row_dict[str(d)] = f"{cell['sum']} 📌"
                                 month_notes.append({
                                     "🗓 День": f"{d} {sel_m.lower()}",
