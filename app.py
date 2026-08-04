@@ -276,10 +276,10 @@ st.markdown("""
 
 st.title("Cafe Forchino🍋")
 
-with st.popover("🚀 Версія: 2.5.0 (Smart PnL)"):
+with st.popover("🚀 Версія: 2.6.0 (Compact Matrix)"):
     st.markdown("""
     **Останні оновлення:**
-    * **v2.5.0:** Розумні категорії витрат (1 колонка), кольорові заголовки та підсумки в PnL, спливаючі підказки (tooltips) замість тексту в дужках, аванси прибрані зі звіту.
+    * **v2.6.0:** Супер-компактна матриця PnL. Коментарі сховані під міткою 📌 і виведені в окрему таблицю розшифровки знизу. Додано стовпець "Всього" (Підсумок за місяць).
     """)
 
 # --- АВТОРИЗАЦІЯ ---
@@ -454,8 +454,7 @@ if st.session_state["active_tab"] == "Касса":
     with fc3:
         with st.popover("📅"):
             d = st.date_input("Оберіть дату", st.session_state["form_date"], format="DD/MM/YYYY", label_visibility="collapsed")
-            if d != st.session_state["form_date"]:
-                st.session_state["form_date"] = d; prefetch_week_window(d); st.rerun()
+            if d != st.session_state["form_date"]: st.session_state["form_date"] = d; prefetch_week_window(d); st.rerun()
     with fc4:
         if st.button("💾", key="fab_save"):
             payload = {"inc": sanitize_df(edited_inc_df), "exp": sanitize_df(edited_exp_df), "adv": sanitize_df(edited_adv_df), "cash": {"coins": m_coins, "20": q_20, "50": q_50, "100": q_100, "200": q_200, "500": q_500, "1000": q_1000}}
@@ -594,8 +593,8 @@ elif st.session_state["active_tab"] == "Сличительная":
             end_d = f"{sel_y+1}-01-01" if m_num == 12 else f"{sel_y}-{m_num+1:02d}-01"
             num_days = calendar.monthrange(sel_y, m_num)[1]
             
-            # --- СТРУКТУРА PnL З РОЗДІЛЮВАЧАМИ ---
             expense_groups_list = list(EXPENSE_TREE.keys())
+            # Виключили "АВАНСЫ"
             order_full = [
                 "Касса на начало дня", 
                 "🟢 НАДХОДЖЕННЯ"
@@ -609,7 +608,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             
             report_data = {cat: {str(d): {"sum": 0, "notes": [], "set": False} for d in range(1, num_days + 1)} for cat in order_full}
 
-            # 1. Смени (Залишки каси)
+            # 1. Залишки
             shifts_data = requests.get(f"{SUPABASE_URL}/rest/v1/shifts?date=gte.{start_d}&date=lt.{end_d}", headers=headers).json()
             if isinstance(shifts_data, list):
                 for s in shifts_data:
@@ -619,7 +618,7 @@ elif st.session_state["active_tab"] == "Сличительная":
                     report_data["Касса на конец дня"][day]["sum"] = get_int(s.get('actual_end', 0))
                     report_data["Касса на конец дня"][day]["set"] = True
 
-            # 2. Транзакції (Прибутки і Витрати)
+            # 2. Транзакції
             trans_data = requests.get(f"{SUPABASE_URL}/rest/v1/transactions?date=gte.{start_d}&date=lt.{end_d}", headers=headers).json()
             if isinstance(trans_data, list):
                 for t in trans_data:
@@ -636,7 +635,6 @@ elif st.session_state["active_tab"] == "Сличительная":
                         if note: report_data[target_inc][day]["notes"].append(note)
                         elif target_inc == "Разное" and left_part: report_data[target_inc][day]["notes"].append(left_part)
                     else:
-                        # Розпізнаємо старий формат (>>) або новий (➔)
                         if ' ➔ ' in left_part: group_name = left_part.split(' ➔ ')[0].strip()
                         elif ' >> ' in left_part: group_name = left_part.split(' >> ')[0].strip()
                         else: group_name = left_part
@@ -644,7 +642,6 @@ elif st.session_state["active_tab"] == "Сличительная":
                         target_cat = group_name if group_name in report_data else "Інші (старі ручні записи)"
                         report_data[target_cat][day]["sum"] += amt
                         
-                        # Додаємо підкатегорію в примітку (tooltips)
                         sub_cat = ""
                         if ' ➔ ' in left_part: sub_cat = left_part.split(' ➔ ')[1].strip()
                         elif ' >> ' in left_part: sub_cat = left_part.split(' >> ')[1].strip()
@@ -660,10 +657,14 @@ elif st.session_state["active_tab"] == "Сличительная":
                 report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["sum"] = day_total
                 if day_total > 0: report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["set"] = True
 
-            # ФОРМУВАННЯ МАТРИЦІ
+            # ФОРМУВАННЯ МАТРИЦІ ТА ПІДРАХУНОК "ІТОГО"
             df_rows = []
+            month_notes = [] # Збираємо всі примітки для нижньої таблиці
+            
             for r in order_full:
                 row_dict = {"Стаття": r}
+                row_total = 0 # Сума за місяць для рядка
+                
                 for d in range(1, num_days + 1):
                     cell = report_data[r][str(d)]
                     
@@ -671,32 +672,57 @@ elif st.session_state["active_tab"] == "Сличительная":
                         row_dict[str(d)] = ""
                     elif r in ["Касса на начало дня", "Касса на конец дня", "🔴 ВСЬОГО ВИТРАТ"]:
                         row_dict[str(d)] = str(cell["sum"]) if cell["set"] else ""
+                        row_total += cell["sum"]
                     else:
                         if cell["sum"] == 0 and not cell["notes"]:
                             row_dict[str(d)] = ""
                         else:
+                            row_total += cell["sum"]
                             valid_notes = [n for n in cell["notes"] if n]
                             if valid_notes:
-                                notes_str = ", ".join(valid_notes)
-                                row_dict[str(d)] = f"{cell['sum']} ({notes_str})"
+                                # Ставимо компактну позначку 📌 замість довгого тексту
+                                row_dict[str(d)] = f"{cell['sum']} 📌"
+                                month_notes.append({
+                                    "🗓 День": f"{d} {sel_m.lower()}",
+                                    "🗂 Стаття": r,
+                                    "💰 Сума": f"{cell['sum']} грн",
+                                    "📝 Примітка": ", ".join(valid_notes)
+                                })
                             else:
                                 row_dict[str(d)] = str(cell["sum"])
+                
+                # ДОДАЄМО СТОВПЕЦЬ "Всього" (Итого)
+                if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"]:
+                    row_dict["Всього"] = ""
+                else:
+                    row_dict["Всього"] = str(row_total) if row_total > 0 else ""
+                    
                 df_rows.append(row_dict)
                 
             df_report = pd.DataFrame(df_rows)
             
             # --- ФУНКЦІЯ СТИЛІЗАЦІЇ (КОЛЬОРИ) ---
             def style_pnl(row):
+                styles = [''] * len(row)
+                # Виділяємо останній стовпець "Всього" жирним шрифтом та сірим фоном
+                styles[-1] = 'background-color: #f3f4f6; font-weight: bold; border-left: 2px solid #d1d5db;'
+                
                 if row['Стаття'] == '🟢 НАДХОДЖЕННЯ': return ['background-color: #d1e7dd; font-weight: bold; color: #0f5132'] * len(row)
                 elif row['Стаття'] == '🔴 ВИТРАТИ': return ['background-color: #f8d7da; font-weight: bold; color: #842029'] * len(row)
                 elif row['Стаття'] == '🔴 ВСЬОГО ВИТРАТ': return ['background-color: #fff3cd; font-weight: bold; color: #664d03'] * len(row)
                 elif row['Стаття'] in ['Касса на начало дня', 'Касса на конец дня']: return ['background-color: #e2e3e5; font-weight: bold; color: #383d41'] * len(row)
-                return [''] * len(row)
+                return styles
 
-            # Накладаємо тільки кольори (без tooltips)
             styled_df = df_report.style.apply(style_pnl, axis=1)
             
             st.dataframe(styled_df, use_container_width=True, hide_index=True)
+            
+            # ВИВЕДЕННЯ ДЕТАЛЕЙ ПІД ТАБЛИЦЕЮ
+            if month_notes:
+                st.markdown("##### 📌 Розшифровка деталей (записи з позначкою 📌)")
+                notes_df = pd.DataFrame(month_notes)
+                st.dataframe(notes_df, use_container_width=True, hide_index=True)
+                
             st.success("✅ Матрицю PnL успішно зведено!")
 
     # --- ПЛАВАЮЧЕ МЕНЮ ---
