@@ -678,146 +678,172 @@ elif st.session_state["active_tab"] == "Сличительная":
     sel_m = c_m.selectbox("Місяць", list(months.keys()), index=st.session_state["form_date"].month-1)
     sel_y = c_y.selectbox("Рік", [2025, 2026, 2027], index=1)
     
-    if st.button("🚀 Згенерувати матрицю PnL", type="primary", use_container_width=True):
-        with st.spinner("Збір даних з бази..."):
-            log_audit("Згенеровано PnL", f"Період: {sel_m} {sel_y}")
-            m_num = months[sel_m]
-            start_d = f"{sel_y}-{m_num:02d}-01"
-            if m_num == 12:
-                end_d = f"{sel_y+1}-01-01"
-            else:
-                end_d = f"{sel_y}-{m_num+1:02d}-01"
-                
-            num_days = calendar.monthrange(sel_y, m_num)[1]
-            expense_groups_list = list(EXPENSE_TREE.keys())
+    with st.spinner("Динамічний розрахунок даних..."):
+        log_audit("Перегляд PnL", f"Період: {sel_m} {sel_y}")
+        m_num = months[sel_m]
+        start_d = f"{sel_y}-{m_num:02d}-01"
+        if m_num == 12:
+            end_d = f"{sel_y+1}-01-01"
+        else:
+            end_d = f"{sel_y}-{m_num+1:02d}-01"
             
-            order_full = [
-                "Касса на начало дня", 
-                "🟢 НАДХОДЖЕННЯ"
-            ] + INCOME_CATEGORIES + [
-                "🔴 ВИТРАТИ"
-            ] + expense_groups_list + [
-                "Інші (старі ручні записи)", 
-                "🔴 ВСЬОГО ВИТРАТ", 
-                "Касса на конец дня"
-            ]
-            
-            report_data = {cat: {str(d): {"sum": 0, "notes": [], "set": False} for d in range(1, num_days + 1)} for cat in order_full}
+        num_days = calendar.monthrange(sel_y, m_num)[1]
+        expense_groups_list = list(EXPENSE_TREE.keys())
+        
+        order_full = [
+            "Касса на начало дня", 
+            "🟢 НАДХОДЖЕННЯ"
+        ] + INCOME_CATEGORIES + [
+            "🔴 ВИТРАТИ"
+        ] + expense_groups_list + [
+            "Інші (старі ручні записи)", 
+            "🔴 ВСЬОГО ВИТРАТ", 
+            "Касса на конец дня"
+        ]
+        
+        report_data = {cat: {str(d): {"sum": 0, "notes": [], "set": False} for d in range(1, num_days + 1)} for cat in order_full}
 
-            # 1. Залишки
-            url_shifts = f"{SUPABASE_URL}/rest/v1/shifts?date=gte.{start_d}&date=lt.{end_d}"
-            shifts_data = requests.get(url_shifts, headers=headers).json()
-            if isinstance(shifts_data, list):
-                for s in shifts_data:
-                    day = str(int(s['date'].split('-')[2]))
-                    report_data["Касса на начало дня"][day]["sum"] = get_int(s.get('start_balance', 0))
-                    report_data["Касса на начало дня"][day]["set"] = True
-                    report_data["Касса на конец дня"][day]["sum"] = get_int(s.get('actual_end', 0))
-                    report_data["Касса на конец дня"][day]["set"] = True
+        # 1. Отримуємо вхідний залишок з минулого місяця (щоб почати ланцюжок доміно)
+        url_prev = f"{SUPABASE_URL}/rest/v1/shifts?date=lt.{start_d}&order=date.desc&limit=1"
+        res_prev = requests.get(url_prev, headers=headers).json()
+        running_balance = 0
+        if isinstance(res_prev, list) and len(res_prev) > 0:
+            running_balance = get_int(res_prev[0].get('calculated_end', 0))
 
-            # 2. Транзакції
-            url_trans = f"{SUPABASE_URL}/rest/v1/transactions?date=gte.{start_d}&date=lt.{end_d}"
-            trans_data = requests.get(url_trans, headers=headers).json()
-            if isinstance(trans_data, list):
-                for t in trans_data:
-                    day = str(int(t['date'].split('-')[2]))
-                    amt = get_int(t.get('amount', 0))
-                    desc_raw = t.get('description', '').strip()
-                    parts = desc_raw.split(' | ', 1)
-                    left_part = parts[0].strip()
-                    note = parts[1].strip() if len(parts) > 1 else ""
+        # Завантажуємо смени цього місяця, щоб знати які дні були робочими
+        url_shifts = f"{SUPABASE_URL}/rest/v1/shifts?date=gte.{start_d}&date=lt.{end_d}"
+        shifts_data = requests.get(url_shifts, headers=headers).json()
+        active_days = set()
+        if isinstance(shifts_data, list):
+            for s in shifts_data:
+                day = int(s['date'].split('-')[2])
+                active_days.add(day)
 
-                    if t.get('type') == 'income':
-                        target_inc = left_part if left_part in INCOME_CATEGORIES else "Разное"
-                        report_data[target_inc][day]["sum"] += amt
-                        
-                        note_text = note if note else (left_part if target_inc == "Разное" else "")
-                        if note_text:
-                            report_data[target_inc][day]["notes"].append(f"{amt} {note_text}")
-                    else:
-                        if ' ➔ ' in left_part: 
-                            group_name = left_part.split(' ➔ ')[0].strip()
-                        elif ' >> ' in left_part: 
-                            group_name = left_part.split(' >> ')[0].strip()
-                        else: 
-                            group_name = left_part
-                        
-                        target_cat = group_name if group_name in report_data else "Інші (старі ручні записи)"
-                        report_data[target_cat][day]["sum"] += amt
-                        
-                        sub_cat = ""
-                        if ' ➔ ' in left_part: 
-                            sub_cat = left_part.split(' ➔ ')[1].strip()
-                        elif ' >> ' in left_part: 
-                            sub_cat = left_part.split(' >> ')[1].strip()
-                        
-                        full_note_parts = [p for p in [sub_cat, note] if p]
-                        if full_note_parts: 
-                            note_str = " - ".join(full_note_parts)
-                            report_data[target_cat][day]["notes"].append(f"{amt} {note_str}")
-                        elif target_cat == "Інші (старі ручні записи)" and group_name: 
-                            report_data[target_cat][day]["notes"].append(f"{amt} {group_name}")
+        # 2. Транзакції
+        url_trans = f"{SUPABASE_URL}/rest/v1/transactions?date=gte.{start_d}&date=lt.{end_d}"
+        trans_data = requests.get(url_trans, headers=headers).json()
+        if isinstance(trans_data, list):
+            for t in trans_data:
+                day = str(int(t['date'].split('-')[2]))
+                amt = get_int(t.get('amount', 0))
+                desc_raw = t.get('description', '').strip()
+                parts = desc_raw.split(' | ', 1)
+                left_part = parts[0].strip()
+                note = parts[1].strip() if len(parts) > 1 else ""
 
-            # Підрахунок ВСЬОГО ВИТРАТ
-            for d in range(1, num_days + 1):
-                day_str = str(d)
-                day_total = sum(report_data[cat][day_str]["sum"] for cat in expense_groups_list + ["Інші (старі ручні записи)"])
-                report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["sum"] = day_total
-                if day_total > 0: 
-                    report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["set"] = True
-
-            # ФОРМУВАННЯ МАТРИЦІ ТА ПІДРАХУНОК "ІТОГО"
-            df_rows = []
-            
-            for r in order_full:
-                row_dict = {"Стаття": r}
-                row_total = 0 
-                
-                for d in range(1, num_days + 1):
-                    cell = report_data[r][str(d)]
+                if t.get('type') == 'income':
+                    target_inc = left_part if left_part in INCOME_CATEGORIES else "Разное"
+                    report_data[target_inc][day]["sum"] += amt
                     
-                    if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"]:
-                        row_dict[str(d)] = ""
-                    elif r in ["Касса на начало дня", "Касса на конец дня", "🔴 ВСЬОГО ВИТРАТ"]:
-                        row_dict[str(d)] = str(cell["sum"]) if cell["set"] else ""
-                        row_total += cell["sum"]
-                    else:
-                        if cell["sum"] == 0 and not cell["notes"]:
-                            row_dict[str(d)] = ""
-                        else:
-                            row_total += cell["sum"]
-                            valid_notes = [n for n in cell["notes"] if n]
-                            
-                            if valid_notes:
-                                row_dict[str(d)] = f"{cell['sum']} ({', '.join(valid_notes)})"
-                            else:
-                                row_dict[str(d)] = str(cell["sum"])
-                
-                # ДОДАЄМО СТОВПЕЦЬ "Всього"
-                if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"]:
-                    row_dict["Всього"] = ""
+                    note_text = note if note else (left_part if target_inc == "Разное" else "")
+                    if note_text:
+                        report_data[target_inc][day]["notes"].append(f"{amt} {note_text}")
                 else:
-                    row_dict["Всього"] = str(row_total) if row_total > 0 else ""
+                    if ' ➔ ' in left_part: 
+                        group_name = left_part.split(' ➔ ')[0].strip()
+                    elif ' >> ' in left_part: 
+                        group_name = left_part.split(' >> ')[0].strip()
+                    else: 
+                        group_name = left_part
                     
-                df_rows.append(row_dict)
-                
-            df_report = pd.DataFrame(df_rows)
-            
-            # --- ФУНКЦІЯ СТИЛІЗАЦІЇ (КОЛЬОРИ) ---
-            def style_pnl(row):
-                styles = [''] * len(row)
-                styles[-1] = 'background-color: #f3f4f6; font-weight: bold; border-left: 2px solid #d1d5db;'
-                
-                if row['Стаття'] == '🟢 НАДХОДЖЕННЯ': return ['background-color: #d1e7dd; font-weight: bold; color: #0f5132'] * len(row)
-                elif row['Стаття'] == '🔴 ВИТРАТИ': return ['background-color: #f8d7da; font-weight: bold; color: #842029'] * len(row)
-                elif row['Стаття'] == '🔴 ВСЬОГО ВИТРАТ': return ['background-color: #fff3cd; font-weight: bold; color: #664d03'] * len(row)
-                elif row['Стаття'] in ['Касса на начало дня', 'Касса на конец дня']: return ['background-color: #e2e3e5; font-weight: bold; color: #383d41'] * len(row)
-                return styles
+                    target_cat = group_name if group_name in report_data else "Інші (старі ручні записи)"
+                    report_data[target_cat][day]["sum"] += amt
+                    
+                    sub_cat = ""
+                    if ' ➔ ' in left_part: 
+                        sub_cat = left_part.split(' ➔ ')[1].strip()
+                    elif ' >> ' in left_part: 
+                        sub_cat = left_part.split(' >> ')[1].strip()
+                    
+                    full_note_parts = [p for p in [sub_cat, note] if p]
+                    if full_note_parts: 
+                        note_str = " - ".join(full_note_parts)
+                        report_data[target_cat][day]["notes"].append(f"{amt} {note_str}")
+                    elif target_cat == "Інші (старі ручні записи)" and group_name: 
+                        report_data[target_cat][day]["notes"].append(f"{amt} {group_name}")
 
-            styled_df = df_report.style.apply(style_pnl, axis=1)
+        # Підрахунок ВСЬОГО ВИТРАТ
+        for d in range(1, num_days + 1):
+            day_str = str(d)
+            day_total = sum(report_data[cat][day_str]["sum"] for cat in expense_groups_list + ["Інші (старі ручні записи)"])
+            report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["sum"] = day_total
+            if day_total > 0: 
+                report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["set"] = True
+
+        # 3. ДИНАМІЧНИЙ ПЕРЕРАХУНОК ЗАЛИШКІВ (ЕФЕКТ ДОМІНО)
+        for d in range(1, num_days + 1):
+            day_str = str(d)
             
-            st.dataframe(styled_df, use_container_width=True, hide_index=True)
-            st.success("✅ Матрицю PnL успішно зведено!")
+            day_inc = sum(report_data[cat][day_str]["sum"] for cat in INCOME_CATEGORIES)
+            day_exp = report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["sum"]
+            
+            is_active = d in active_days or day_inc > 0 or day_exp > 0
+            
+            if is_active:
+                # Встановлюємо математичний початок дня
+                report_data["Касса на начало дня"][day_str]["sum"] = running_balance
+                report_data["Касса на начало дня"][day_str]["set"] = True
+                
+                # Розраховуємо кінець дня
+                calc_end = running_balance + day_inc - day_exp
+                
+                report_data["Касса на конец дня"][day_str]["sum"] = calc_end
+                report_data["Касса на конец дня"][day_str]["set"] = True
+                
+                # Переносимо залишок на наступний день
+                running_balance = calc_end
+
+        # ФОРМУВАННЯ МАТРИЦІ ТА ПІДРАХУНОК "ІТОГО"
+        df_rows = []
+        
+        for r in order_full:
+            row_dict = {"Стаття": r}
+            row_total = 0 
+            
+            for d in range(1, num_days + 1):
+                cell = report_data[r][str(d)]
+                
+                if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"]:
+                    row_dict[str(d)] = ""
+                elif r in ["Касса на начало дня", "Касса на конец дня", "🔴 ВСЬОГО ВИТРАТ"]:
+                    row_dict[str(d)] = str(cell["sum"]) if cell["set"] else ""
+                    row_total += cell["sum"]
+                else:
+                    if cell["sum"] == 0 and not cell["notes"]:
+                        row_dict[str(d)] = ""
+                    else:
+                        row_total += cell["sum"]
+                        valid_notes = [n for n in cell["notes"] if n]
+                        
+                        if valid_notes:
+                            row_dict[str(d)] = f"{cell['sum']} ({', '.join(valid_notes)})"
+                        else:
+                            row_dict[str(d)] = str(cell["sum"])
+            
+            # ДОДАЄМО СТОВПЕЦЬ "Всього"
+            if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"]:
+                row_dict["Всього"] = ""
+            else:
+                row_dict["Всього"] = str(row_total) if row_total > 0 else ""
+                
+            df_rows.append(row_dict)
+            
+        df_report = pd.DataFrame(df_rows)
+        
+        # --- ФУНКЦІЯ СТИЛІЗАЦІЇ (КОЛЬОРИ) ---
+        def style_pnl(row):
+            styles = [''] * len(row)
+            styles[-1] = 'background-color: #f3f4f6; font-weight: bold; border-left: 2px solid #d1d5db;'
+            
+            if row['Стаття'] == '🟢 НАДХОДЖЕННЯ': return ['background-color: #d1e7dd; font-weight: bold; color: #0f5132'] * len(row)
+            elif row['Стаття'] == '🔴 ВИТРАТИ': return ['background-color: #f8d7da; font-weight: bold; color: #842029'] * len(row)
+            elif row['Стаття'] == '🔴 ВСЬОГО ВИТРАТ': return ['background-color: #fff3cd; font-weight: bold; color: #664d03'] * len(row)
+            elif row['Стаття'] in ['Касса на начало дня', 'Касса на конец дня']: return ['background-color: #e2e3e5; font-weight: bold; color: #383d41'] * len(row)
+            return styles
+
+        styled_df = df_report.style.apply(style_pnl, axis=1)
+        
+        st.dataframe(styled_df, use_container_width=True, hide_index=True)
 
 
 # --- ПЛАВАЮЧЕ МЕНЮ РОУТИНГ ---
