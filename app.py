@@ -1526,6 +1526,10 @@ elif st.session_state["active_tab"] == "Закупки":
             catalog_df["sku"] = ""
         catalog_df["sku"] = catalog_df["sku"].fillna("")
 
+        if "supplier" not in catalog_df.columns:
+            catalog_df["supplier"] = ""
+        catalog_df["supplier"] = catalog_df["supplier"].fillna("")
+
         if "category" not in catalog_df.columns:
             catalog_df["category"] = ""
         
@@ -1571,12 +1575,13 @@ elif st.session_state["active_tab"] == "Закупки":
 
             with st.expander(f"**{category_name}** {badge}", expanded=(filled_in_cat > 0)):
                 edited_cat = st.data_editor(
-                    cat_df[["id", "num", "sku", "name", "qty", "unit"]],
+                    cat_df[["id", "num", "sku", "name", "supplier", "qty", "unit"]],
                     column_config={
                         "id": None, # Скрытый ID
                         "num": st.column_config.NumberColumn("№", disabled=True, width="small"),
                         "sku": st.column_config.TextColumn("Артикул", disabled=True),
                         "name": st.column_config.TextColumn("Наименование", disabled=True),
+                        "supplier": st.column_config.TextColumn("Поставщик", disabled=True),
                         "qty": st.column_config.NumberColumn(
                             "Количество", min_value=0, step=1, required=True
                         ),
@@ -1593,7 +1598,6 @@ elif st.session_state["active_tab"] == "Закупки":
                     item_id = row["id"]
                     val = get_int(row["qty"])
                     st.session_state[draft_key][item_id] = val
-                    # Обновляем локальный catalog_df для секции Заказов
                     catalog_df.loc[catalog_df["id"] == item_id, "qty"] = val
 
         # Итоговые выбранные позиции (где qty > 0)
@@ -1736,12 +1740,13 @@ elif st.session_state["active_tab"] == "Закупки":
     st.divider()
 
     # ------------------------------------------
-    # 3. ОБНОВЛЕНИЕ СПРАВОЧНИКА
+    # 3. ОБНОВЛЕНИЕ И УПРАВЛЕНИЕ СПРАВОЧНИКОМ
     # ------------------------------------------
     st.markdown("### 3. Обновление справочника")
-    st.caption("Добавление новых позиций в базу товаров")
+    st.caption("Добавление новых позиций и удаление устаревших из базы товаров")
 
     if can_edit:
+        # --- ФОРМА ДОБАВЛЕНИЯ НОВОГО ТОВАРА ---
         with st.form(key="add_supplies_item_form", clear_on_submit=True):
             col_sku, col_name, col_cat, col_unit, col_sup = st.columns([1.5, 3, 2.5, 1.2, 2])
 
@@ -1816,12 +1821,51 @@ elif st.session_state["active_tab"] == "Закупки":
                     time.sleep(1)
                     st.rerun()
 
-    # Экспандер для просмотра текущего справочника
+        # --- ИНСТРУМЕНТ УДАЛЕНИЯ ТОВАРА ---
+        if catalog_items:
+            with st.expander("🗑️ Удалить позицию из справочника"):
+                st.caption("Выберите позицию, которую необходимо безвозвратно удалить из Supabase:")
+                
+                # Формируем читабельный список товаров для выпадающего списка
+                item_map = {}
+                for it in catalog_items:
+                    item_id = it.get("id")
+                    if item_id:
+                        sku_label = f"[{it.get('sku')}] " if it.get('sku') else ""
+                        label = f"{sku_label}{it.get('name')} | {it.get('supplier')} (ID: {item_id})"
+                        item_map[label] = item_id
+
+                if item_map:
+                    col_del_select, col_del_btn = st.columns([3, 1])
+                    with col_del_select:
+                        selected_to_delete = st.selectbox(
+                            "Выбор товара к удалению",
+                            options=list(item_map.keys()),
+                            key="del_item_selectbox",
+                            label_visibility="collapsed"
+                        )
+                    with col_del_btn:
+                        if st.button("🗑️ Удалить", type="primary", use_container_width=True):
+                            target_id = item_map[selected_to_delete]
+                            res_del = requests.delete(
+                                f"{SUPABASE_URL}/rest/v1/supplies_catalog?id=eq.{target_id}",
+                                headers=headers,
+                            )
+                            if res_del.status_code in [200, 204]:
+                                log_audit(
+                                    "Удален товар из справочника",
+                                    f"Удален: {selected_to_delete}"
+                                )
+                                st.success("✅ Товар успешно удален!")
+                                time.sleep(1)
+                                st.rerun()
+                            else:
+                                st.error(f"❌ Помилка видалення: {res_del.text}")
+
+    # --- ЭКСПАНДЕР ДЛЯ ПРОСМОТРА ТЕКУЩЕГО СПРАВОЧНИКА ---
     if catalog_items:
         with st.expander("📋 Просмотреть текущий справочник товаров"):
-            df_cat_show = (
-                pd.DataFrame(catalog_items)
-            )
+            df_cat_show = pd.DataFrame(catalog_items)
             cols_to_show = [c for c in ["sku", "name", "category", "unit", "supplier"] if c in df_cat_show.columns]
             
             df_cat_show = (
