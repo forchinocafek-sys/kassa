@@ -1566,27 +1566,24 @@ elif st.session_state["active_tab"] == "Закупки":
             if cat_df.empty:
                 continue
 
-            # Нумерация внутри категории
-            cat_df["num"] = range(1, len(cat_df) + 1)
-            
             # Считаем активные позиции для категории
             filled_in_cat = sum(1 for _, r in cat_df.iterrows() if st.session_state[draft_key].get(r["id"], 0) > 0)
             badge = f"🟢 [Заказано: {filled_in_cat}]" if filled_in_cat > 0 else f"({len(cat_df)} поз.)"
 
             with st.expander(f"**{category_name}** {badge}", expanded=(filled_in_cat > 0)):
                 edited_cat = st.data_editor(
-                    cat_df[["id", "num", "sku", "name", "supplier", "qty", "unit"]],
+                    cat_df[["id", "sku", "name", "qty", "unit", "supplier"]],
                     column_config={
-                        "id": None, # Скрытый ID
-                        "num": st.column_config.NumberColumn("№", disabled=True, width="small"),
-                        "sku": st.column_config.TextColumn("Артикул", disabled=True),
+                        "id": None,      # Скрываем ID
+                        "sku": None,     # Скрываем Артикул (он проявится в готовом заказе)
                         "name": st.column_config.TextColumn("Наименование", disabled=True),
-                        "supplier": st.column_config.TextColumn("Поставщик", disabled=True),
                         "qty": st.column_config.NumberColumn(
                             "Количество", min_value=0, step=1, required=True
                         ),
                         "unit": st.column_config.TextColumn("Ед. изм.", disabled=True, width="small"),
+                        "supplier": st.column_config.TextColumn("Поставщик", disabled=True),
                     },
+                    column_order=["name", "qty", "unit", "supplier"],
                     hide_index=True,
                     use_container_width=True,
                     key=f"supplies_cat_editor_{cat_idx}_{selected_date}",
@@ -1602,7 +1599,6 @@ elif st.session_state["active_tab"] == "Закупки":
 
         # Итоговые выбранные позиции (где qty > 0)
         catalog_df["qty"] = catalog_df["id"].map(lambda x: st.session_state[draft_key].get(x, 0))
-        catalog_df["num"] = range(1, len(catalog_df) + 1)
         order_items = catalog_df[catalog_df["qty"] > 0].copy()
 
     st.divider()
@@ -1625,9 +1621,9 @@ elif st.session_state["active_tab"] == "Закупки":
 
             has_sku = (sup_df["sku"].astype(str).str.strip() != "").any()
 
-            table_cols = ["num"]
+            table_cols = []
             col_rename = {
-                "num": "№",
+                "sku": "Артикул",
                 "name": "Наименование",
                 "qty": "Количество",
                 "unit": "Единица Измерения",
@@ -1635,7 +1631,6 @@ elif st.session_state["active_tab"] == "Закупки":
 
             if has_sku:
                 table_cols.append("sku")
-                col_rename["sku"] = "Артикул"
 
             table_cols.extend(["name", "qty", "unit"])
 
@@ -1683,7 +1678,7 @@ elif st.session_state["active_tab"] == "Закупки":
                 with st.spinner("Сохранение закупки в облаке..."):
                     order_records = sanitize_df(
                         order_items[
-                            ["num", "sku", "name", "qty", "unit", "supplier", "category"]
+                            ["sku", "name", "qty", "unit", "supplier", "category"]
                         ]
                     )
 
@@ -1826,7 +1821,6 @@ elif st.session_state["active_tab"] == "Закупки":
             with st.expander("🗑️ Удалить позицию из справочника"):
                 st.caption("Выберите позицию, которую необходимо безвозвратно удалить из Supabase:")
                 
-                # Формируем читабельный список товаров для выпадающего списка
                 item_map = {}
                 for it in catalog_items:
                     item_id = it.get("id")
@@ -1860,7 +1854,7 @@ elif st.session_state["active_tab"] == "Закупки":
                                 time.sleep(1)
                                 st.rerun()
                             else:
-                                st.error(f"❌ Помилка видалення: {res_del.text}")
+                                st.error(f"❌ Ошибка удаления: {res_del.text}")
 
     # --- ЭКСПАНДЕР ДЛЯ ПРОСМОТРА ТЕКУЩЕГО СПРАВОЧНИКА ---
     if catalog_items:
