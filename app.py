@@ -1448,11 +1448,52 @@ elif st.session_state["active_tab"] == "Закупки":
 
     if not can_edit:
         st.warning(
-            f"🔒 {st.session_state['user_name']}, просмотр в режиме «Только"
-            " чтение»."
+            f"🔒 {st.session_state['user_name']}, просмотр в режиме «Только чтение»."
         )
 
-    # --- ЗАВРУЗКА СПРАВОЧНИКА ИЗ БАЗЫ ---
+    # --- СПИСОК КАТЕГОРИЙ И ВСПОМОГАТЕЛЬНАЯ ФУНКЦИЯ ---
+    SUPPLIES_CATEGORIES = [
+        "Губки, мочалки, салфетки для уборки, мопы и инвентарь",
+        "Перчатки и одноразовая одежда",
+        "Пакеты для мусора",
+        "Бумажная продукция (полотенца, туалетная бумага, салфетки)",
+        "Бытовая химия, моющие и дезинфицирующие средства",
+        "Кассовая лента, канцтовары и прочие расходники",
+        "Пакеты (фасовка, вакуум, ZIP), пленка, фольга и пергамент",
+        "Приборы, шпажки, соломка и мешалки",
+        "Упаковка, контейнеры, стаканы, крышки, емкости и бутылки"
+    ]
+
+    def auto_assign_category(name, current_cat=""):
+        if current_cat and str(current_cat).strip() in SUPPLIES_CATEGORIES:
+            return str(current_cat).strip()
+        n = str(name).lower()
+        if any(k in n for k in ['рукавичк', 'перчатк', 'шапочк', 'фартук']):
+            return "Перчатки и одноразовая одежда"
+        elif any(k in n for k in ['сміття', 'мусор']):
+            return "Пакеты для мусора"
+        elif any(k in n for k in ['рушник', 'полотенц', 'папір', 'бумага', 'туалет']):
+            return "Бумажная продукция (полотенца, туалетная бумага, салфетки)"
+        elif any(k in n for k in ['засіб', 'средств', 'доместос', 'клінер', 'аква', 'гель', 'мило', 'порошок', 'білизна', 'чищення кавомашин', 'дезинфек', 'дезінфек', 'химия', 'хімія']):
+            return "Бытовая химия, моющие и дезинфицирующие средства"
+        elif any(k in n for k in ['касов', 'кассовая', 'діркопробивач', 'канц', 'ручка', 'скотч', 'лента']):
+            return "Кассовая лента, канцтовары и прочие расходники"
+        elif any(k in n for k in ['вакуум', 'зіп', 'zip', 'саше', 'фасов', 'майка', 'плівка', 'пленка', 'стретч', 'стрейч', 'фольга', 'пергамент']):
+            return "Пакеты (фасовка, вакуум, ZIP), пленка, фольга и пергамент"
+        elif any(k in n for k in ['ложка', 'виделка', 'вилка', 'ніж', 'палочк', 'соломка', 'мішалк', 'мешалк', 'шпажк']):
+            return "Приборы, шпажки, соломка и мешалки"
+        elif any(k in n for k in ['губк', 'мочалк', 'скребок', 'тканина', 'мікрофібр', 'насадк', 'швабр', 'щітк', 'відро', 'віскоз', 'целюлоз', 'моп', 'інвентар']):
+            return "Губки, мочалки, салфетки для уборки, мопы и инвентарь"
+        elif any(k in n for k in ['контейнер', 'супов', 'ємність', 'кришк', 'крышк', 'соусник', 'стакан', 'банка', 'пляшк', 'підстаканник', 'тримач', 'упаков', 'бокс', 'пакет крафт']):
+            return "Упаковка, контейнеры, стаканы, крышки, емкости и бутылки"
+        return "Упаковка, контейнеры, стаканы, крышки, емкости и бутылки"
+
+    # --- ИНИЦИАЛИЗАЦИЯ ЧЕРНОВИКА СЕССИИ ---
+    draft_key = f"supplies_draft_qty_{selected_date}"
+    if draft_key not in st.session_state:
+        st.session_state[draft_key] = {}
+
+    # --- ЗАГРУЗКА СПРАВОЧНИКА ИЗ БАЗЫ ---
     catalog_items = []
     try:
         res_cat = requests.get(
@@ -1468,62 +1509,108 @@ elif st.session_state["active_tab"] == "Закупки":
         catalog_items = st.session_state["supplies_catalog"]
 
     # ------------------------------------------
-    # 1. ФОРМИРОВАНИЕ ЗАКАЗА
+    # 1. ФОРМИРОВАНИЕ ЗАКАЗА ПО КАТЕГОРИЯМ
     # ------------------------------------------
     st.markdown("### 1. Формирование заказа")
 
     if not catalog_items:
         st.info(
-            "ℹ️ Справочник товаров пуст. Добавьте позиции ниже в блоке **3."
-            " Обновление справочника**."
+            "ℹ️ Справочник товаров пуст. Добавьте позиции ниже в блоке **3. Обновление справочника**."
         )
         order_items = pd.DataFrame()
     else:
         catalog_df = pd.DataFrame(catalog_items)
+        
+        # Гарантируем наличие необходимых колонок
         if "sku" not in catalog_df.columns:
             catalog_df["sku"] = ""
         catalog_df["sku"] = catalog_df["sku"].fillna("")
 
-        # Добавляем нумерацию № и поле ввода количества
-        catalog_df.insert(0, "num", range(1, len(catalog_df) + 1))
-        catalog_df["qty"] = 0
-
-        # Редактор отображает строго 5 столбцов, Поставщик скрыт через column_order
-        edited_supplies = st.data_editor(
-            catalog_df,
-            column_config={
-                "num": st.column_config.NumberColumn("№", disabled=True),
-                "sku": st.column_config.TextColumn("Артикул", disabled=True),
-                "name": st.column_config.TextColumn(
-                    "Наименование", disabled=True
-                ),
-                "qty": st.column_config.NumberColumn(
-                    "Количество", min_value=0, step=1, required=True
-                ),
-                "unit": st.column_config.TextColumn(
-                    "Единица Измерения", disabled=True
-                ),
-            },
-            column_order=["num", "sku", "name", "qty", "unit"],
-            hide_index=True,
-            use_container_width=True,
-            key=f"supplies_editor_{selected_date}",
-            disabled=not can_edit,
+        if "category" not in catalog_df.columns:
+            catalog_df["category"] = ""
+        
+        # Автоматическая разметка категорий при отсутствии
+        catalog_df["category"] = catalog_df.apply(
+            lambda r: auto_assign_category(r["name"], r.get("category", "")), axis=1
         )
 
-        order_items = edited_supplies[edited_supplies["qty"] > 0].copy()
+        # Подтягиваем количества из черновика
+        catalog_df["qty"] = catalog_df["id"].map(
+            lambda item_id: st.session_state[draft_key].get(item_id, 0)
+        )
+
+        # Панель управления черновиком
+        total_selected = sum(1 for q in st.session_state[draft_key].values() if q > 0)
+        
+        col_dr1, col_dr2, col_dr3 = st.columns([2, 2, 3])
+        with col_dr1:
+            if st.button("💾 Сохранить черновик", type="primary", use_container_width=True, disabled=not can_edit):
+                st.toast("✅ Черновик заказа сохранен!", icon="💾")
+                log_audit("Сохранен черновик закупки", f"Дата: {selected_date}")
+        with col_dr2:
+            if st.button("🗑️ Очистить ввод", use_container_width=True, disabled=not can_edit):
+                st.session_state[draft_key] = {}
+                st.rerun()
+        with col_dr3:
+            st.markdown(f"**Всего выбрано позиций:** `{total_selected}`")
+
+        st.write("")
+
+        # ВЫВОД КАТЕГОРИЙ В ЖЕСТКОМ ПОРЯДКЕ
+        for cat_idx, category_name in enumerate(SUPPLIES_CATEGORIES):
+            cat_df = catalog_df[catalog_df["category"] == category_name].copy()
+            if cat_df.empty:
+                continue
+
+            # Нумерация внутри категории
+            cat_df["num"] = range(1, len(cat_df) + 1)
+            
+            # Считаем активные позиции для категории
+            filled_in_cat = sum(1 for _, r in cat_df.iterrows() if st.session_state[draft_key].get(r["id"], 0) > 0)
+            badge = f"🟢 [Заказано: {filled_in_cat}]" if filled_in_cat > 0 else f"({len(cat_df)} поз.)"
+
+            with st.expander(f"**{category_name}** {badge}", expanded=(filled_in_cat > 0)):
+                edited_cat = st.data_editor(
+                    cat_df[["id", "num", "sku", "name", "qty", "unit"]],
+                    column_config={
+                        "id": None, # Скрытый ID
+                        "num": st.column_config.NumberColumn("№", disabled=True, width="small"),
+                        "sku": st.column_config.TextColumn("Артикул", disabled=True),
+                        "name": st.column_config.TextColumn("Наименование", disabled=True),
+                        "qty": st.column_config.NumberColumn(
+                            "Количество", min_value=0, step=1, required=True
+                        ),
+                        "unit": st.column_config.TextColumn("Ед. изм.", disabled=True, width="small"),
+                    },
+                    hide_index=True,
+                    use_container_width=True,
+                    key=f"supplies_cat_editor_{cat_idx}_{selected_date}",
+                    disabled=not can_edit,
+                )
+
+                # Записываем измененные количества в глобальный черновик сессии
+                for _, row in edited_cat.iterrows():
+                    item_id = row["id"]
+                    val = get_int(row["qty"])
+                    st.session_state[draft_key][item_id] = val
+                    # Обновляем локальный catalog_df для секции Заказов
+                    catalog_df.loc[catalog_df["id"] == item_id, "qty"] = val
+
+        # Итоговые выбранные позиции (где qty > 0)
+        catalog_df["qty"] = catalog_df["id"].map(lambda x: st.session_state[draft_key].get(x, 0))
+        catalog_df["num"] = range(1, len(catalog_df) + 1)
+        order_items = catalog_df[catalog_df["qty"] > 0].copy()
 
     st.divider()
 
     # ------------------------------------------
-    # 2. ЗАКАЗЫ
+    # 2. ЗАКАЗЫ (ГРУППИРОВКА ПО ПОСТАВЩИКАМ)
     # ------------------------------------------
     st.markdown("### 2. Заказы")
 
     if order_items.empty:
         st.info(
-            "ℹ️ Укажите количество позиций к закупке в таблице формирования"
-            " заказа."
+            "ℹ️ Укажите количество позиций к закупке в блоках категорий выше."
         )
     else:
         suppliers = order_items["supplier"].unique()
@@ -1532,10 +1619,8 @@ elif st.session_state["active_tab"] == "Закупки":
             st.markdown(f"#### 🚚 Поставщик: **{sup}**")
             sup_df = order_items[order_items["supplier"] == sup].copy()
 
-            # Проверяем, есть ли артикулы у выбранных товаров этого поставщика
             has_sku = (sup_df["sku"].astype(str).str.strip() != "").any()
 
-            # Динамически формируем колонки для таблицы
             table_cols = ["num"]
             col_rename = {
                 "num": "№",
@@ -1560,7 +1645,6 @@ elif st.session_state["active_tab"] == "Закупки":
                 )
 
             with col_code:
-                # Генерация готового текстового сообщения
                 msg_lines = [
                     f"Привет! Заказ для Cafe Forchino ({selected_date}):"
                 ]
@@ -1588,14 +1672,14 @@ elif st.session_state["active_tab"] == "Закупки":
     with col_save:
         if can_edit and not order_items.empty:
             if st.button(
-                "💾 Сохранить и зафиксировать закупку в истории",
+                "🚀 Фиксировать и отправлять закупку в историю",
                 type="primary",
                 use_container_width=True,
             ):
                 with st.spinner("Сохранение закупки в облаке..."):
                     order_records = sanitize_df(
                         order_items[
-                            ["num", "sku", "name", "qty", "unit", "supplier"]
+                            ["num", "sku", "name", "qty", "unit", "supplier", "category"]
                         ]
                     )
 
@@ -1659,7 +1743,7 @@ elif st.session_state["active_tab"] == "Закупки":
 
     if can_edit:
         with st.form(key="add_supplies_item_form", clear_on_submit=True):
-            col_sku, col_name, col_unit, col_sup = st.columns([1.5, 3, 1.5, 2])
+            col_sku, col_name, col_cat, col_unit, col_sup = st.columns([1.5, 3, 2.5, 1.2, 2])
 
             with col_sku:
                 new_sku = st.text_input(
@@ -1669,9 +1753,15 @@ elif st.session_state["active_tab"] == "Закупки":
                 new_name = st.text_input(
                     "Наименование *", placeholder="например, Пакет крафт 28х15х32"
                 )
+            with col_cat:
+                new_cat = st.selectbox(
+                    "Категория *",
+                    options=SUPPLIES_CATEGORIES,
+                    index=8
+                )
             with col_unit:
                 new_unit = st.text_input(
-                    "Ед. изм. *", placeholder="шт / рул / уп"
+                    "Ед. изм. *", placeholder="шт/рул/уп"
                 )
             with col_sup:
                 new_sup = st.text_input(
@@ -1679,7 +1769,7 @@ elif st.session_state["active_tab"] == "Закупки":
                 )
 
             btn_add = st.form_submit_button(
-                "➕ Додати в довідник",
+                "➕ Добавить в справочник",
                 use_container_width=True,
                 type="primary",
             )
@@ -1698,11 +1788,11 @@ elif st.session_state["active_tab"] == "Закупки":
                     new_item = {
                         "sku": new_sku.strip(),
                         "name": new_name.strip(),
+                        "category": new_cat.strip(),
                         "unit": new_unit.strip(),
                         "supplier": new_sup.strip(),
                     }
 
-                    # Отправка в Supabase
                     try:
                         requests.post(
                             f"{SUPABASE_URL}/rest/v1/supplies_catalog",
@@ -1718,7 +1808,7 @@ elif st.session_state["active_tab"] == "Закупки":
 
                     log_audit(
                         "Добавлено товар в справочник",
-                        f"Товар: {new_name}, Поставщик: {new_sup}",
+                        f"Товар: {new_name}, Категория: {new_cat}, Поставщик: {new_sup}",
                     )
                     st.success(
                         f"✅ Товар **{new_name}** успешно добавлен в справочник!"
@@ -1726,18 +1816,22 @@ elif st.session_state["active_tab"] == "Закупки":
                     time.sleep(1)
                     st.rerun()
 
-    # Экспандер для просмотра уже внесенных товаров
+    # Экспандер для просмотра текущего справочника
     if catalog_items:
         with st.expander("📋 Просмотреть текущий справочник товаров"):
             df_cat_show = (
-                pd.DataFrame(catalog_items)[
-                    ["sku", "name", "unit", "supplier"]
-                ]
+                pd.DataFrame(catalog_items)
+            )
+            cols_to_show = [c for c in ["sku", "name", "category", "unit", "supplier"] if c in df_cat_show.columns]
+            
+            df_cat_show = (
+                df_cat_show[cols_to_show]
                 .fillna("")
                 .rename(
                     columns={
                         "sku": "Артикул",
                         "name": "Наименование",
+                        "category": "Категория",
                         "unit": "Ед. изм.",
                         "supplier": "Поставщик",
                     }
