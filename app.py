@@ -1444,112 +1444,137 @@ elif st.session_state["active_tab"] == "Сличительная":
 # РОЗДІЛ 4: ЗАКУПКИ (ХОЗИ ТА УПАКОВКА)
 # ==========================================
 elif st.session_state["active_tab"] == "Закупки":
-    st.subheader(
-        f"🧹 Еженедельная закупка хозов и упаковки ({selected_date})"
-    )
+    st.subheader(f"🧹 Закупка ({selected_date})")
 
     if not can_edit:
         st.warning(
-            f"🔒 {st.session_state['user_name']}, пересмотр списка в режиме «Только чтение»."
+            f"🔒 {st.session_state['user_name']}, просмотр в режиме «Только"
+            " чтение»."
         )
 
-    # Завантаження або ініціалізація номенклатури
-    catalog_df = pd.DataFrame(DEFAULT_SUPPLIES_CATALOG)
+    # --- ЗАВРУЗКА СПРАВОЧНИКА ИЗ БАЗЫ ---
+    catalog_items = []
+    try:
+        res_cat = requests.get(
+            f"{SUPABASE_URL}/rest/v1/supplies_catalog?select=*&order=id.asc",
+            headers=headers,
+        )
+        if res_cat.status_code == 200 and isinstance(res_cat.json(), list):
+            catalog_items = res_cat.json()
+    except Exception:
+        pass
 
-    # Готуємо структуру для редактора
-    catalog_df["fact_stock"] = 0
+    if not catalog_items and "supplies_catalog" in st.session_state:
+        catalog_items = st.session_state["supplies_catalog"]
 
-    # Авто-расчет рекомендованной закупки
-    catalog_df["auto_order"] = (
-        catalog_df["par"] - catalog_df["fact_stock"]
-    ).apply(lambda x: max(x, 0))
-    catalog_df["final_order"] = catalog_df["auto_order"]
+    # ------------------------------------------
+    # 1. ФОРМИРОВАНИЕ ЗАКАЗА
+    # ------------------------------------------
+    st.markdown("### 1. Формирование заказа")
 
-    st.markdown("### 1. Перекличка остатков и корректировка заказа")
-    st.caption(
-        "💡 Впишите фактический остаток или сразу укажите прямое количество к"
-        " заказу (например, под банкеты или сезонный спрос)."
-    )
+    if not catalog_items:
+        st.info(
+            "ℹ️ Справочник товаров пуст. Добавьте позиции ниже в блоке **3."
+            " Обновление справочника**."
+        )
+        order_items = pd.DataFrame()
+    else:
+        catalog_df = pd.DataFrame(catalog_items)
+        if "sku" not in catalog_df.columns:
+            catalog_df["sku"] = ""
+        catalog_df["sku"] = catalog_df["sku"].fillna("")
 
-    edited_supplies = st.data_editor(
-        catalog_df,
-        column_config={
-            "category": st.column_config.TextColumn(
-                "Категория", disabled=True
-            ),
-            "name": st.column_config.TextColumn(
-                "Наименование", disabled=True
-            ),
-            "unit": st.column_config.TextColumn("Ед.", disabled=True),
-            "par": st.column_config.NumberColumn("PAR", disabled=True),
-            "supplier": st.column_config.TextColumn(
-                "Поставщик", disabled=True
-            ),
-            "fact_stock": st.column_config.NumberColumn(
-                "Остаток факт", min_value=0, step=1, required=True
-            ),
-            "final_order": st.column_config.NumberColumn(
-                "К ЗАКАЗУ (ручное)",
-                min_value=0,
-                step=1,
-                required=True,
-                help="Можете изменить количество вручную под потребности",
-            ),
-        },
-        column_order=[
-            "category",
-            "name",
-            "unit",
-            "par",
-            "fact_stock",
-            "final_order",
-            "supplier",
-        ],
-        hide_index=True,
-        use_container_width=True,
-        key=f"supplies_editor_{selected_date}",
-        disabled=not can_edit,
-    )
+        # Добавляем нумерацию № и поле ввода количества
+        catalog_df.insert(0, "num", range(1, len(catalog_df) + 1))
+        catalog_df["qty"] = 0
 
-    # Фильтрация позиций, которые нужно заказать
-    order_items = edited_supplies[edited_supplies["final_order"] > 0].copy()
+        # Редактор отображает строго 5 столбцов, Поставщик скрыт через column_order
+        edited_supplies = st.data_editor(
+            catalog_df,
+            column_config={
+                "num": st.column_config.NumberColumn("№", disabled=True),
+                "sku": st.column_config.TextColumn("Артикул", disabled=True),
+                "name": st.column_config.TextColumn(
+                    "Наименование", disabled=True
+                ),
+                "qty": st.column_config.NumberColumn(
+                    "Количество", min_value=0, step=1, required=True
+                ),
+                "unit": st.column_config.TextColumn(
+                    "Единица Измерения", disabled=True
+                ),
+            },
+            column_order=["num", "sku", "name", "qty", "unit"],
+            hide_index=True,
+            use_container_width=True,
+            key=f"supplies_editor_{selected_date}",
+            disabled=not can_edit,
+        )
+
+        order_items = edited_supplies[edited_supplies["qty"] > 0].copy()
 
     st.divider()
-    st.markdown("### 2. Готовые заказы по поставщикам")
+
+    # ------------------------------------------
+    # 2. ЗАКАЗЫ
+    # ------------------------------------------
+    st.markdown("### 2. Заказы")
 
     if order_items.empty:
-        st.info("ℹ️ Нет позиций к закупке. Все остатки в норме!")
+        st.info(
+            "ℹ️ Укажите количество позиций к закупке в таблице формирования"
+            " заказа."
+        )
     else:
         suppliers = order_items["supplier"].unique()
 
         for sup in suppliers:
             st.markdown(f"#### 🚚 Поставщик: **{sup}**")
-            sup_df = order_items[order_items["supplier"] == sup]
+            sup_df = order_items[order_items["supplier"] == sup].copy()
 
-            col_table, col_code = st.columns([1, 1])
+            # Проверяем, есть ли артикулы у выбранных товаров этого поставщика
+            has_sku = (sup_df["sku"].astype(str).str.strip() != "").any()
+
+            # Динамически формируем колонки для таблицы
+            table_cols = ["num"]
+            col_rename = {
+                "num": "№",
+                "name": "Наименование",
+                "qty": "Количество",
+                "unit": "Единица Измерения",
+            }
+
+            if has_sku:
+                table_cols.append("sku")
+                col_rename["sku"] = "Артикул"
+
+            table_cols.extend(["name", "qty", "unit"])
+
+            col_table, col_code = st.columns([1.2, 1])
 
             with col_table:
                 st.dataframe(
-                    sup_df[["name", "final_order", "unit"]].rename(
-                        columns={
-                            "name": "Товар",
-                            "final_order": "Кол-во",
-                            "unit": "Ед.",
-                        }
-                    ),
+                    sup_df[table_cols].rename(columns=col_rename),
                     hide_index=True,
                     use_container_width=True,
                 )
 
             with col_code:
-                # Формирование чистого текста для копаста в Telegram/Viber
+                # Генерация готового текстового сообщения
                 msg_lines = [
                     f"Привет! Заказ для Cafe Forchino ({selected_date}):"
                 ]
                 for _, r in sup_df.iterrows():
-                    msg_lines.append(
-                        f"• {r['name']} — {int(r['final_order'])} {r['unit']}"
-                    )
+                    sku_str = str(r["sku"]).strip()
+                    if sku_str:
+                        msg_lines.append(
+                            f"• [{sku_str}] {r['name']} — {int(r['qty'])}"
+                            f" {r['unit']}"
+                        )
+                    else:
+                        msg_lines.append(
+                            f"• {r['name']} — {int(r['qty'])} {r['unit']}"
+                        )
                 msg_lines.append("\nСпасибо!")
 
                 full_msg = "\n".join(msg_lines)
@@ -1557,7 +1582,7 @@ elif st.session_state["active_tab"] == "Закупки":
 
     st.divider()
 
-    # Фиксация истории
+    # Фиксация и история закупки
     col_save, col_history = st.columns([1, 1])
 
     with col_save:
@@ -1567,10 +1592,10 @@ elif st.session_state["active_tab"] == "Закупки":
                 type="primary",
                 use_container_width=True,
             ):
-                with st.spinner("Сохранение закупки в хмару..."):
+                with st.spinner("Сохранение закупки в облаке..."):
                     order_records = sanitize_df(
                         order_items[
-                            ["category", "name", "final_order", "unit", "supplier"]
+                            ["num", "sku", "name", "qty", "unit", "supplier"]
                         ]
                     )
 
@@ -1580,7 +1605,6 @@ elif st.session_state["active_tab"] == "Закупки":
                         "items": order_records,
                     }
 
-                    # Сохранение в Supabase
                     res_order = requests.post(
                         f"{SUPABASE_URL}/rest/v1/supplies_orders",
                         headers=headers,
@@ -1615,7 +1639,7 @@ elif st.session_state["active_tab"] == "Закупки":
                             f" {p.get('created_by', 'Н/Д')}"
                         )
                         items_str = ", ".join([
-                            f"{it['name']} ({it['final_order']} {it['unit']})"
+                            f"{it['name']} — {it['qty']} {it['unit']}"
                             for it in p.get("items", [])
                         ])
                         st.caption(f"Товары: {items_str}")
@@ -1625,6 +1649,101 @@ elif st.session_state["active_tab"] == "Закупки":
             except Exception:
                 st.info("Не удалось загрузить историю.")
 
+    st.divider()
+
+    # ------------------------------------------
+    # 3. ОБНОВЛЕНИЕ СПРАВОЧНИКА
+    # ------------------------------------------
+    st.markdown("### 3. Обновление справочника")
+    st.caption("Добавление новых позиций в базу товаров")
+
+    if can_edit:
+        with st.form(key="add_supplies_item_form", clear_on_submit=True):
+            col_sku, col_name, col_unit, col_sup = st.columns([1.5, 3, 1.5, 2])
+
+            with col_sku:
+                new_sku = st.text_input(
+                    "Артикул (необязательно)", placeholder="например, PKG-001"
+                )
+            with col_name:
+                new_name = st.text_input(
+                    "Наименование *", placeholder="например, Пакет крафт 28х15х32"
+                )
+            with col_unit:
+                new_unit = st.text_input(
+                    "Ед. изм. *", placeholder="шт / рул / уп"
+                )
+            with col_sup:
+                new_sup = st.text_input(
+                    "Поставщик *", placeholder="например, Альфа-Пак"
+                )
+
+            btn_add = st.form_submit_button(
+                "➕ Додати в довідник",
+                use_container_width=True,
+                type="primary",
+            )
+
+            if btn_add:
+                if (
+                    not new_name.strip()
+                    or not new_unit.strip()
+                    or not new_sup.strip()
+                ):
+                    st.error(
+                        "❌ Пожалуйста, заполните обязательные поля: Наименование,"
+                        " Ед. изм. и Поставщик."
+                    )
+                else:
+                    new_item = {
+                        "sku": new_sku.strip(),
+                        "name": new_name.strip(),
+                        "unit": new_unit.strip(),
+                        "supplier": new_sup.strip(),
+                    }
+
+                    # Отправка в Supabase
+                    try:
+                        requests.post(
+                            f"{SUPABASE_URL}/rest/v1/supplies_catalog",
+                            headers=headers,
+                            json=new_item,
+                        )
+                    except Exception:
+                        pass
+
+                    if "supplies_catalog" not in st.session_state:
+                        st.session_state["supplies_catalog"] = []
+                    st.session_state["supplies_catalog"].append(new_item)
+
+                    log_audit(
+                        "Добавлено товар в справочник",
+                        f"Товар: {new_name}, Поставщик: {new_sup}",
+                    )
+                    st.success(
+                        f"✅ Товар **{new_name}** успешно добавлен в справочник!"
+                    )
+                    time.sleep(1)
+                    st.rerun()
+
+    # Экспандер для просмотра уже внесенных товаров
+    if catalog_items:
+        with st.expander("📋 Просмотреть текущий справочник товаров"):
+            df_cat_show = (
+                pd.DataFrame(catalog_items)[
+                    ["sku", "name", "unit", "supplier"]
+                ]
+                .fillna("")
+                .rename(
+                    columns={
+                        "sku": "Артикул",
+                        "name": "Наименование",
+                        "unit": "Ед. изм.",
+                        "supplier": "Поставщик",
+                    }
+                )
+            )
+            st.dataframe(df_cat_show, hide_index=True, use_container_width=True)
 
 # --- ПЛАВАЮЧЕ МЕНЮ РОУТИНГ ---
 fc1, fc2, fc3, fc4, fc5, fc6 = st.columns(6)
