@@ -1229,6 +1229,12 @@ elif st.session_state["active_tab"] == "Сличительная":
         num_days = calendar.monthrange(sel_y, m_num)[1]
         expense_groups_list = list(EXPENSE_TREE.keys())
 
+        # Карта обратного поиска: подкатегория -> (Группа, Подкатегория)
+        SUB_TO_GROUP = {}
+        for grp, subs in EXPENSE_TREE.items():
+            for sub in subs:
+                SUB_TO_GROUP[sub.strip().lower()] = (grp, sub.strip())
+
         order_full = (
             ["Касса на начало дня", "🟢 НАДХОДЖЕННЯ"]
             + INCOME_CATEGORIES
@@ -1282,22 +1288,31 @@ elif st.session_state["active_tab"] == "Сличительная":
                     )
                     report_data[target_inc][day]["sum"] += amt
 
-                    note_text = (
-                        note
-                        if note
-                        else (left_part if target_inc == "Разное" else "")
-                    )
-                    if note_text:
-                        report_data[target_inc][day]["notes"].append(
-                            f"{amt} {note_text}"
-                        )
+                    if note:
+                        inc_note = f"{amt} грн ({note})"
+                    elif target_inc == "Разное" and left_part != "Разное":
+                        inc_note = f"{amt} грн ({left_part})"
+                    else:
+                        inc_note = f"{amt} грн"
+
+                    report_data[target_inc][day]["notes"].append(inc_note)
                 else:
+                    group_name = ""
+                    sub_cat = ""
+
                     if " ➔ " in left_part:
-                        group_name = left_part.split(" ➔ ")[0].strip()
+                        sp = left_part.split(" ➔ ", 1)
+                        group_name = sp[0].strip()
+                        sub_cat = sp[1].strip()
                     elif " >> " in left_part:
-                        group_name = left_part.split(" >> ")[0].strip()
+                        sp = left_part.split(" >> ", 1)
+                        group_name = sp[0].strip()
+                        sub_cat = sp[1].strip()
+                    elif left_part.lower() in SUB_TO_GROUP:
+                        group_name, sub_cat = SUB_TO_GROUP[left_part.lower()]
                     else:
                         group_name = left_part
+                        sub_cat = ""
 
                     target_cat = (
                         group_name
@@ -1306,25 +1321,17 @@ elif st.session_state["active_tab"] == "Сличительная":
                     )
                     report_data[target_cat][day]["sum"] += amt
 
-                    sub_cat = ""
-                    if " ➔ " in left_part:
-                        sub_cat = left_part.split(" ➔ ")[1].strip()
-                    elif " >> " in left_part:
-                        sub_cat = left_part.split(" >> ")[1].strip()
+                    # Формирование строки комментария с подкатегорией
+                    if sub_cat and note:
+                        item_note = f"{sub_cat} — {amt} грн ({note})"
+                    elif sub_cat:
+                        item_note = f"{sub_cat} — {amt} грн"
+                    elif note:
+                        item_note = f"{amt} грн ({note})"
+                    else:
+                        item_note = f"{amt} грн"
 
-                    full_note_parts = [p for p in [sub_cat, note] if p]
-                    if full_note_parts:
-                        note_str = " - ".join(full_note_parts)
-                        report_data[target_cat][day]["notes"].append(
-                            f"{amt} {note_str}"
-                        )
-                    elif (
-                        target_cat == "Інші (старі ручні записи)"
-                        and group_name
-                    ):
-                        report_data[target_cat][day]["notes"].append(
-                            f"{amt} {group_name}"
-                        )
+                    report_data[target_cat][day]["notes"].append(item_note)
 
         for d in range(1, num_days + 1):
             day_str = str(d)
@@ -1494,7 +1501,7 @@ elif st.session_state["active_tab"] == "Сличительная":
         }
         </style>
         """
-        
+
         # Сборка HTML таблицы
         table_parts = [pnl_css, '<div class="pnl-wrapper"><table class="pnl-table"><thead><tr>']
         table_parts.append("<th>Стаття</th>")
@@ -1538,16 +1545,15 @@ elif st.session_state["active_tab"] == "Сличительная":
                     else:
                         val_str = str(sum_val)
                         if valid_notes:
-                            # Формируем текст для всплывающей подсказки и клика
                             note_lines = "\n• " + "\n• ".join(valid_notes)
-                            safe_title = f"{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
+                            safe_title = f"💬 Двойной клик для просмотра комментария:{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
                             
                             js_comment = note_lines.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", "\\n")
                             safe_stattya = r.replace("'", "\\'")
 
                             table_parts.append(
                                 f'<td class="has-comment" title="{safe_title}" '
-                                f'ondblclick="alert(\'💬 Комментарий ({safe_stattya}, {d} число):\\n{js_comment}\')">'
+                                f'ondblclick="alert(\'💬 {safe_stattya} ({d} число):\\n{js_comment}\')">'
                                 f'{val_str}</td>'
                             )
                         else:
@@ -1564,7 +1570,6 @@ elif st.session_state["active_tab"] == "Сличительная":
 
         table_parts.append("</tbody></table></div>")
         st.markdown("".join(table_parts), unsafe_allow_html=True)
-
 # ==========================================
 # РОЗДІЛ 4: ЗАКУПКИ (ХОЗИ ТА УПАКОВКА)
 # ==========================================
