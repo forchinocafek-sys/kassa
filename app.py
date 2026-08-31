@@ -605,12 +605,11 @@ st.markdown(
 
 st.title("Cafe Forchino🍋")
 
-with st.popover("🚀 Версія: 3.0.0 (Модуль Закупівлі Хозів)"):
+with st.popover("🚀 Версія: 3.1.0 (Оновлений PnL)"):
     st.markdown("""
     **Останні оновлення:**
+    * **v3.1.0:** У вкладці «Сличительная» закріплено першу колонку з назвами статей при горизонтальній прокрутці, вирівняно однакову ширину колонок днів та зроблено відображення таблиці на повну висоту.
     * **v3.0.0:** Додано інтерактивний модуль закупівлі господарських товарів та упаковки з генерацією текстових повідомлень і збереженням історії замовлень.
-    * **v2.9.2:** Виправлено `TypeError` при перевірці доступу, який виникав через конфлікт форматів дати.
-    * **v2.9.1:** Виправлено `KeyError`, який виникав через збережені старі сесії в браузері.
     * **v2.9.0:** Впроваджено рівні доступу та журнал аудиту.
     """)
 
@@ -1406,38 +1405,138 @@ elif st.session_state["active_tab"] == "Сличительная":
 
         df_report = pd.DataFrame(df_rows)
 
-        def style_pnl(row):
-            styles = [""] * len(row)
-            styles[-1] = (
-                "background-color: #f3f4f6; font-weight: bold; border-left: 2px"
-                " solid #d1d5db;"
-            )
+        # --- HTML + CSS ТАБЛИЦЯ PnL (ЗАКРЕПЛЕННЫЙ 1-Й СТОЛБЕЦ, ОДИНАКОВАЯ ШИРИНА ДНЕЙ, ПОЛНАЯ ВЫСОТА) ---
+        pnl_css = """
+        <style>
+        .pnl-wrapper {
+            overflow-x: auto;
+            width: 100%;
+            margin-top: 15px;
+            margin-bottom: 25px;
+            border: 1px solid #d1d5db;
+            border-radius: 10px;
+            background-color: #ffffff;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .pnl-table {
+            border-collapse: separate;
+            border-spacing: 0;
+            width: max-content;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-size: 13px;
+            color: #111827;
+        }
+        .pnl-table th, .pnl-table td {
+            padding: 8px 10px;
+            border-bottom: 1px solid #e5e7eb;
+            border-right: 1px solid #e5e7eb;
+            white-space: nowrap;
+            text-align: center;
+            box-sizing: border-box;
+        }
+        /* Шапка таблицы */
+        .pnl-table th {
+            background-color: #f3f4f6;
+            font-weight: 700;
+            border-bottom: 2px solid #cbd5e1;
+            position: sticky;
+            top: 0;
+            z-index: 3;
+        }
+        /* Первый столбец (Стаття) - ЗАКРЕПЛЕННЫЙ И ШИРОКИЙ */
+        .pnl-table th:first-child, .pnl-table td:first-child {
+            position: sticky;
+            left: 0;
+            z-index: 2;
+            text-align: left;
+            min-width: 280px;
+            max-width: 320px;
+            font-weight: 600;
+            border-right: 2px solid #cbd5e1;
+        }
+        .pnl-table th:first-child {
+            z-index: 4;
+            background-color: #e2e8f0;
+        }
 
-            if row["Стаття"] == "🟢 НАДХОДЖЕННЯ":
-                return [
-                    "background-color: #d1e7dd; font-weight: bold; color:"
-                    " #0f5132"
-                ] * len(row)
-            elif row["Стаття"] == "🔴 ВИТРАТИ":
-                return [
-                    "background-color: #f8d7da; font-weight: bold; color:"
-                    " #842029"
-                ] * len(row)
-            elif row["Стаття"] == "🔴 ВСЬОГО ВИТРАТ":
-                return [
-                    "background-color: #fff3cd; font-weight: bold; color:"
-                    " #664d03"
-                ] * len(row)
-            elif row["Стаття"] in ["Касса на начало дня", "Касса на конец дня"]:
-                return [
-                    "background-color: #e2e3e5; font-weight: bold; color:"
-                    " #383d41"
-                ] * len(row)
-            return styles
+        /* Столбцы дней (1-31) - ОДИНАКОВАЯ ШИРИНА */
+        .pnl-table th:not(:first-child):not(:last-child), 
+        .pnl-table td:not(:first-child):not(:last-child) {
+            min-width: 75px;
+            width: 75px;
+            max-width: 75px;
+        }
 
-        styled_df = df_report.style.apply(style_pnl, axis=1)
+        /* Последний столбец (Всього) */
+        .pnl-table th:last-child, .pnl-table td:last-child {
+            min-width: 95px;
+            width: 95px;
+            font-weight: 700;
+            background-color: #f8fafc;
+            border-left: 2px solid #cbd5e1;
+        }
 
-        st.dataframe(styled_df, use_container_width=True, hide_index=True)
+        /* Цвета строк */
+        .pnl-row-inc, .pnl-row-inc td {
+            background-color: #d1e7dd !important;
+            color: #0f5132 !important;
+            font-weight: 700;
+        }
+        .pnl-row-exp-header, .pnl-row-exp-header td {
+            background-color: #f8d7da !important;
+            color: #842029 !important;
+            font-weight: 700;
+        }
+        .pnl-row-exp-total, .pnl-row-exp-total td {
+            background-color: #fff3cd !important;
+            color: #664d03 !important;
+            font-weight: 700;
+        }
+        .pnl-row-cash, .pnl-row-cash td {
+            background-color: #e2e3e5 !important;
+            color: #383d41 !important;
+            font-weight: 700;
+        }
+
+        /* Стандартные строки */
+        .pnl-row-normal td:first-child {
+            background-color: #ffffff;
+        }
+        .pnl-row-normal:nth-child(even) td:not(:first-child):not(:last-child) {
+            background-color: #f9fafb;
+        }
+        .pnl-row-normal:nth-child(odd) td:not(:first-child):not(:last-child) {
+            background-color: #ffffff;
+        }
+        </style>
+        """
+
+        table_parts = [pnl_css, '<div class="pnl-wrapper"><table class="pnl-table"><thead><tr>']
+        for col in df_report.columns:
+            table_parts.append(f"<th>{col}</th>")
+        table_parts.append("</tr></thead><tbody>")
+
+        for _, row in df_report.iterrows():
+            stattya = row["Стаття"]
+            if stattya == "🟢 НАДХОДЖЕННЯ":
+                row_cls = "pnl-row-inc"
+            elif stattya == "🔴 ВИТРАТИ":
+                row_cls = "pnl-row-exp-header"
+            elif stattya == "🔴 ВСЬОГО ВИТРАТ":
+                row_cls = "pnl-row-exp-total"
+            elif stattya in ["Касса на начало дня", "Касса на конец дня"]:
+                row_cls = "pnl-row-cash"
+            else:
+                row_cls = "pnl-row-normal"
+
+            table_parts.append(f'<tr class="{row_cls}">')
+            for val in row:
+                cell_text = str(val) if pd.notna(val) else ""
+                table_parts.append(f"<td>{cell_text}</td>")
+            table_parts.append("</tr>")
+
+        table_parts.append("</tbody></table></div>")
+        st.markdown("".join(table_parts), unsafe_allow_html=True)
 
 
 # ==========================================
