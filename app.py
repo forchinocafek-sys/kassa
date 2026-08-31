@@ -1235,17 +1235,31 @@ elif st.session_state["active_tab"] == "Сличительная":
             for sub in subs:
                 SUB_TO_GROUP[sub.strip().lower()] = (grp, sub.strip())
 
+        # Формируем полный порядок строк: Главные категории + вложенные подкатегории
         order_full = (
             ["Касса на начало дня", "🟢 НАДХОДЖЕННЯ"]
             + INCOME_CATEGORIES
             + ["🔴 ВИТРАТИ"]
-            + expense_groups_list
-            + [
-                "Інші (старі ручні записи)",
-                "🔴 ВСЬОГО ВИТРАТ",
-                "Касса на конец дня",
-            ]
         )
+
+        group_row_keys = []
+        sub_row_keys = set()
+
+        for grp, subs in EXPENSE_TREE.items():
+            grp_key = f"📁 {grp}"
+            order_full.append(grp_key)
+            group_row_keys.append(grp_key)
+            for sub in subs:
+                sub_key = f"↳ {sub}"
+                order_full.append(sub_key)
+                sub_row_keys.add(sub_key)
+
+        order_full += [
+            "Інші (старі ручні записи)",
+            "🔴 ВСЬОГО ВИТРАТ",
+            "Касса на конец дня",
+        ]
+        group_row_keys.append("Інші (старі ручні записи)")
 
         report_data = {
             cat: {
@@ -1288,14 +1302,8 @@ elif st.session_state["active_tab"] == "Сличительная":
                     )
                     report_data[target_inc][day]["sum"] += amt
 
-                    if note:
-                        inc_note = f"{amt} грн ({note})"
-                    elif target_inc == "Разное" and left_part != "Разное":
-                        inc_note = f"{amt} грн ({left_part})"
-                    else:
-                        inc_note = f"{amt} грн"
-
-                    report_data[target_inc][day]["notes"].append(inc_note)
+                    note_text = f"{amt} грн ({note})" if note else f"{amt} грн"
+                    report_data[target_inc][day]["notes"].append(note_text)
                 else:
                     group_name = ""
                     sub_cat = ""
@@ -1310,34 +1318,39 @@ elif st.session_state["active_tab"] == "Сличительная":
                         sub_cat = sp[1].strip()
                     elif left_part.lower() in SUB_TO_GROUP:
                         group_name, sub_cat = SUB_TO_GROUP[left_part.lower()]
-                    else:
+                    elif left_part in EXPENSE_TREE:
                         group_name = left_part
                         sub_cat = ""
-
-                    target_cat = (
-                        group_name
-                        if group_name in report_data
-                        else "Інші (старі ручні записи)"
-                    )
-                    report_data[target_cat][day]["sum"] += amt
-
-                    # Формирование строки комментария с подкатегорией
-                    if sub_cat and note:
-                        item_note = f"{sub_cat} — {amt} грн ({note})"
-                    elif sub_cat:
-                        item_note = f"{sub_cat} — {amt} грн"
-                    elif note:
-                        item_note = f"{amt} грн ({note})"
                     else:
-                        item_note = f"{amt} грн"
+                        group_name = "Інші (старі ручні записи)"
+                        sub_cat = ""
 
-                    report_data[target_cat][day]["notes"].append(item_note)
+                    grp_key = (
+                        f"📁 {group_name}"
+                        if group_name in EXPENSE_TREE
+                        else group_name
+                    )
+                    sub_key = f"↳ {sub_cat}" if sub_cat else None
+
+                    note_item = f"{amt} грн ({note})" if note else f"{amt} грн"
+
+                    # Запись в подкатегорию
+                    if sub_key and sub_key in report_data:
+                        report_data[sub_key][day]["sum"] += amt
+                        report_data[sub_key][day]["notes"].append(note_item)
+                        report_data[sub_key][day]["set"] = True
+
+                    # Запись в сумму группы
+                    if grp_key in report_data:
+                        report_data[grp_key][day]["sum"] += amt
+                        report_data[grp_key][day]["set"] = True
+                        if not sub_key:
+                            report_data[grp_key][day]["notes"].append(note_item)
 
         for d in range(1, num_days + 1):
             day_str = str(d)
             day_total = sum(
-                report_data[cat][day_str]["sum"]
-                for cat in expense_groups_list + ["Інші (старі ручні записи)"]
+                report_data[grp_k][day_str]["sum"] for grp_k in group_row_keys
             )
             report_data["🔴 ВСЬОГО ВИТРАТ"][day_str]["sum"] = day_total
             if day_total > 0:
@@ -1366,7 +1379,7 @@ elif st.session_state["active_tab"] == "Сличительная":
 
                 running_balance = calc_end
 
-        # --- CSS ДЛЯ СТИЛИЗАЦИИ ТАБЛИЦЫ В СТИЛЕ EXCEL С ИНДИКАТОРАМИ КОММЕНТАРИЕВ ---
+        # --- CSS ТАБЛИЦЫ PnL С ВЛОЖЕННЫМИ ПОДКТЕГОРИЯМИ ---
         pnl_css = """
         <style>
         .pnl-wrapper {
@@ -1388,7 +1401,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             color: #111827;
         }
         .pnl-table th, .pnl-table td {
-            padding: 8px 6px;
+            padding: 7px 6px;
             border-bottom: 1px solid #e5e7eb;
             border-right: 1px solid #e5e7eb;
             text-align: center;
@@ -1405,7 +1418,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             z-index: 3;
             white-space: nowrap;
         }
-        /* Первый столбец (Стаття) - РАСШИРЕН И С ПЕРЕНОСОМ ТЕКСТА */
+        /* Первый столбец (Стаття) */
         .pnl-table th:first-child, .pnl-table td:first-child {
             position: sticky;
             left: 0;
@@ -1414,11 +1427,9 @@ elif st.session_state["active_tab"] == "Сличительная":
             min-width: 320px;
             width: 320px;
             max-width: 320px;
-            font-weight: 600;
             border-right: 2px solid #cbd5e1;
             white-space: normal;
             word-wrap: break-word;
-            overflow-wrap: break-word;
             line-height: 1.25;
         }
         .pnl-table th:first-child {
@@ -1427,7 +1438,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             white-space: nowrap;
         }
 
-        /* Столбцы дней (1-31) - ОДИНАКОВАЯ ШИРИНА */
+        /* Столбцы дней (1-31) */
         .pnl-table th:not(:first-child):not(:last-child), 
         .pnl-table td:not(:first-child):not(:last-child) {
             min-width: 75px;
@@ -1489,14 +1500,27 @@ elif st.session_state["active_tab"] == "Сличительная":
             font-weight: 700;
         }
 
-        /* Зебра для стандартных строк */
-        .pnl-row-normal td:first-child {
+        /* Группа категорий расходы (заголовок + сумма) */
+        .pnl-row-grp, .pnl-row-grp td {
+            background-color: #f1f5f9 !important;
+            font-weight: 700 !important;
+            border-top: 1px solid #cbd5e1 !important;
+        }
+        .pnl-row-grp td:first-child {
+            background-color: #e2e8f0 !important;
+        }
+
+        /* Подкатегории */
+        .pnl-row-sub td:first-child {
+            padding-left: 20px !important;
+            font-weight: 400 !important;
+            color: #374151 !important;
             background-color: #ffffff;
         }
-        .pnl-row-normal:nth-child(even) td:not(:first-child):not(:last-child):not(.has-comment) {
+        .pnl-row-sub:nth-child(even) td:not(:first-child):not(:last-child):not(.has-comment) {
             background-color: #f9fafb;
         }
-        .pnl-row-normal:nth-child(odd) td:not(:first-child):not(:last-child):not(.has-comment) {
+        .pnl-row-sub:nth-child(odd) td:not(:first-child):not(:last-child):not(.has-comment) {
             background-color: #ffffff;
         }
         </style>
@@ -1518,6 +1542,10 @@ elif st.session_state["active_tab"] == "Сличительная":
                 row_cls = "pnl-row-exp-total"
             elif r in ["Касса на начало дня", "Касса на конец дня"]:
                 row_cls = "pnl-row-cash"
+            elif r in group_row_keys:
+                row_cls = "pnl-row-grp"
+            elif r in sub_row_keys:
+                row_cls = "pnl-row-sub"
             else:
                 row_cls = "pnl-row-normal"
 
@@ -1546,7 +1574,7 @@ elif st.session_state["active_tab"] == "Сличительная":
                         val_str = str(sum_val)
                         if valid_notes:
                             note_lines = "\n• " + "\n• ".join(valid_notes)
-                            safe_title = f"💬 Двойной клик для просмотра комментария:{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
+                            safe_title = f"💬 Двойной клик для детализации:{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
                             
                             js_comment = note_lines.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", "\\n")
                             safe_stattya = r.replace("'", "\\'")
