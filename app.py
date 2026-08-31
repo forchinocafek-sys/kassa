@@ -1405,7 +1405,7 @@ elif st.session_state["active_tab"] == "Сличительная":
 
         df_report = pd.DataFrame(df_rows)
 
-        # --- HTML + CSS ТАБЛИЦЯ PnL (ЗАКРЕПЛЕННЫЙ 1-Й СТОЛБЕЦ, ОДИНАКОВАЯ ШИРИНА ДНЕЙ, ПОЛНАЯ ВЫСОТА) ---
+        # --- HTML + CSS ТАБЛИЦЯ PnL (БЕЗ НАЛОЖЕНИЯ ТЕКСТА) ---
         pnl_css = """
         <style>
         .pnl-wrapper {
@@ -1423,16 +1423,16 @@ elif st.session_state["active_tab"] == "Сличительная":
             border-spacing: 0;
             width: max-content;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 13px;
+            font-size: 12px;
             color: #111827;
         }
         .pnl-table th, .pnl-table td {
-            padding: 8px 10px;
+            padding: 8px 6px;
             border-bottom: 1px solid #e5e7eb;
             border-right: 1px solid #e5e7eb;
-            white-space: nowrap;
             text-align: center;
             box-sizing: border-box;
+            vertical-align: top;
         }
         /* Шапка таблицы */
         .pnl-table th {
@@ -1442,6 +1442,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             position: sticky;
             top: 0;
             z-index: 3;
+            white-space: nowrap;
         }
         /* Первый столбец (Стаття) - ЗАКРЕПЛЕННЫЙ И ШИРОКИЙ */
         .pnl-table th:first-child, .pnl-table td:first-child {
@@ -1449,22 +1450,27 @@ elif st.session_state["active_tab"] == "Сличительная":
             left: 0;
             z-index: 2;
             text-align: left;
-            min-width: 280px;
-            max-width: 320px;
+            min-width: 260px;
+            width: 260px;
+            max-width: 260px;
             font-weight: 600;
             border-right: 2px solid #cbd5e1;
+            white-space: nowrap;
         }
         .pnl-table th:first-child {
             z-index: 4;
             background-color: #e2e8f0;
         }
 
-        /* Столбцы дней (1-31) - ОДИНАКОВАЯ ШИРИНА */
+        /* Столбцы дней (1-31) - СТРОГАЯ ШИРИНА И ПЕРЕНОС ТЕКСТА */
         .pnl-table th:not(:first-child):not(:last-child), 
         .pnl-table td:not(:first-child):not(:last-child) {
-            min-width: 75px;
-            width: 75px;
-            max-width: 75px;
+            min-width: 90px;
+            width: 90px;
+            max-width: 90px;
+            white-space: normal;
+            word-wrap: break-word;
+            word-break: break-word;
         }
 
         /* Последний столбец (Всього) */
@@ -1474,6 +1480,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             font-weight: 700;
             background-color: #f8fafc;
             border-left: 2px solid #cbd5e1;
+            white-space: nowrap;
         }
 
         /* Цвета строк */
@@ -1532,12 +1539,12 @@ elif st.session_state["active_tab"] == "Сличительная":
             table_parts.append(f'<tr class="{row_cls}">')
             for val in row:
                 cell_text = str(val) if pd.notna(val) else ""
-                table_parts.append(f"<td>{cell_text}</td>")
+                safe_title = cell_text.replace('"', '&quot;')
+                table_parts.append(f'<td title="{safe_title}">{cell_text}</td>')
             table_parts.append("</tr>")
 
         table_parts.append("</tbody></table></div>")
         st.markdown("".join(table_parts), unsafe_allow_html=True)
-
 
 # ==========================================
 # РОЗДІЛ 4: ЗАКУПКИ (ХОЗИ ТА УПАКОВКА)
