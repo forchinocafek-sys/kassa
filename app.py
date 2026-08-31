@@ -1536,7 +1536,6 @@ elif st.session_state["active_tab"] == "Сличительная":
                         if valid_notes:
                             # Формируем текст для всплывающей подсказки и клика
                             note_lines = "\n• " + "\n• ".join(valid_notes)
-                            safe_title = f"💬 Двойной клик для просмотра комментария:{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
                             
                             js_comment = note_lines.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", "\\n")
                             safe_stattya = r.replace("'", "\\'")
