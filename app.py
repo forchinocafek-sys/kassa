@@ -1398,22 +1398,26 @@ elif st.session_state["active_tab"] == "Сличительная":
             z-index: 3;
             white-space: nowrap;
         }
-        /* Первый столбец (Стаття) - ЗАКРЕПЛЕННЫЙ И ШИРОКИЙ */
+        /* Первый столбец (Стаття) - РАСШИРЕН И С ПЕРЕНОСОМ ТЕКСТА */
         .pnl-table th:first-child, .pnl-table td:first-child {
             position: sticky;
             left: 0;
             z-index: 2;
             text-align: left;
-            min-width: 260px;
-            width: 260px;
-            max-width: 260px;
+            min-width: 320px;
+            width: 320px;
+            max-width: 320px;
             font-weight: 600;
             border-right: 2px solid #cbd5e1;
-            white-space: nowrap;
+            white-space: normal;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.25;
         }
         .pnl-table th:first-child {
             z-index: 4;
             background-color: #e2e8f0;
+            white-space: nowrap;
         }
 
         /* Столбцы дней (1-31) - ОДИНАКОВАЯ ШИРИНА */
@@ -1439,7 +1443,7 @@ elif st.session_state["active_tab"] == "Сличительная":
         .has-comment {
             position: relative !important;
             cursor: pointer !important;
-            background-color: #fef9c3 !important; /* Легкая желтая подсветка */
+            background-color: #fef9c3 !important;
             font-weight: 600;
         }
         .has-comment::after {
@@ -1449,11 +1453,11 @@ elif st.session_state["active_tab"] == "Сличительная":
             right: 0;
             width: 0;
             height: 0;
-            border-top: 8px solid #f59e0b; /* Оранжевый уголок, как в Excel */
+            border-top: 8px solid #f59e0b;
             border-left: 8px solid transparent;
         }
         .has-comment:hover {
-            background-color: #fef08a !important; /* Более яркая подсветка при наведении */
+            background-color: #fef08a !important;
         }
 
         /* Цвета специальных строк */
@@ -1490,7 +1494,7 @@ elif st.session_state["active_tab"] == "Сличительная":
         }
         </style>
         """
-
+        
         # Сборка HTML таблицы
         table_parts = [pnl_css, '<div class="pnl-wrapper"><table class="pnl-table"><thead><tr>']
         table_parts.append("<th>Стаття</th>")
