@@ -1235,7 +1235,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             for sub in subs:
                 SUB_TO_GROUP[sub.strip().lower()] = (grp, sub.strip())
 
-        # Формируем полный порядок строк: Главные категории + вложенные подкатегории
+        # Формируем полный порядок строк: Главные категории + подкатегории
         order_full = (
             ["Касса на начало дня", "🟢 НАДХОДЖЕННЯ"]
             + INCOME_CATEGORIES
@@ -1340,7 +1340,7 @@ elif st.session_state["active_tab"] == "Сличительная":
                         report_data[sub_key][day]["notes"].append(note_item)
                         report_data[sub_key][day]["set"] = True
 
-                    # Запись в сумму группы
+                    # Запись в сумму группы для расчета "🔴 ВСЬОГО ВИТРАТ"
                     if grp_key in report_data:
                         report_data[grp_key][day]["sum"] += amt
                         report_data[grp_key][day]["set"] = True
@@ -1500,7 +1500,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             font-weight: 700;
         }
 
-        /* Группа категорий расходы (заголовок + сумма) */
+        /* Заголовок группы расходов */
         .pnl-row-grp, .pnl-row-grp td {
             background-color: #f1f5f9 !important;
             font-weight: 700 !important;
@@ -1557,7 +1557,8 @@ elif st.session_state["active_tab"] == "Сличительная":
             for d in range(1, num_days + 1):
                 cell = report_data[r][str(d)]
 
-                if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"]:
+                # Из заголовочных строк категорий убираем суммы (оставляем пустые ячейки)
+                if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"] or r.startswith("📁 "):
                     table_parts.append("<td></td>")
                 elif r in ["Касса на начало дня", "Касса на конец дня", "🔴 ВСЬОГО ВИТРАТ"]:
                     val_str = str(cell["sum"]) if cell["set"] else ""
@@ -1588,7 +1589,7 @@ elif st.session_state["active_tab"] == "Сличительная":
                             table_parts.append(f"<td>{val_str}</td>")
 
             # Столбец Всього
-            if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"]:
+            if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"] or r.startswith("📁 "):
                 table_parts.append("<td></td>")
             else:
                 vsyogo_val = str(row_total) if row_total > 0 else ""
@@ -1598,6 +1599,7 @@ elif st.session_state["active_tab"] == "Сличительная":
 
         table_parts.append("</tbody></table></div>")
         st.markdown("".join(table_parts), unsafe_allow_html=True)
+        
 # ==========================================
 # РОЗДІЛ 4: ЗАКУПКИ (ХОЗИ ТА УПАКОВКА)
 # ==========================================
