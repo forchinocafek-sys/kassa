@@ -1575,7 +1575,7 @@ elif st.session_state["active_tab"] == "Сличительная":
                         val_str = str(sum_val)
                         if valid_notes:
                             note_lines = "\n• " + "\n• ".join(valid_notes)
-                            safe_title = f"💬 Двойной клик для детализации:{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
+                            safe_title = f"{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
                             
                             js_comment = note_lines.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", "\\n")
                             safe_stattya = r.replace("'", "\\'")
