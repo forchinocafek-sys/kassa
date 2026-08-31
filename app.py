@@ -1359,53 +1359,7 @@ elif st.session_state["active_tab"] == "Сличительная":
 
                 running_balance = calc_end
 
-        df_rows = []
-
-        for r in order_full:
-            row_dict = {"Стаття": r}
-            row_total = 0
-
-            for d in range(1, num_days + 1):
-                cell = report_data[r][str(d)]
-
-                if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"]:
-                    row_dict[str(d)] = ""
-                elif r in [
-                    "Касса на начало дня",
-                    "Касса на конец дня",
-                    "🔴 ВСЬОГО ВИТРАТ",
-                ]:
-                    row_dict[str(d)] = str(cell["sum"]) if cell["set"] else ""
-                    row_total += cell["sum"]
-                else:
-                    if cell["sum"] == 0 and not cell["notes"]:
-                        row_dict[str(d)] = ""
-                    else:
-                        row_total += cell["sum"]
-                        valid_notes = [n for n in cell["notes"] if n]
-
-                        if valid_notes:
-                            row_dict[str(d)] = (
-                                f"{cell['sum']} ({', '.join(valid_notes)})"
-                            )
-                        else:
-                            row_dict[str(d)] = str(cell["sum"])
-
-            if r in [
-                "🟢 НАДХОДЖЕННЯ",
-                "🔴 ВИТРАТИ",
-                "Касса на начало дня",
-                "Касса на конец дня",
-            ]:
-                row_dict["Всього"] = ""
-            else:
-                row_dict["Всього"] = str(row_total) if row_total > 0 else ""
-
-            df_rows.append(row_dict)
-
-        df_report = pd.DataFrame(df_rows)
-
-        # --- HTML + CSS ТАБЛИЦЯ PnL (БЕЗ НАЛОЖЕНИЯ ТЕКСТА) ---
+        # --- CSS ДЛЯ СТИЛИЗАЦИИ ТАБЛИЦЫ В СТИЛЕ EXCEL С ИНДИКАТОРАМИ КОММЕНТАРИЕВ ---
         pnl_css = """
         <style>
         .pnl-wrapper {
@@ -1423,7 +1377,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             border-spacing: 0;
             width: max-content;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            font-size: 12px;
+            font-size: 13px;
             color: #111827;
         }
         .pnl-table th, .pnl-table td {
@@ -1432,7 +1386,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             border-right: 1px solid #e5e7eb;
             text-align: center;
             box-sizing: border-box;
-            vertical-align: top;
+            vertical-align: middle;
         }
         /* Шапка таблицы */
         .pnl-table th {
@@ -1462,15 +1416,13 @@ elif st.session_state["active_tab"] == "Сличительная":
             background-color: #e2e8f0;
         }
 
-        /* Столбцы дней (1-31) - СТРОГАЯ ШИРИНА И ПЕРЕНОС ТЕКСТА */
+        /* Столбцы дней (1-31) - ОДИНАКОВАЯ ШИРИНА */
         .pnl-table th:not(:first-child):not(:last-child), 
         .pnl-table td:not(:first-child):not(:last-child) {
-            min-width: 90px;
-            width: 90px;
-            max-width: 90px;
-            white-space: normal;
-            word-wrap: break-word;
-            word-break: break-word;
+            min-width: 75px;
+            width: 75px;
+            max-width: 75px;
+            white-space: nowrap;
         }
 
         /* Последний столбец (Всього) */
@@ -1483,7 +1435,28 @@ elif st.session_state["active_tab"] == "Сличительная":
             white-space: nowrap;
         }
 
-        /* Цвета строк */
+        /* ИНДИКАТОР КОММЕНТАРИЯ (уголок Excel + подсветка) */
+        .has-comment {
+            position: relative !important;
+            cursor: pointer !important;
+            background-color: #fef9c3 !important; /* Легкая желтая подсветка */
+            font-weight: 600;
+        }
+        .has-comment::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 0;
+            height: 0;
+            border-top: 8px solid #f59e0b; /* Оранжевый уголок, как в Excel */
+            border-left: 8px solid transparent;
+        }
+        .has-comment:hover {
+            background-color: #fef08a !important; /* Более яркая подсветка при наведении */
+        }
+
+        /* Цвета специальных строк */
         .pnl-row-inc, .pnl-row-inc td {
             background-color: #d1e7dd !important;
             color: #0f5132 !important;
@@ -1505,42 +1478,84 @@ elif st.session_state["active_tab"] == "Сличительная":
             font-weight: 700;
         }
 
-        /* Стандартные строки */
+        /* Зебра для стандартных строк */
         .pnl-row-normal td:first-child {
             background-color: #ffffff;
         }
-        .pnl-row-normal:nth-child(even) td:not(:first-child):not(:last-child) {
+        .pnl-row-normal:nth-child(even) td:not(:first-child):not(:last-child):not(.has-comment) {
             background-color: #f9fafb;
         }
-        .pnl-row-normal:nth-child(odd) td:not(:first-child):not(:last-child) {
+        .pnl-row-normal:nth-child(odd) td:not(:first-child):not(:last-child):not(.has-comment) {
             background-color: #ffffff;
         }
         </style>
         """
 
+        # Сборка HTML таблицы
         table_parts = [pnl_css, '<div class="pnl-wrapper"><table class="pnl-table"><thead><tr>']
-        for col in df_report.columns:
-            table_parts.append(f"<th>{col}</th>")
-        table_parts.append("</tr></thead><tbody>")
+        table_parts.append("<th>Стаття</th>")
+        for d in range(1, num_days + 1):
+            table_parts.append(f"<th>{d}</th>")
+        table_parts.append("<th>Всього</th></tr></thead><tbody>")
 
-        for _, row in df_report.iterrows():
-            stattya = row["Стаття"]
-            if stattya == "🟢 НАДХОДЖЕННЯ":
+        for r in order_full:
+            if r == "🟢 НАДХОДЖЕННЯ":
                 row_cls = "pnl-row-inc"
-            elif stattya == "🔴 ВИТРАТИ":
+            elif r == "🔴 ВИТРАТИ":
                 row_cls = "pnl-row-exp-header"
-            elif stattya == "🔴 ВСЬОГО ВИТРАТ":
+            elif r == "🔴 ВСЬОГО ВИТРАТ":
                 row_cls = "pnl-row-exp-total"
-            elif stattya in ["Касса на начало дня", "Касса на конец дня"]:
+            elif r in ["Касса на начало дня", "Касса на конец дня"]:
                 row_cls = "pnl-row-cash"
             else:
                 row_cls = "pnl-row-normal"
 
             table_parts.append(f'<tr class="{row_cls}">')
-            for val in row:
-                cell_text = str(val) if pd.notna(val) else ""
-                safe_title = cell_text.replace('"', '&quot;')
-                table_parts.append(f'<td title="{safe_title}">{cell_text}</td>')
+            table_parts.append(f"<td>{r}</td>")
+
+            row_total = 0
+
+            for d in range(1, num_days + 1):
+                cell = report_data[r][str(d)]
+
+                if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"]:
+                    table_parts.append("<td></td>")
+                elif r in ["Касса на начало дня", "Касса на конец дня", "🔴 ВСЬОГО ВИТРАТ"]:
+                    val_str = str(cell["sum"]) if cell["set"] else ""
+                    row_total += cell["sum"] if cell["set"] else 0
+                    table_parts.append(f"<td>{val_str}</td>")
+                else:
+                    sum_val = cell["sum"]
+                    row_total += sum_val
+                    valid_notes = [n for n in cell["notes"] if n]
+
+                    if sum_val == 0 and not valid_notes:
+                        table_parts.append("<td></td>")
+                    else:
+                        val_str = str(sum_val)
+                        if valid_notes:
+                            # Формируем текст для всплывающей подсказки и клика
+                            note_lines = "\n• " + "\n• ".join(valid_notes)
+                            safe_title = f"💬 Двойной клик для просмотра комментария:{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
+                            
+                            js_comment = note_lines.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", "\\n")
+                            safe_stattya = r.replace("'", "\\'")
+
+                            table_parts.append(
+                                f'<td class="has-comment" title="{safe_title}" '
+                                f'ondblclick="alert(\'💬 Комментарий ({safe_stattya}, {d} число):\\n{js_comment}\')">'
+                                f'{val_str}</td>'
+                            )
+                        else:
+                            table_parts.append(f"<td>{val_str}</td>")
+
+            # Столбец Всього
+            if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"]:
+                table_parts.append("<td></td>")
+            else:
+                vsyogo_val = str(row_total) if row_total > 0 else ""
+                table_parts.append(f"<td>{vsyogo_val}</td>")
+
             table_parts.append("</tr>")
 
         table_parts.append("</tbody></table></div>")
