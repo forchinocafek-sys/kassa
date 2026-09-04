@@ -1,4 +1,3 @@
-import calendar
 import time
 from datetime import datetime, timedelta
 import pandas as pd
@@ -21,12 +20,28 @@ def render_tableware_tab(selected_date, can_edit):
     )
 
     # -------------------------------------------------------------------
-    # ВЕ do 1: ИНВЕНТАРИЗАЦИЯ НОМЕНКЛАТУРЫ
+    # ВЕК 1: ИНВЕНТАРИЗАЦИЯ НОМЕНКЛАТУРЫ
     # -------------------------------------------------------------------
     with tab_inv:
-        draft_key = f"tableware_inv_draft_{selected_date}"
-        if draft_key not in st.session_state:
-            st.session_state[draft_key] = {}
+        draft_session_key = f"tableware_inv_draft_{selected_date}"
+        supabase_draft_date = f"tableware_{selected_date}"
+
+        # Загрузка черновика из Supabase при первом открытии дня
+        if draft_session_key not in st.session_state:
+            st.session_state[draft_session_key] = {}
+            try:
+                res_draft = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
+                    headers=headers,
+                ).json()
+                if isinstance(res_draft, list) and len(res_draft) > 0:
+                    saved_payload = res_draft[0].get("payload", {})
+                    # Преобразуем строковые ключи обратно в int (ID товаров)
+                    st.session_state[draft_session_key] = {
+                        int(k): v for k, v in saved_payload.items() if str(k).isdigit()
+                    }
+            except Exception:
+                pass
 
         catalog_items = []
         try:
@@ -46,12 +61,12 @@ def render_tableware_tab(selected_date, can_edit):
             df["cost_price"] = df["cost_price"].apply(get_int)
             df["prev_month_qty"] = df["prev_month_qty"].apply(get_int)
 
-            # Инициализация динамических полей
+            # Привязка значений к черновику (Фактичний залишок по умолчанию 0!)
             for field in ["arrived", "broken", "fact_qty"]:
                 df[field] = df["id"].map(
-                    lambda item_id: st.session_state[draft_key]
+                    lambda item_id: st.session_state[draft_session_key]
                     .get(item_id, {})
-                    .get(field, df.loc[df["id"] == item_id, "prev_month_qty"].values[0] if field == "fact_qty" else 0)
+                    .get(field, 0)
                 )
 
             # Расчетные столбцы
@@ -64,7 +79,54 @@ def render_tableware_tab(selected_date, can_edit):
                 lambda r: r["diff"] * r["cost_price"] if r["diff"] > 0 else 0, axis=1
             )
 
-            st.markdown("##### 📝 Таблица переучета")
+            # Кнопки управления черновиком
+            c_dr1, c_dr2, c_dr3 = st.columns([2, 2, 3])
+            with c_dr1:
+                if st.button("💾 Сохранить черновик", type="primary", use_container_width=True, disabled=not can_edit):
+                    try:
+                        draft_payload = {
+                            str(k): v for k, v in st.session_state[draft_session_key].items()
+                        }
+                        check_draft = requests.get(
+                            f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
+                            headers=headers,
+                        ).json()
+
+                        if isinstance(check_draft, list) and len(check_draft) > 0:
+                            requests.patch(
+                                f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
+                                headers=headers,
+                                json={"payload": draft_payload},
+                            )
+                        else:
+                            requests.post(
+                                f"{SUPABASE_URL}/rest/v1/drafts",
+                                headers=headers,
+                                json={"date": supabase_draft_date, "payload": draft_payload},
+                            )
+                        log_audit("Збережено чернетку посуду", f"Дата: {selected_date}")
+                        st.toast("✅ Черновик переучета сохранен в облаке!", icon="💾")
+                    except Exception as e:
+                        st.error(f"Помилка збереження чернетки: {e}")
+
+            with c_dr2:
+                if st.button("🗑️ Очистить ввод", use_container_width=True, disabled=not can_edit):
+                    st.session_state[draft_session_key] = {}
+                    requests.delete(
+                        f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
+                        headers=headers,
+                    )
+                    st.rerun()
+
+            with c_dr3:
+                filled_count = sum(
+                    1 for v in st.session_state[draft_session_key].values() if v.get("fact_qty", 0) > 0
+                )
+                st.markdown(f"**Заполнено позиций:** `{filled_count} из {len(df)}`")
+
+            st.write("")
+
+            # Таблица инвентаризации с настроенными ширинами колонок
             edited_df = st.data_editor(
                 df[
                     [
@@ -83,16 +145,16 @@ def render_tableware_tab(selected_date, can_edit):
                 ],
                 column_config={
                     "id": None,
-                    "name": st.column_config.TextColumn("Найменування", disabled=True),
-                    "cost_price": st.column_config.NumberColumn("Ціна (грн)", disabled=True, width="small"),
-                    "prev_month_qty": st.column_config.NumberColumn("К-сть (минулий міс)", disabled=True, width="small"),
-                    "arrived": st.column_config.NumberColumn("Приїхало (шт)", min_value=0, step=1, required=True),
-                    "broken": st.column_config.NumberColumn("Розбилося (шт)", min_value=0, step=1, required=True),
-                    "calc_qty": st.column_config.NumberColumn("Розрахунковий залишок", disabled=True, width="small"),
-                    "fact_qty": st.column_config.NumberColumn("Фактичний залишок", min_value=0, step=1, required=True),
-                    "diff": st.column_config.NumberColumn("Різниця (шт)", disabled=True, width="small"),
-                    "shortage_uah": st.column_config.NumberColumn("Недостача (грн)", disabled=True, width="small"),
-                    "surplus_uah": st.column_config.NumberColumn("Надлишок (грн)", disabled=True, width="small"),
+                    "name": st.column_config.TextColumn("Найменування", disabled=True, width="large"),
+                    "cost_price": st.column_config.NumberColumn("Ціна", disabled=True, width="small"),
+                    "prev_month_qty": st.column_config.NumberColumn("Минулий", disabled=True, width="small"),
+                    "arrived": st.column_config.NumberColumn("Приїхало", min_value=0, step=1, required=True, width="small"),
+                    "broken": st.column_config.NumberColumn("Розбилося", min_value=0, step=1, required=True, width="small"),
+                    "calc_qty": st.column_config.NumberColumn("Розрахунок", disabled=True, width="small"),
+                    "fact_qty": st.column_config.NumberColumn("Факт (шт)", min_value=0, step=1, required=True, width="small"),
+                    "diff": st.column_config.NumberColumn("Різниця", disabled=True, width="small"),
+                    "shortage_uah": st.column_config.NumberColumn("Минус (грн)", disabled=True, width="small"),
+                    "surplus_uah": st.column_config.NumberColumn("Плюс (грн)", disabled=True, width="small"),
                 },
                 hide_index=True,
                 use_container_width=True,
@@ -100,10 +162,10 @@ def render_tableware_tab(selected_date, can_edit):
                 disabled=not can_edit,
             )
 
-            # Сохранение текущих значений редактора в сессию
+            # Запись изменений из таблицы в сессию
             for _, r in edited_df.iterrows():
                 item_id = r["id"]
-                st.session_state[draft_key][item_id] = {
+                st.session_state[draft_session_key][item_id] = {
                     "arrived": get_int(r["arrived"]),
                     "broken": get_int(r["broken"]),
                     "fact_qty": get_int(r["fact_qty"]),
@@ -120,7 +182,7 @@ def render_tableware_tab(selected_date, can_edit):
 
             st.write("")
             if can_edit:
-                if st.button("🚀 Зберегти інвентаризацію", type="primary", use_container_width=True):
+                if st.button("🚀 Зберегти фінальну інвентаризацію", type="primary", use_container_width=True):
                     payload_data = sanitize_df(edited_df)
                     requests.post(
                         f"{SUPABASE_URL}/rest/v1/tableware_inventories",
@@ -142,13 +204,20 @@ def render_tableware_tab(selected_date, can_edit):
                             json={"prev_month_qty": get_int(r["fact_qty"])},
                         )
 
-                    log_audit("Збережено інвентаризацію посуду", f"Дата: {selected_date}")
+                    # Очищаем черновик после финализации
+                    requests.delete(
+                        f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
+                        headers=headers,
+                    )
+                    st.session_state[draft_session_key] = {}
+
+                    log_audit("Збережено фінальну інвентаризацію посуду", f"Дата: {selected_date}")
                     st.success("🎉 Інвентаризацію успішно збережено!")
                     time.sleep(1)
                     st.rerun()
 
     # -------------------------------------------------------------------
-    # ВЕ do 2: ФИНАНСОВЫЙ УЧЕТ ПОТЕРЬ ЗА МЕСЯЦ
+    # ВЕК 2: ФИНАНСОВЫЙ УЧЕТ ПОТЕРЬ ЗА МЕСЯЦ
     # -------------------------------------------------------------------
     with tab_fin:
         st.markdown("##### 📊 Підсумковий баланс втрат за місяць")
@@ -164,7 +233,6 @@ def render_tableware_tab(selected_date, can_edit):
 
         month_key = f"{sel_y}-{months[sel_m]:02d}"
 
-        # Загрузка записи потерь за выбранный месяц
         loss_record = {"broken_paid": 0, "broken_unpaid": 0, "lost": 0, "found": 0}
         try:
             res_loss = requests.get(
@@ -205,7 +273,6 @@ def render_tableware_tab(selected_date, can_edit):
                     disabled=not can_edit,
                 )
 
-            # Чистый убыток заведения = Неоплаченный бой + Утеряно - Найдено
             total_net_shortage = b_unpaid + v_lost - v_found
 
             st.markdown(
@@ -241,7 +308,7 @@ def render_tableware_tab(selected_date, can_edit):
                     st.success("✅ Підсумок успішно збережено!")
 
     # -------------------------------------------------------------------
-    # ВЕ do 3: УПРАВЛЕНИЕ СПРАВОЧНИКОМ ПОСУДЫ
+    # ВЕК 3: УПРАВЛЕНИЕ СПРАВОЧНИКОМ ПОСУДЫ
     # -------------------------------------------------------------------
     st.divider()
     st.markdown("### ⚙️ Управление справочником посуды")
