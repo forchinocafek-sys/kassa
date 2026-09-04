@@ -3,7 +3,16 @@ from datetime import datetime, timedelta
 import pandas as pd
 import requests
 import streamlit as st
-from config import SUPABASE_URL, SUPABASE_KEY, headers, upload_headers, INCOME_CATEGORIES, EXPENSE_CHOICES
+from config import (
+    SUPABASE_URL,
+    SUPABASE_KEY,
+    headers,
+    upload_headers,
+    INCOME_CATEGORIES,
+    EXPENSE_CHOICES,
+    SUPPLIES_CATEGORIES,
+)
+
 
 def log_audit(action, details=""):
     try:
@@ -313,8 +322,8 @@ def load_draft_or_init(date_str):
         st.session_state[f"qty_{k}_{date_str}"] = ""
 
 
-def auto_assign_category(name, current_cat="", supplies_categories=[]):
-    if current_cat and str(current_cat).strip() in supplies_categories:
+def auto_assign_category(name, current_cat=""):
+    if current_cat and str(current_cat).strip() in SUPPLIES_CATEGORIES:
         return str(current_cat).strip()
     n = str(name).lower()
     if any(k in n for k in ['рукавичк', 'перчатк', 'шапочк', 'фартук']):
@@ -336,3 +345,39 @@ def auto_assign_category(name, current_cat="", supplies_categories=[]):
     elif any(k in n for k in ['контейнер', 'супов', 'ємність', 'кришк', 'крышк', 'соусник', 'стакан', 'банка', 'пляшк', 'підстаканник', 'тримач', 'упаков', 'бокс', 'пакет крафт']):
         return "Упаковка, контейнеры, стаканы, крышки, емкости и бутылки"
     return "Упаковка, контейнеры, стаканы, крышки, емкости и бутылки"
+
+
+def save_kassa_draft_to_supabase(selected_date, edited_inc_df, edited_exp_df, edited_adv_df, m_coins, q_dict):
+    payload = {
+        "inc": sanitize_df(edited_inc_df),
+        "exp": sanitize_df(edited_exp_df),
+        "adv": sanitize_df(edited_adv_df),
+        "cash": {
+            "coins": m_coins,
+            "20": q_dict.get("20", 0),
+            "50": q_dict.get("50", 0),
+            "100": q_dict.get("100", 0),
+            "200": q_dict.get("200", 0),
+            "500": q_dict.get("500", 0),
+            "1000": q_dict.get("1000", 0),
+        },
+    }
+    check_draft = requests.get(
+        f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+        headers=headers,
+    ).json()
+    if isinstance(check_draft, list) and len(check_draft) > 0:
+        requests.patch(
+            f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+            headers=headers,
+            json={"payload": payload},
+        )
+    else:
+        requests.post(
+            f"{SUPABASE_URL}/rest/v1/drafts",
+            headers=headers,
+            json={"date": selected_date, "payload": payload},
+        )
+    if "drafts_cache" in st.session_state:
+        st.session_state["drafts_cache"][selected_date] = payload
+    log_audit("Збережено чернетку", f"Дата: {selected_date}")
