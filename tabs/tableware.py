@@ -23,7 +23,6 @@ def render_tableware_tab(selected_date, can_edit):
         ]
     )
 
-    # Загрузка справочника посуды
     catalog_items = []
     catalog_dict = {}
     try:
@@ -60,7 +59,6 @@ def render_tableware_tab(selected_date, can_edit):
         draft_session_key = f"tableware_inv_draft_{inv_date_str}"
         editor_key = f"tableware_editor_{inv_date_str}"
 
-        # 1. Загрузка данных: черновик или ранее сохраненная инвентаризация
         if draft_session_key not in st.session_state:
             st.session_state[draft_session_key] = {}
             loaded_data = False
@@ -95,7 +93,6 @@ def render_tableware_tab(selected_date, can_edit):
                 except Exception:
                     pass
 
-        # 2. Синхронизация ввода ДО расчета формул
         if editor_key in st.session_state and "edited_rows" in st.session_state[editor_key]:
             edited_rows = st.session_state[editor_key]["edited_rows"]
             for row_idx_str, changes in edited_rows.items():
@@ -104,7 +101,6 @@ def render_tableware_tab(selected_date, can_edit):
                     item_id = catalog_items[row_idx]["id"]
                     st.session_state[draft_session_key][item_id] = get_int(changes["fact_qty"])
 
-        # 3. Поиск предыдущей инвентаризации
         last_inv_date = None
         try:
             res_prev_inv = requests.get(
@@ -419,12 +415,12 @@ def render_tableware_tab(selected_date, can_edit):
         m_idx = months[sel_m_name]
         month_key = f"{sel_y_num}-{m_idx:02d}"
         start_d = f"{sel_y_num}-{m_idx:02d}-01"
-        end_d = f"{sel_y_num+1}-01-01" if m_idx == 12 else f"{sel_y_num}-{m_idx+1:02d}-01"
+        end_d = f"{sel_y_num+1}-01-01" if m_idx == 12 else f"{sel_y}-{m_idx+1:02d}-01"
 
         # --- 3. УДЕРЖАНИЯ С ПЕРСОНАЛА И КОМПЕНСАЦИИ ЗА МЕСЯЦ ---
         st.markdown("### 💰 Удержания с персонала и компенсации за месяц")
 
-        loss_record = {"actual_staff_deduction": 0, "guest_payments": 0}
+        loss_record = {}
         try:
             res_loss = requests.get(
                 f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{month_key}",
@@ -438,7 +434,8 @@ def render_tableware_tab(selected_date, can_edit):
         col_w1, col_w2 = st.columns([2, 1])
 
         with col_w1:
-            st.markdown("#### 🧾 Расчет удержаний с персонала (50% от боя)")
+            st.markdown("#### 🧾 Расчет удержаний с персонала")
+            calculated_debt_sum = 0
             try:
                 res_debts = requests.get(
                     f"{SUPABASE_URL}/rest/v1/tableware_events?event_type=eq.breakage&waiter_debt=gt.0&date=gte.{start_d}&date=lt.{end_d}",
@@ -447,20 +444,33 @@ def render_tableware_tab(selected_date, can_edit):
                 if isinstance(res_debts, list) and len(res_debts) > 0:
                     df_debts = pd.DataFrame(res_debts)
                     summary_debts = df_debts.groupby("waiter_name")["waiter_debt"].sum().reset_index()
-                    summary_debts.columns = ["Сотрудник", "Начислено к удержанию (грн)"]
+                    summary_debts.columns = ["Сотрудник", "Начислено 50% боя (грн)"]
+                    calculated_debt_sum = int(summary_debts["Начислено 50% боя (грн)"].sum())
                     st.dataframe(summary_debts, hide_index=True, use_container_width=True)
                 else:
-                    st.info("🎉 В этом месяце удержаний с персонала нет!")
+                    st.info("🎉 В этом месяце индивидуального боя по персоналу нет.")
             except Exception:
                 pass
 
+            # Вычисление дефолтного ручного ввода из ранее сохраненной итоговой суммы
+            saved_total = get_int(loss_record.get("actual_staff_deduction", 0))
+            default_manual_val = max(0, saved_total - calculated_debt_sum) if saved_total > 0 else 0
+
             with st.form("save_monthly_deductions_form"):
-                st.caption("Укажите сумму, которая реально списывается из ЗП персонала в конце месяца:")
-                actual_staff_val = st.number_input(
-                    "Фактически удержано из ЗП персонала за месяц (грн):",
+                manual_val = st.number_input(
+                    "Фиксированная / ручная сумма удержания (грн):",
                     min_value=0,
-                    value=get_int(loss_record.get("actual_staff_deduction", 0)),
+                    value=default_manual_val,
+                    step=50,
                     disabled=not can_edit,
+                    help="Укажите базовую сумму сборов с персонала. К ней автоматически прибавится 50% от личного боя."
+                )
+
+                total_staff_val = manual_val + calculated_debt_sum
+
+                st.markdown(
+                    f"**🎯 Итого удержано из ЗП персонала:** `{total_staff_val} грн` "
+                    f"*(Ручная сумма: {manual_val} грн + 50% боя: {calculated_debt_sum} грн)*"
                 )
 
                 if can_edit:
@@ -468,7 +478,7 @@ def render_tableware_tab(selected_date, can_edit):
                         try:
                             payload = {
                                 "month_year": month_key,
-                                "actual_staff_deduction": actual_staff_val,
+                                "actual_staff_deduction": total_staff_val,
                                 "guest_payments": get_int(loss_record.get("guest_payments", 0)),
                                 "updated_at": (datetime.utcnow() + timedelta(hours=3)).isoformat(),
                             }
@@ -481,8 +491,8 @@ def render_tableware_tab(selected_date, can_edit):
                             )
                             res_post.raise_for_status()
 
-                            log_audit("Сохранены удержания с персонала", f"Месяц: {month_key}, Сумма: {actual_staff_val}")
-                            st.success("✅ Удержание из ЗП успешно сохранено!")
+                            log_audit("Сохранены удержания с персонала", f"Месяц: {month_key}, Итого: {total_staff_val} грн")
+                            st.success(f"✅ Удержание из ЗП сохраненено: {total_staff_val} грн!")
                             time.sleep(1)
                             st.rerun()
                         except Exception as ex:
