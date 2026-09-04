@@ -60,9 +60,12 @@ def render_tableware_tab(selected_date, can_edit):
         draft_session_key = f"tableware_inv_draft_{inv_date_str}"
         editor_key = f"tableware_editor_{inv_date_str}"
 
-        # 1. Загрузка черновика из таблицы tableware_drafts
+        # 1. Загрузка данных: сначала черновик, если его нет — финальная инвентаризация из tableware_inventories
         if draft_session_key not in st.session_state:
             st.session_state[draft_session_key] = {}
+            loaded_data = False
+
+            # Пробуем загрузить незавершенный черновик
             try:
                 res_draft = requests.get(
                     f"{SUPABASE_URL}/rest/v1/tableware_drafts?date=eq.{inv_date_str}",
@@ -71,10 +74,28 @@ def render_tableware_tab(selected_date, can_edit):
                 if isinstance(res_draft, list) and len(res_draft) > 0:
                     saved_payload = res_draft[0].get("payload", {})
                     st.session_state[draft_session_key] = {
-                        int(k): v for k, v in saved_payload.items() if str(k).isdigit()
+                        int(k): get_int(v) for k, v in saved_payload.items() if str(k).isdigit()
                     }
+                    loaded_data = True
             except Exception:
                 pass
+
+            # Если черновика нет, подтягиваем ранее сохраненную финальную инвентаризацию
+            if not loaded_data:
+                try:
+                    res_inv = requests.get(
+                        f"{SUPABASE_URL}/rest/v1/tableware_inventories?date=eq.{inv_date_str}&order=id.desc&limit=1",
+                        headers=headers,
+                    ).json()
+                    if isinstance(res_inv, list) and len(res_inv) > 0:
+                        inv_payload = res_inv[0].get("payload", [])
+                        if isinstance(inv_payload, list):
+                            st.session_state[draft_session_key] = {
+                                get_int(item.get("id")): get_int(item.get("fact_qty", 0))
+                                for item in inv_payload if "id" in item
+                            }
+                except Exception:
+                    pass
 
         # 2. Синхронизация ввода ДО расчета формул
         if editor_key in st.session_state and "edited_rows" in st.session_state[editor_key]:
@@ -85,7 +106,7 @@ def render_tableware_tab(selected_date, can_edit):
                     item_id = catalog_items[row_idx]["id"]
                     st.session_state[draft_session_key][item_id] = get_int(changes["fact_qty"])
 
-        # 3. Умный поиск предыдущей инвентаризации для динамического периода операций
+        # 3. Поиск предыдущей инвентаризации для динамического периода операций
         last_inv_date = None
         try:
             res_prev_inv = requests.get(
@@ -97,7 +118,6 @@ def render_tableware_tab(selected_date, can_edit):
         except Exception:
             pass
 
-        # Формирование SQL-фильтра событий: от последней ревизии до текущей даты
         inv_year_num = inv_date.year
         inv_month_num = inv_date.month
         inv_month_start = f"{inv_year_num}-{inv_month_num:02d}-01"
@@ -245,9 +265,12 @@ def render_tableware_tab(selected_date, can_edit):
             if can_edit:
                 if st.button("🚀 Зберегти фінальну інвентаризацію", type="primary", use_container_width=True):
                     payload_data = sanitize_df(edited_df)
+                    
+                    # Сохраняем/обновляем в tableware_inventories (UPSERT)
+                    upsert_inv_headers = {**headers, "Prefer": "resolution=merge-duplicates"}
                     requests.post(
                         f"{SUPABASE_URL}/rest/v1/tableware_inventories",
-                        headers=headers,
+                        headers=upsert_inv_headers,
                         json={
                             "date": inv_date_str,
                             "created_by": st.session_state["user_name"],
@@ -388,7 +411,6 @@ def render_tableware_tab(selected_date, can_edit):
 
         st.divider()
 
-        # Выбор месяца для отчетов
         months = {
             "Січень": 1, "Лютий": 2, "Березень": 3, "Квітень": 4,
             "Травень": 5, "Червень": 6, "Липень": 7, "Серпень": 8,
