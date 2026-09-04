@@ -116,9 +116,10 @@ def render_tableware_tab(selected_date, can_edit):
         inv_month_num = inv_date.month
         inv_month_start = f"{inv_year_num}-{inv_month_num:02d}-01"
 
-        events_query = f"{SUPABASE_URL}/rest/v1/tableware_events?date=lte.{inv_date_str}"
+        # Приходы и бой берутся ВКЛЮЧАЯ дату прошлого переучета и СТРОГО ДО утреннего текущего переучета
+        events_query = f"{SUPABASE_URL}/rest/v1/tableware_events?date=lt.{inv_date_str}"
         if last_inv_date:
-            events_query += f"&date=gt.{last_inv_date}"
+            events_query += f"&date=gte.{last_inv_date}"
         else:
             events_query += f"&date=gte.{inv_month_start}"
 
@@ -585,96 +586,126 @@ def render_tableware_tab(selected_date, can_edit):
     with tab_fin:
         st.markdown("##### 📊 Расчет чистого минуса казны заведения")
 
-        months_fin = {
-            "Січень": 1, "Лютий": 2, "Березень": 3, "Квітень": 4,
-            "Травень": 5, "Червень": 6, "Липень": 7, "Серпень": 8,
-            "Вересень": 9, "Жовтень": 10, "Листопад": 11, "Грудень": 12,
-        }
-        c_m, c_y = st.columns(2)
-        sel_m = c_m.selectbox("Місяць", list(months_fin.keys()), index=st.session_state["form_date"].month - 1, key="fin_month_sel")
-        sel_y = c_y.selectbox("Рік", [2025, 2026, 2027], index=1, key="fin_year_sel")
-
-        month_key = f"{sel_y}-{months_fin[sel_m]:02d}"
-        m_num = months_fin[sel_m]
-        start_d = f"{sel_y}-{m_num:02d}-01"
-        end_d = f"{sel_y+1}-01-01" if m_num == 12 else f"{sel_y}-{m_num+1:02d}-01"
-
-        v_start = 0
-        v_fact = 0
-        has_inv = False
-
-        # Поиск сохраненной инвентаризации
+        inv_list = []
         try:
-            res_inv = requests.get(
-                f"{SUPABASE_URL}/rest/v1/tableware_inventories?date=gte.{start_d}&date=lt.{end_d}&order=date.desc&limit=1",
+            res_all_inv = requests.get(
+                f"{SUPABASE_URL}/rest/v1/tableware_inventories?select=date,created_by,total_shortage_uah&order=date.desc",
                 headers=headers,
             ).json()
-            if isinstance(res_inv, list) and len(res_inv) > 0:
-                has_inv = True
-                inv_items = res_inv[0].get("payload", [])
-                if isinstance(inv_items, list):
-                    # Берем начальный и фактический остаток из зафиксированного отчета ревизии
-                    v_start = sum(get_int(row.get("prev_month_qty", 0)) * get_int(row.get("cost_price", 0)) for row in inv_items)
-                    v_fact = sum(get_int(row.get("fact_qty", 0)) * get_int(row.get("cost_price", 0)) for row in inv_items)
+            if isinstance(res_all_inv, list) and len(res_all_inv) > 0:
+                inv_list = res_all_inv
         except Exception:
             pass
 
-        # Если инвентаризация за текущий месяц еще не проводилась, считаем текущий v_start из справочника
-        if not has_inv:
-            v_start = sum(get_int(it.get("prev_month_qty", 0)) * get_int(it.get("cost_price", 0)) for it in catalog_items)
+        if not inv_list:
+            st.info("ℹ️ В базе еще нет сохраненных финальных инвентаризаций.")
+        else:
+            inv_options = {
+                f"📅 Переучет от {inv['date']} (автор: {inv.get('created_by', '—')})": inv["date"]
+                for inv in inv_list
+            }
+            sel_inv_label = st.selectbox(
+                "Выберите конкретную инвентаризацию для финансового отчета:",
+                options=list(inv_options.keys()),
+                key="fin_inv_selector",
+            )
+            sel_inv_date = inv_options[sel_inv_label]
 
-        v_deliv = 0
-        m_guest_auto = 0
+            curr_inv_data = None
+            prev_inv_data = None
+            prev_inv_date = None
 
-        try:
-            res_m_events = requests.get(
-                f"{SUPABASE_URL}/rest/v1/tableware_events?date=gte.{start_d}&date=lt.{end_d}",
-                headers=headers,
-            ).json()
-            if isinstance(res_m_events, list):
-                for ev in res_m_events:
-                    if ev.get("event_type") == "delivery":
-                        v_deliv += get_int(ev.get("total_amount", 0))
-                    elif ev.get("event_type") == "breakage":
-                        m_guest_auto += get_int(ev.get("paid_amount", 0))
-        except Exception:
-            pass
+            try:
+                res_curr = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/tableware_inventories?date=eq.{sel_inv_date}",
+                    headers=headers,
+                ).json()
+                if isinstance(res_curr, list) and len(res_curr) > 0:
+                    curr_inv_data = res_curr[0]
+            except Exception:
+                pass
 
-        m_staff_actual = 0
-        try:
-            res_loss = requests.get(
-                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{month_key}",
-                headers=headers,
-            ).json()
-            if isinstance(res_loss, list) and len(res_loss) > 0:
-                m_staff_actual = get_int(res_loss[0].get("actual_staff_deduction", 0))
-        except Exception:
-            pass
+            try:
+                res_prev = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/tableware_inventories?date=lt.{sel_inv_date}&order=date.desc&limit=1",
+                    headers=headers,
+                ).json()
+                if isinstance(res_prev, list) and len(res_prev) > 0:
+                    prev_inv_data = res_prev[0]
+                    prev_inv_date = prev_inv_data.get("date")
+            except Exception:
+                pass
 
-        gross_shortage = (v_start + v_deliv) - v_fact if has_inv else 0
-        total_compensations = m_staff_actual + m_guest_auto
-        net_loss_kazna = gross_shortage - total_compensations if has_inv else 0
+            curr_payload = curr_inv_data.get("payload", []) if curr_inv_data else []
+            v_fact = sum(get_int(row.get("fact_qty", 0)) * get_int(row.get("cost_price", 0)) for row in curr_payload)
 
-        st.markdown("###### **1. Стоимость имущества на балансе:**")
-        f1, f2, f3 = st.columns(3)
-        f1.metric("Сумма на прошлый период (V_прошлый)", f"{v_start} грн")
-        f2.metric("Сумма приходов (V_приход)", f"{v_deliv} грн")
-        f3.metric("Сумма на нынешний период (V_нынешний)", f"{v_fact} грн" if has_inv else "Инвентаризация не проведена")
+            if prev_inv_data:
+                prev_payload = prev_inv_data.get("payload", [])
+                v_start = sum(get_int(row.get("fact_qty", 0)) * get_int(row.get("cost_price", 0)) for row in prev_payload)
+            else:
+                v_start = sum(get_int(row.get("prev_month_qty", 0)) * get_int(row.get("cost_price", 0)) for row in curr_payload)
 
-        st.divider()
+            # Учитываем приходы ВКЛЮЧАЯ дату предыдущего утреннего переучета и СТРОГО ДО утреннего текущего
+            events_query = f"{SUPABASE_URL}/rest/v1/tableware_events?date=lt.{sel_inv_date}"
+            if prev_inv_date:
+                events_query += f"&date=gte.{prev_inv_date}"
+            else:
+                start_of_month = f"{sel_inv_date[:7]}-01"
+                events_query += f"&date=gte.{start_of_month}"
 
-        st.markdown("###### **2. Компенсации и удержания:**")
-        k1, k2, k3 = st.columns(3)
-        k1.metric("Удержано с персонала (M_персонал)", f"{m_staff_actual} грн")
-        k2.metric("Оплачено гостями (M_гости)", f"{m_guest_auto} грн")
-        k3.metric("Всего компенсаций", f"{total_compensations} грн")
+            v_deliv = 0
+            m_guest_auto = 0
+            try:
+                res_events = requests.get(events_query, headers=headers).json()
+                if isinstance(res_events, list):
+                    for ev in res_events:
+                        if ev.get("event_type") == "delivery":
+                            v_deliv += get_int(ev.get("total_amount", 0))
+                        elif ev.get("event_type") == "breakage":
+                            m_guest_auto += get_int(ev.get("paid_amount", 0))
+            except Exception:
+                pass
 
-        st.divider()
+            sel_month_key = sel_inv_date[:7]
+            m_staff_actual = 0
+            try:
+                res_loss = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{sel_month_key}",
+                    headers=headers,
+                ).json()
+                if isinstance(res_loss, list) and len(res_loss) > 0:
+                    m_staff_actual = get_int(res_loss[0].get("actual_staff_deduction", 0))
+            except Exception:
+                pass
 
-        st.markdown("###### **3. Итоговый финансовый результат:**")
-        r1, r2 = st.columns(2)
-        r1.metric("Валовая физическая недостача", f"{gross_shortage} грн" if has_inv else "0 грн")
-        r2.metric("📉 ЧИСТЫЙ МИНУС КАЗНЫ", f"{net_loss_kazna} грн" if has_inv else "0 грн")
+            gross_shortage = (v_start + v_deliv) - v_fact
+            total_compensations = m_staff_actual + m_guest_auto
+            net_loss_kazna = gross_shortage - total_compensations
+
+            st.caption(
+                f"ℹ️ **Период отчета:** с `{prev_inv_date if prev_inv_date else 'Начала работы'}` (утро) по `{sel_inv_date}` (утро)"
+            )
+
+            st.markdown("###### **1. Стоимость имущества на балансе:**")
+            f1, f2, f3 = st.columns(3)
+            f1.metric("Сумма на прошлый период (V_прошлый)", f"{v_start} грн")
+            f2.metric("Сумма приходов (V_приход)", f"{v_deliv} грн")
+            f3.metric("Сумма на нынешний период (V_нынешний)", f"{v_fact} грн")
+
+            st.divider()
+
+            st.markdown("###### **2. Компенсации и удержания:**")
+            k1, k2, k3 = st.columns(3)
+            k1.metric("Удержано с персонала (M_персонал)", f"{m_staff_actual} грн")
+            k2.metric("Оплачено гостями (M_гости)", f"{m_guest_auto} грн")
+            k3.metric("Всего компенсаций", f"{total_compensations} грн")
+
+            st.divider()
+
+            st.markdown("###### **3. Итоговый финансовый результат:**")
+            r1, r2 = st.columns(2)
+            r1.metric("Валовая физическая недостача", f"{gross_shortage} грн")
+            r2.metric("📉 ЧИСТЫЙ МИНУС КАЗНЫ", f"{net_loss_kazna} грн")
 
     # -------------------------------------------------------------------
     # УПРАВЛЕНИЕ СПРАВОЧНИКОМ
