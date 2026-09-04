@@ -59,7 +59,9 @@ def render_tableware_tab(selected_date, can_edit):
 
         draft_session_key = f"tableware_inv_draft_{inv_date_str}"
         supabase_draft_date = f"tableware_{inv_date_str}"
+        editor_key = f"tableware_editor_{inv_date_str}"
 
+        # 1. Загрузка черновика при первом открытии
         if draft_session_key not in st.session_state:
             st.session_state[draft_session_key] = {}
             try:
@@ -75,6 +77,16 @@ def render_tableware_tab(selected_date, can_edit):
             except Exception:
                 pass
 
+        # 2. Мгновенная синхронизация ввода из st.data_editor ДО расчета формул
+        if editor_key in st.session_state and "edited_rows" in st.session_state[editor_key]:
+            edited_rows = st.session_state[editor_key]["edited_rows"]
+            for row_idx_str, changes in edited_rows.items():
+                row_idx = int(row_idx_str)
+                if "fact_qty" in changes and row_idx < len(catalog_items):
+                    item_id = catalog_items[row_idx]["id"]
+                    st.session_state[draft_session_key][item_id] = get_int(changes["fact_qty"])
+
+        # Загрузка приходов и боев
         events_summary = {}
         try:
             res_ev = requests.get(
@@ -104,9 +116,10 @@ def render_tableware_tab(selected_date, can_edit):
             df["broken"] = df["id"].map(lambda x: events_summary.get(x, {}).get("broken", 0))
 
             df["fact_qty"] = df["id"].map(
-                lambda x: st.session_state[draft_session_key].get(x, 0)
+                lambda x: get_int(st.session_state[draft_session_key].get(x, 0))
             )
 
+            # Строгий расчет формул
             df["calc_qty"] = df["prev_month_qty"] + df["arrived"] - df["broken"]
             df["diff"] = df["fact_qty"] - df["calc_qty"]
             df["shortage_uah"] = df.apply(
@@ -155,10 +168,23 @@ def render_tableware_tab(selected_date, can_edit):
                     st.rerun()
 
             with c_dr3:
-                filled_count = sum(1 for v in st.session_state[draft_session_key].values() if v > 0)
-                st.markdown(f"**Введено позиций:** `{filled_count} из {len(df)}`")
+                filled_count = sum(1 for v in st.session_state[draft_session_key].values() if get_int(v) > 0)
+                st.markdown(f"**Заполнено позиций:** `{filled_count} из {len(df)}`")
 
             st.write("")
+
+            # Блокировка всех расчетных колонок (редактируется ТОЛЬКО Fact)
+            disabled_columns = [
+                "name",
+                "cost_price",
+                "prev_month_qty",
+                "arrived",
+                "broken",
+                "calc_qty",
+                "diff",
+                "shortage_uah",
+                "surplus_uah",
+            ] if can_edit else True
 
             edited_df = st.data_editor(
                 df[
@@ -178,25 +204,22 @@ def render_tableware_tab(selected_date, can_edit):
                 ],
                 column_config={
                     "id": None,
-                    "name": st.column_config.TextColumn("Найменування", disabled=True, width="large"),
-                    "cost_price": st.column_config.NumberColumn("Ціна", disabled=True, width="small"),
-                    "prev_month_qty": st.column_config.NumberColumn("Минулий", disabled=True, width="small"),
-                    "arrived": st.column_config.NumberColumn("Приїхало (авто)", disabled=True, width="small"),
-                    "broken": st.column_config.NumberColumn("Розбилося (авто)", disabled=True, width="small"),
-                    "calc_qty": st.column_config.NumberColumn("Розрахунок", disabled=True, width="small"),
+                    "name": st.column_config.TextColumn("Найменування", width="large"),
+                    "cost_price": st.column_config.NumberColumn("Ціна", width="small"),
+                    "prev_month_qty": st.column_config.NumberColumn("Минулий", width="small"),
+                    "arrived": st.column_config.NumberColumn("Приїхало (авто)", width="small"),
+                    "broken": st.column_config.NumberColumn("Розбилося (авто)", width="small"),
+                    "calc_qty": st.column_config.NumberColumn("Розрахунок", width="small"),
                     "fact_qty": st.column_config.NumberColumn("Факт (шт)", min_value=0, step=1, required=True, width="small"),
-                    "diff": st.column_config.NumberColumn("Різниця", disabled=True, width="small"),
-                    "shortage_uah": st.column_config.NumberColumn("Минус (грн)", disabled=True, width="small"),
-                    "surplus_uah": st.column_config.NumberColumn("Плюс (грн)", disabled=True, width="small"),
+                    "diff": st.column_config.NumberColumn("Різниця", width="small"),
+                    "shortage_uah": st.column_config.NumberColumn("Минус (грн)", width="small"),
+                    "surplus_uah": st.column_config.NumberColumn("Плюс (грн)", width="small"),
                 },
+                disabled=disabled_columns,
                 hide_index=True,
                 use_container_width=True,
-                key=f"tableware_editor_{inv_date_str}",
-                disabled=not can_edit,
+                key=editor_key,
             )
-
-            for _, r in edited_df.iterrows():
-                st.session_state[draft_session_key][r["id"]] = get_int(r["fact_qty"])
 
             tot_shortage = edited_df["shortage_uah"].sum()
             tot_surplus = edited_df["surplus_uah"].sum()
@@ -532,10 +555,8 @@ def render_tableware_tab(selected_date, can_edit):
         start_d = f"{sel_y}-{m_num:02d}-01"
         end_d = f"{sel_y+1}-01-01" if m_num == 12 else f"{sel_y}-{m_num+1:02d}-01"
 
-        # 1. Сумма на прошлый период (V_прошлый)
         v_start = sum(get_int(it.get("prev_month_qty", 0)) * get_int(it.get("cost_price", 0)) for it in catalog_items)
 
-        # 2. Сумма приходов (V_приход) и Оплаты гостей (M_гости)
         v_deliv = 0
         m_guest_auto = 0
 
@@ -553,7 +574,6 @@ def render_tableware_tab(selected_date, can_edit):
         except Exception:
             pass
 
-        # 3. Сумма на нынешний период (V_нынешний)
         v_fact = 0
         has_inv = False
         try:
@@ -568,7 +588,6 @@ def render_tableware_tab(selected_date, can_edit):
         except Exception:
             pass
 
-        # 4. Удержания из ЗП персонала (M_персонал)
         m_staff_actual = 0
         try:
             res_loss = requests.get(
@@ -580,7 +599,6 @@ def render_tableware_tab(selected_date, can_edit):
         except Exception:
             pass
 
-        # Применение формулы: (V_прошлый + V_приход - V_нынешний) - (M_персонал + M_гости)
         gross_shortage = (v_start + v_deliv) - v_fact if has_inv else 0
         total_compensations = m_staff_actual + m_guest_auto
         net_loss_kazna = gross_shortage - total_compensations if has_inv else 0
