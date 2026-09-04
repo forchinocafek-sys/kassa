@@ -415,7 +415,7 @@ def render_tableware_tab(selected_date, can_edit):
         m_idx = months[sel_m_name]
         month_key = f"{sel_y_num}-{m_idx:02d}"
         start_d = f"{sel_y_num}-{m_idx:02d}-01"
-        end_d = f"{sel_y_num+1}-01-01" if m_idx == 12 else f"{sel_y}-{m_idx+1:02d}-01"
+        end_d = f"{sel_y_num+1}-01-01" if m_idx == 12 else f"{sel_y_num}-{m_idx+1:02d}-01"
 
         # --- 3. УДЕРЖАНИЯ С ПЕРСОНАЛА И КОМПЕНСАЦИИ ЗА МЕСЯЦ ---
         st.markdown("### 💰 Удержания с персонала и компенсации за месяц")
@@ -447,30 +447,34 @@ def render_tableware_tab(selected_date, can_edit):
                     summary_debts.columns = ["Сотрудник", "Начислено 50% боя (грн)"]
                     calculated_debt_sum = int(summary_debts["Начислено 50% боя (грн)"].sum())
                     st.dataframe(summary_debts, hide_index=True, use_container_width=True)
+                    st.caption(f"💥 **Итого 50% личного боя по всем сотрудникам:** `{calculated_debt_sum} грн`")
                 else:
-                    st.info("🎉 В этом месяце индивидуального боя по персоналу нет.")
+                    st.info("🎉 В этом месяце личного боя по персоналу не зафиксировано.")
             except Exception:
                 pass
 
-            # Вычисление дефолтного ручного ввода из ранее сохраненной итоговой суммы
+            # Извлекаем ранее сохраненную итоговую сумму
             saved_total = get_int(loss_record.get("actual_staff_deduction", 0))
+            # Вычисляем сохраненную ручную часть
             default_manual_val = max(0, saved_total - calculated_debt_sum) if saved_total > 0 else 0
 
             with st.form("save_monthly_deductions_form"):
                 manual_val = st.number_input(
-                    "Фиксированная / ручная сумма удержания (грн):",
+                    "Дополнительный / фиксированный сбор с персонала (грн):",
                     min_value=0,
                     value=default_manual_val,
                     step=50,
                     disabled=not can_edit,
-                    help="Укажите базовую сумму сборов с персонала. К ней автоматически прибавится 50% от личного боя."
+                    help="Укажите базовый сбор (например, 2100). К нему автоматически прибавится 50% от личного боя."
                 )
 
                 total_staff_val = manual_val + calculated_debt_sum
 
+                st.markdown("---")
                 st.markdown(
-                    f"**🎯 Итого удержано из ЗП персонала:** `{total_staff_val} грн` "
-                    f"*(Ручная сумма: {manual_val} грн + 50% боя: {calculated_debt_sum} грн)*"
+                    f"### 🎯 **Итого к удержанию:** `{total_staff_val} грн`\n"
+                    f"* **Ваш фиксированный сбор:** `{manual_val} грн`\n"
+                    f"* **+ 50% личного боя (авто):** `{calculated_debt_sum} грн`"
                 )
 
                 if can_edit:
@@ -492,7 +496,7 @@ def render_tableware_tab(selected_date, can_edit):
                             res_post.raise_for_status()
 
                             log_audit("Сохранены удержания с персонала", f"Месяц: {month_key}, Итого: {total_staff_val} грн")
-                            st.success(f"✅ Удержание из ЗП сохраненено: {total_staff_val} грн!")
+                            st.success(f"✅ Сохранено! Новая итоговая сумма: {total_staff_val} грн!")
                             time.sleep(1)
                             st.rerun()
                         except Exception as ex:
