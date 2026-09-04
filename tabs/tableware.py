@@ -116,7 +116,6 @@ def render_tableware_tab(selected_date, can_edit):
         inv_month_num = inv_date.month
         inv_month_start = f"{inv_year_num}-{inv_month_num:02d}-01"
 
-        # Приходы и бой берутся ВКЛЮЧАЯ дату прошлого переучета и СТРОГО ДО утреннего текущего переучета
         events_query = f"{SUPABASE_URL}/rest/v1/tableware_events?date=lt.{inv_date_str}"
         if last_inv_date:
             events_query += f"&date=gte.{last_inv_date}"
@@ -404,181 +403,226 @@ def render_tableware_tab(selected_date, can_edit):
 
         st.divider()
 
-        months = {
-            "Січень": 1, "Лютий": 2, "Березень": 3, "Квітень": 4,
-            "Травень": 5, "Червень": 6, "Липень": 7, "Серпень": 8,
-            "Вересень": 9, "Жовтень": 10, "Листопад": 11, "Грудень": 12,
-        }
-        col_m1, col_y1 = st.columns(2)
-        sel_m_name = col_m1.selectbox("Выберите месяц отчетности", list(months.keys()), index=st.session_state["form_date"].month - 1)
-        sel_y_num = col_y1.selectbox("Выберите год", [2025, 2026, 2027], index=1, key="rep_year_sel")
+        # --- МОДУЛЬ ВЫБОРА ДИАПАЗОНА ПЕРЕУЧЕТА ---
+        st.markdown("### 📊 Выбор периода переучета")
 
-        m_idx = months[sel_m_name]
-        month_key = f"{sel_y_num}-{m_idx:02d}"
-        start_d = f"{sel_y_num}-{m_idx:02d}-01"
-        end_d = f"{sel_y_num+1}-01-01" if m_idx == 12 else f"{sel_y_num}-{m_idx+1:02d}-01"
-
-        # --- 3. УДЕРЖАНИЯ С ПЕРСОНАЛА И КОМПЕНСАЦИИ ЗА МЕСЯЦ ---
-        st.markdown("### 💰 Удержания с персонала и компенсации за месяц")
-
-        loss_record = {}
+        inv_list = []
         try:
-            res_loss = requests.get(
-                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{month_key}",
+            res_all_inv = requests.get(
+                f"{SUPABASE_URL}/rest/v1/tableware_inventories?select=date,created_by&order=date.desc",
                 headers=headers,
             ).json()
-            if isinstance(res_loss, list) and len(res_loss) > 0:
-                loss_record = res_loss[0]
+            if isinstance(res_all_inv, list) and len(res_all_inv) > 0:
+                inv_list = res_all_inv
         except Exception:
             pass
 
-        col_w1, col_w2 = st.columns([2, 1])
+        if not inv_list:
+            st.info("ℹ️ В базе еще нет сохраненных финальных инвентаризаций. Оформите переучет в Веке 1.")
+        else:
+            inv_options = {
+                f"📅 Переучет от {inv['date']} (автор: {inv.get('created_by', '—')})": inv["date"]
+                for inv in inv_list
+            }
+            sel_inv_label = st.selectbox(
+                "Выберите конкретную инвентаризацию / период:",
+                options=list(inv_options.keys()),
+                key="ops_inv_selector",
+            )
+            sel_inv_date = inv_options[sel_inv_label]
 
-        with col_w1:
-            st.markdown("#### 🧾 Расчет удержаний с персонала")
-            calculated_debt_sum = 0
+            prev_inv_date = None
             try:
-                res_debts = requests.get(
-                    f"{SUPABASE_URL}/rest/v1/tableware_events?event_type=eq.breakage&waiter_debt=gt.0&date=gte.{start_d}&date=lt.{end_d}",
+                res_prev = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/tableware_inventories?date=lt.{sel_inv_date}&order=date.desc&limit=1",
                     headers=headers,
                 ).json()
-                if isinstance(res_debts, list) and len(res_debts) > 0:
-                    df_debts = pd.DataFrame(res_debts)
-                    summary_debts = df_debts.groupby("waiter_name")["waiter_debt"].sum().reset_index()
-                    summary_debts.columns = ["Сотрудник", "Начислено 50% боя (грн)"]
-                    calculated_debt_sum = int(summary_debts["Начислено 50% боя (грн)"].sum())
-                    st.dataframe(summary_debts, hide_index=True, use_container_width=True)
-                    st.caption(f"💥 **Итого 50% личного боя по всем сотрудникам:** `{calculated_debt_sum} грн`")
-                else:
-                    st.info("🎉 В этом месяце личного боя по персоналу не зафиксировано.")
+                if isinstance(res_prev, list) and len(res_prev) > 0:
+                    prev_inv_date = res_prev[0].get("date")
             except Exception:
                 pass
 
-            saved_total = get_int(loss_record.get("actual_staff_deduction", 0))
-            default_manual_val = max(0, saved_total - calculated_debt_sum) if saved_total > 0 else 0
+            st.caption(
+                f"ℹ️ **Период отчета:** с `{prev_inv_date if prev_inv_date else 'Начала работы'}` (утро) по `{sel_inv_date}` (утро)"
+            )
 
-            with st.form("save_monthly_deductions_form"):
-                manual_val = st.number_input(
-                    "Дополнительный / фиксированный сбор с персонала (грн):",
-                    min_value=0,
-                    value=default_manual_val,
-                    step=50,
-                    disabled=not can_edit,
-                    help="Укажите базовый сбор (например, 2100). К нему автоматически прибавится 50% от личного боя."
-                )
-
-                total_staff_val = manual_val + calculated_debt_sum
-
-                st.markdown("---")
-                st.markdown(
-                    f"### 🎯 **Итого к удержанию:** `{total_staff_val} грн`\n"
-                    f"* **Ваш фиксированный сбор:** `{manual_val} грн`\n"
-                    f"* **+ 50% личного боя (авто):** `{calculated_debt_sum} грн`"
-                )
-
-                if can_edit:
-                    if st.form_submit_button("💾 Сохранить сумму удержаний", type="primary", use_container_width=True):
-                        try:
-                            payload = {
-                                "month_year": month_key,
-                                "actual_staff_deduction": total_staff_val,
-                                "guest_payments": get_int(loss_record.get("guest_payments", 0)),
-                                "updated_at": (datetime.utcnow() + timedelta(hours=3)).isoformat(),
-                            }
-                            
-                            upsert_h = {**headers, "Prefer": "resolution=merge-duplicates"}
-                            res_post = requests.post(
-                                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?on_conflict=month_year",
-                                headers=upsert_h,
-                                json=payload,
-                            )
-                            res_post.raise_for_status()
-
-                            log_audit("Сохранены удержания с персонала", f"Месяц: {month_key}, Итого: {total_staff_val} грн")
-                            st.success(f"✅ Сохранено! Новая итоговая сумма: {total_staff_val} грн!")
-                            time.sleep(1)
-                            st.rerun()
-                        except Exception as ex:
-                            st.error(f"❌ Ошибка сохранения в Supabase: {ex}")
-
-        with col_w2:
-            st.markdown("#### 👤 Справочник персонала")
-            if can_edit:
-                with st.form("add_waiter_form", clear_on_submit=True):
-                    new_w_name = st.text_input("Имя сотрудника")
-                    if st.form_submit_button("➕ Добавить"):
-                        if new_w_name.strip():
-                            requests.post(
-                                f"{SUPABASE_URL}/rest/v1/tableware_waiters",
-                                headers=headers,
-                                json={"name": new_w_name.strip()},
-                            )
-                            st.success("Добавлено!")
-                            time.sleep(1)
-                            st.rerun()
-
-        st.divider()
-
-        # --- 4. ОБЩАЯ ВЕДОМОСТЬ БОЯ ЗА МЕСЯЦ ---
-        st.markdown("### 📋 Общая ведомость боя за месяц")
-
-        try:
-            res_breakage = requests.get(
-                f"{SUPABASE_URL}/rest/v1/tableware_events?event_type=eq.breakage&date=gte.{start_d}&date=lt.{end_d}&order=date.desc",
-                headers=headers,
-            ).json()
-
-            if isinstance(res_breakage, list) and len(res_breakage) > 0:
-                rows = []
-                tot_pcs = 0
-                tot_sum = 0
-                tot_guest = 0
-                tot_staff_debt = 0
-                tot_venue_loss = 0
-
-                for b in res_breakage:
-                    item_name = catalog_dict.get(b.get("item_id"), "Удаленная позиция")
-                    qty = get_int(b.get("qty", 0))
-                    u_price = get_int(b.get("unit_price", 0))
-                    tot = get_int(b.get("total_amount", 0))
-                    resp = str(b.get("responsible_type", ""))
-                    person = str(b.get("waiter_name", "")) if b.get("waiter_name") else "-"
-                    p_guest = get_int(b.get("paid_amount", 0))
-                    d_staff = get_int(b.get("waiter_debt", 0))
-                    unpaid = get_int(b.get("unpaid_amount", 0))
-
-                    tot_pcs += qty
-                    tot_sum += tot
-                    tot_guest += p_guest
-                    tot_staff_debt += d_staff
-                    tot_venue_loss += unpaid
-
-                    rows.append({
-                        "Дата": b.get("date"),
-                        "Посуда": item_name,
-                        "К-во (шт)": qty,
-                        "Цена (грн)": u_price,
-                        "Сумма (грн)": tot,
-                        "Причина / Кто": resp,
-                        "Сотрудник": person,
-                        "Оплачено гостем": p_guest,
-                        "Долг персонала": d_staff,
-                        "Списано на заведение": unpaid,
-                    })
-
-                df_br_report = pd.DataFrame(rows)
-
-                m_b1, m_b2, m_b3, m_b4 = st.columns(4)
-                m_b1.metric("Всего разбито", f"{tot_pcs} шт ({tot_sum} грн)")
-                m_b2.metric("Оплачено гостями", f"{tot_guest} грн")
-                m_b3.metric("Долг персонала (50%)", f"{tot_staff_debt} грн")
-                m_b4.metric("Потери заведения", f"{tot_venue_loss} грн")
-
-                st.dataframe(df_br_report, hide_index=True, use_container_width=True)
+            # Переучет делается утром, поэтому операции за период: >= prev_inv_date и < sel_inv_date
+            events_query = f"date=lt.{sel_inv_date}"
+            if prev_inv_date:
+                events_query += f"&date=gte.{prev_inv_date}"
             else:
-                st.info(f"ℹ️ В {sel_m_name} {sel_y_num} г. случаев боя не зафиксировано.")
-        except Exception as e:
-            st.error(f"Ошибка загрузки отчета: {e}")
+                start_of_month = f"{sel_inv_date[:7]}-01"
+                events_query += f"&date=gte.{start_of_month}"
+
+            # --- 3. УДЕРЖАНИЯ С ПЕРСОНАЛА И КОМПЕНСАЦИИ ЗА ПЕРИОД ---
+            st.divider()
+            st.markdown("### 💰 Удержания с персонала и компенсации за период")
+
+            sel_month_key = sel_inv_date[:7]
+            loss_record = {}
+            try:
+                res_loss = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{sel_inv_date}",
+                    headers=headers,
+                ).json()
+                if isinstance(res_loss, list) and len(res_loss) > 0:
+                    loss_record = res_loss[0]
+                else:
+                    res_loss_m = requests.get(
+                        f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{sel_month_key}",
+                        headers=headers,
+                    ).json()
+                    if isinstance(res_loss_m, list) and len(res_loss_m) > 0:
+                        loss_record = res_loss_m[0]
+            except Exception:
+                pass
+
+            col_w1, col_w2 = st.columns([2, 1])
+
+            with col_w1:
+                st.markdown("#### 🧾 Расчет удержаний с персонала")
+                calculated_debt_sum = 0
+                try:
+                    res_debts = requests.get(
+                        f"{SUPABASE_URL}/rest/v1/tableware_events?event_type=eq.breakage&waiter_debt=gt.0&{events_query}",
+                        headers=headers,
+                    ).json()
+                    if isinstance(res_debts, list) and len(res_debts) > 0:
+                        df_debts = pd.DataFrame(res_debts)
+                        summary_debts = df_debts.groupby("waiter_name")["waiter_debt"].sum().reset_index()
+                        summary_debts.columns = ["Сотрудник", "Начислено 50% боя (грн)"]
+                        calculated_debt_sum = int(summary_debts["Начислено 50% боя (грн)"].sum())
+                        st.dataframe(summary_debts, hide_index=True, use_container_width=True)
+                        st.caption(f"💥 **Итого 50% личного боя за этот период:** `{calculated_debt_sum} грн`")
+                    else:
+                        st.info("🎉 В этом периоде переучета личного боя по персоналу не зафиксировано.")
+                except Exception:
+                    pass
+
+                saved_total = get_int(loss_record.get("actual_staff_deduction", 0))
+                default_manual_val = max(0, saved_total - calculated_debt_sum) if saved_total > 0 else 0
+
+                with st.form("save_monthly_deductions_form"):
+                    manual_val = st.number_input(
+                        "Дополнительный / фиксированный сбор с персонала (грн):",
+                        min_value=0,
+                        value=default_manual_val,
+                        step=50,
+                        disabled=not can_edit,
+                        help="Укажите базовый сбор (например, 2100). К нему автоматически прибавится 50% от личного боя за выбранный период."
+                    )
+
+                    total_staff_val = manual_val + calculated_debt_sum
+
+                    st.markdown("---")
+                    st.markdown(
+                        f"### 🎯 **Итого к удержанию за период:** `{total_staff_val} грн`\n"
+                        f"* **Ваш фиксированный сбор:** `{manual_val} грн`\n"
+                        f"* **+ 50% личного боя (авто):** `{calculated_debt_sum} грн`"
+                    )
+
+                    if can_edit:
+                        if st.form_submit_button("💾 Сохранить сумму удержаний", type="primary", use_container_width=True):
+                            try:
+                                payload = {
+                                    "month_year": sel_inv_date,
+                                    "actual_staff_deduction": total_staff_val,
+                                    "guest_payments": get_int(loss_record.get("guest_payments", 0)),
+                                    "updated_at": (datetime.utcnow() + timedelta(hours=3)).isoformat(),
+                                }
+                                
+                                upsert_h = {**headers, "Prefer": "resolution=merge-duplicates"}
+                                res_post = requests.post(
+                                    f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?on_conflict=month_year",
+                                    headers=upsert_h,
+                                    json=payload,
+                                )
+                                res_post.raise_for_status()
+
+                                log_audit("Сохранены удержания с персонала", f"Период: {sel_inv_date}, Итого: {total_staff_val} грн")
+                                st.success(f"✅ Удержание за период сохранено: {total_staff_val} грн!")
+                                time.sleep(1)
+                                st.rerun()
+                            except Exception as ex:
+                                st.error(f"❌ Ошибка сохранения в Supabase: {ex}")
+
+            with col_w2:
+                st.markdown("#### 👤 Справочник персонала")
+                if can_edit:
+                    with st.form("add_waiter_form", clear_on_submit=True):
+                        new_w_name = st.text_input("Имя сотрудника")
+                        if st.form_submit_button("➕ Добавить"):
+                            if new_w_name.strip():
+                                requests.post(
+                                    f"{SUPABASE_URL}/rest/v1/tableware_waiters",
+                                    headers=headers,
+                                    json={"name": new_w_name.strip()},
+                                )
+                                st.success("Добавлено!")
+                                time.sleep(1)
+                                st.rerun()
+
+            # --- 4. ОБЩАЯ ВЕДОМОСТЬ БОЯ ЗА ПЕРИОД ---
+            st.divider()
+            st.markdown("### 📋 Общая ведомость боя за период переучета")
+
+            try:
+                res_breakage = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/tableware_events?event_type=eq.breakage&{events_query}&order=date.desc",
+                    headers=headers,
+                ).json()
+
+                if isinstance(res_breakage, list) and len(res_breakage) > 0:
+                    rows = []
+                    tot_pcs = 0
+                    tot_sum = 0
+                    tot_guest = 0
+                    tot_staff_debt = 0
+                    tot_venue_loss = 0
+
+                    for b in res_breakage:
+                        item_name = catalog_dict.get(b.get("item_id"), "Удаленная позиция")
+                        qty = get_int(b.get("qty", 0))
+                        u_price = get_int(b.get("unit_price", 0))
+                        tot = get_int(b.get("total_amount", 0))
+                        resp = str(b.get("responsible_type", ""))
+                        person = str(b.get("waiter_name", "")) if b.get("waiter_name") else "-"
+                        p_guest = get_int(b.get("paid_amount", 0))
+                        d_staff = get_int(b.get("waiter_debt", 0))
+                        unpaid = get_int(b.get("unpaid_amount", 0))
+
+                        tot_pcs += qty
+                        tot_sum += tot
+                        tot_guest += p_guest
+                        tot_staff_debt += d_staff
+                        tot_venue_loss += unpaid
+
+                        rows.append({
+                            "Дата": b.get("date"),
+                            "Посуда": item_name,
+                            "К-во (шт)": qty,
+                            "Цена (грн)": u_price,
+                            "Сумма (грн)": tot,
+                            "Причина / Кто": resp,
+                            "Сотрудник": person,
+                            "Оплачено гостем": p_guest,
+                            "Долг персонала": d_staff,
+                            "Списано на заведение": unpaid,
+                        })
+
+                    df_br_report = pd.DataFrame(rows)
+
+                    m_b1, m_b2, m_b3, m_b4 = st.columns(4)
+                    m_b1.metric("Всего разбито", f"{tot_pcs} шт ({tot_sum} грн)")
+                    m_b2.metric("Оплачено гостями", f"{tot_guest} грн")
+                    m_b3.metric("Долг персонала (50%)", f"{tot_staff_debt} грн")
+                    m_b4.metric("Потери заведения", f"{tot_venue_loss} грн")
+
+                    st.dataframe(df_br_report, hide_index=True, use_container_width=True)
+                else:
+                    st.info(f"ℹ️ За выбранный период (с {prev_inv_date if prev_inv_date else 'начала'} по {sel_inv_date}) случаев боя не зафиксировано.")
+            except Exception as e:
+                st.error(f"Ошибка загрузки отчета: {e}")
 
     # -------------------------------------------------------------------
     # ВЕК 3: ФИНАНСОВЫЙ УЧЕТ ПОТЕРЬ
@@ -645,7 +689,6 @@ def render_tableware_tab(selected_date, can_edit):
             else:
                 v_start = sum(get_int(row.get("prev_month_qty", 0)) * get_int(row.get("cost_price", 0)) for row in curr_payload)
 
-            # Учитываем приходы ВКЛЮЧАЯ дату предыдущего утреннего переучета и СТРОГО ДО утреннего текущего
             events_query = f"{SUPABASE_URL}/rest/v1/tableware_events?date=lt.{sel_inv_date}"
             if prev_inv_date:
                 events_query += f"&date=gte.{prev_inv_date}"
@@ -670,11 +713,18 @@ def render_tableware_tab(selected_date, can_edit):
             m_staff_actual = 0
             try:
                 res_loss = requests.get(
-                    f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{sel_month_key}",
+                    f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{sel_inv_date}",
                     headers=headers,
                 ).json()
                 if isinstance(res_loss, list) and len(res_loss) > 0:
                     m_staff_actual = get_int(res_loss[0].get("actual_staff_deduction", 0))
+                else:
+                    res_loss_m = requests.get(
+                        f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{sel_month_key}",
+                        headers=headers,
+                    ).json()
+                    if isinstance(res_loss_m, list) and len(res_loss_m) > 0:
+                        m_staff_actual = get_int(res_loss_m[0].get("actual_staff_deduction", 0))
             except Exception:
                 pass
 
