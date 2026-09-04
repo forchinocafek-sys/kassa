@@ -1379,11 +1379,12 @@ elif st.session_state["active_tab"] == "Сличительная":
 
                 running_balance = calc_end
 
-        # --- CSS ТАБЛИЦЫ PnL С ВЛОЖЕННЫМИ ПОДКТЕГОРИЯМИ ---
+        # --- CSS ТАБЛИЦЫ PnL С ОГРАНИЧЕНИЕМ ВЫСОТЫ И ВСЕГДА ВИДИМЫМ СКРОЛЛОМ ---
         pnl_css = """
         <style>
         .pnl-wrapper {
-            overflow-x: auto;
+            overflow: auto !important; /* Включает внутреннюю прокрутку по обеим осям */
+            max-height: 80vh; /* Контейнер занимает максимум 80% высоты экрана */
             width: 100%;
             margin-top: 15px;
             margin-bottom: 25px;
@@ -1392,6 +1393,24 @@ elif st.session_state["active_tab"] == "Сличительная":
             background-color: #ffffff;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
         }
+
+        /* Стильный и заметный скроллбар (всегда виден в пределах экрана) */
+        .pnl-wrapper::-webkit-scrollbar {
+            width: 8px;
+            height: 8px;
+        }
+        .pnl-wrapper::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 4px;
+        }
+        .pnl-wrapper::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 4px;
+        }
+        .pnl-wrapper::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
         .pnl-table {
             border-collapse: separate;
             border-spacing: 0;
@@ -1409,7 +1428,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             box-sizing: border-box !important;
             vertical-align: middle;
         }
-        /* Шапка таблицы */
+        /* Шапка таблицы - липнет к верху внутреннего окна */
         .pnl-table th {
             background-color: #f3f4f6;
             font-weight: 700;
@@ -1419,7 +1438,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             z-index: 3;
             white-space: nowrap;
         }
-        /* Первый столбец (Стаття) - Жёсткая фиксация геометрии */
+        /* Первый столбец (Стаття) - липнет к левому краю */
         .pnl-table th:first-child, 
         .pnl-table td:first-child {
             position: sticky;
