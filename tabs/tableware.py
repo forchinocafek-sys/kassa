@@ -8,7 +8,7 @@ from utils import log_audit, get_int, sanitize_df
 
 
 def render_tableware_tab(selected_date, can_edit):
-    st.subheader(f"🍽️ Переучет и учет потерь посуды ({selected_date})")
+    st.subheader("🍽️ Переучет и учет потерь посуды")
 
     if not can_edit:
         st.warning(
@@ -23,10 +23,27 @@ def render_tableware_tab(selected_date, can_edit):
     # ВЕК 1: ИНВЕНТАРИЗАЦИЯ НОМЕНКЛАТУРЫ
     # -------------------------------------------------------------------
     with tab_inv:
-        draft_session_key = f"tableware_inv_draft_{selected_date}"
-        supabase_draft_date = f"tableware_{selected_date}"
+        # Выбор даты инвентаризации
+        default_date_obj = (
+            datetime.strptime(selected_date, "%Y-%m-%d").date()
+            if isinstance(selected_date, str)
+            else selected_date
+        )
 
-        # Загрузка черновика из Supabase при первом открытии дня
+        col_date, _ = st.columns([1, 2])
+        with col_date:
+            inv_date = st.date_input(
+                "📅 Дата проведення інвентаризації:",
+                value=default_date_obj,
+                format="DD/MM/YYYY",
+                key="tableware_inv_date_picker",
+            )
+            inv_date_str = inv_date.strftime("%Y-%m-%d")
+
+        draft_session_key = f"tableware_inv_draft_{inv_date_str}"
+        supabase_draft_date = f"tableware_{inv_date_str}"
+
+        # Загрузка черновика из Supabase при выборе даты
         if draft_session_key not in st.session_state:
             st.session_state[draft_session_key] = {}
             try:
@@ -36,7 +53,6 @@ def render_tableware_tab(selected_date, can_edit):
                 ).json()
                 if isinstance(res_draft, list) and len(res_draft) > 0:
                     saved_payload = res_draft[0].get("payload", {})
-                    # Преобразуем строковые ключи обратно в int (ID товаров)
                     st.session_state[draft_session_key] = {
                         int(k): v for k, v in saved_payload.items() if str(k).isdigit()
                     }
@@ -61,7 +77,7 @@ def render_tableware_tab(selected_date, can_edit):
             df["cost_price"] = df["cost_price"].apply(get_int)
             df["prev_month_qty"] = df["prev_month_qty"].apply(get_int)
 
-            # Привязка значений к черновику (Фактичний залишок по умолчанию 0!)
+            # Привязка значений к черновику (Фактичний залишок по умолчанию 0)
             for field in ["arrived", "broken", "fact_qty"]:
                 df[field] = df["id"].map(
                     lambda item_id: st.session_state[draft_session_key]
@@ -104,8 +120,8 @@ def render_tableware_tab(selected_date, can_edit):
                                 headers=headers,
                                 json={"date": supabase_draft_date, "payload": draft_payload},
                             )
-                        log_audit("Збережено чернетку посуду", f"Дата: {selected_date}")
-                        st.toast("✅ Черновик переучета сохранен в облаке!", icon="💾")
+                        log_audit("Збережено чернетку посуду", f"Дата: {inv_date_str}")
+                        st.toast(f"✅ Черновик сохранен на {inv_date_str}!", icon="💾")
                     except Exception as e:
                         st.error(f"Помилка збереження чернетки: {e}")
 
@@ -126,7 +142,7 @@ def render_tableware_tab(selected_date, can_edit):
 
             st.write("")
 
-            # Таблица инвентаризации с настроенными ширинами колонок
+            # Таблица инвентаризации
             edited_df = st.data_editor(
                 df[
                     [
@@ -158,11 +174,11 @@ def render_tableware_tab(selected_date, can_edit):
                 },
                 hide_index=True,
                 use_container_width=True,
-                key=f"tableware_editor_{selected_date}",
+                key=f"tableware_editor_{inv_date_str}",
                 disabled=not can_edit,
             )
 
-            # Запись изменений из таблицы в сессию
+            # Запись изменений в сессию
             for _, r in edited_df.iterrows():
                 item_id = r["id"]
                 st.session_state[draft_session_key][item_id] = {
@@ -188,7 +204,7 @@ def render_tableware_tab(selected_date, can_edit):
                         f"{SUPABASE_URL}/rest/v1/tableware_inventories",
                         headers=headers,
                         json={
-                            "date": selected_date,
+                            "date": inv_date_str,
                             "created_by": st.session_state["user_name"],
                             "payload": payload_data,
                             "total_shortage_uah": int(tot_shortage),
@@ -204,15 +220,15 @@ def render_tableware_tab(selected_date, can_edit):
                             json={"prev_month_qty": get_int(r["fact_qty"])},
                         )
 
-                    # Очищаем черновик после финализации
+                    # Очищаем черновик после сохранения
                     requests.delete(
                         f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
                         headers=headers,
                     )
                     st.session_state[draft_session_key] = {}
 
-                    log_audit("Збережено фінальну інвентаризацію посуду", f"Дата: {selected_date}")
-                    st.success("🎉 Інвентаризацію успішно збережено!")
+                    log_audit("Збережено фінальну інвентаризацію посуду", f"Дата: {inv_date_str}")
+                    st.success(f"🎉 Інвентаризацію за {inv_date_str} успішно збережено!")
                     time.sleep(1)
                     st.rerun()
 
