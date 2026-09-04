@@ -1396,6 +1396,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             border-collapse: separate;
             border-spacing: 0;
             width: max-content;
+            table-layout: fixed !important;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 13px;
             color: #111827;
@@ -1405,7 +1406,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             border-bottom: 1px solid #e5e7eb;
             border-right: 1px solid #e5e7eb;
             text-align: center;
-            box-sizing: border-box;
+            box-sizing: border-box !important;
             vertical-align: middle;
         }
         /* Шапка таблицы */
@@ -1418,44 +1419,56 @@ elif st.session_state["active_tab"] == "Сличительная":
             z-index: 3;
             white-space: nowrap;
         }
-        /* Первый столбец (Стаття) */
-        .pnl-table th:first-child, .pnl-table td:first-child {
+        /* Первый столбец (Стаття) - Жёсткая фиксация геометрии */
+        .pnl-table th:first-child, 
+        .pnl-table td:first-child {
             position: sticky;
             left: 0;
-            z-index: 2;
+            z-index: 5 !important;
             text-align: left;
-            min-width: 320px;
-            width: 320px;
-            max-width: 320px;
-            border-right: 2px solid #cbd5e1;
+            width: 320px !important;
+            min-width: 320px !important;
+            max-width: 320px !important;
+            border-right: 2px solid #cbd5e1 !important;
             white-space: normal;
-            word-wrap: break-word;
+            word-break: break-word;
             line-height: 1.25;
+            background-color: #ffffff;
         }
         .pnl-table th:first-child {
-            z-index: 4;
-            background-color: #e2e8f0;
+            z-index: 6 !important;
+            background-color: #e2e8f0 !important;
             white-space: nowrap;
         }
 
         /* Столбцы дней (1-31) */
         .pnl-table th:not(:first-child):not(:last-child), 
         .pnl-table td:not(:first-child):not(:last-child) {
-            min-width: 75px;
-            width: 75px;
-            max-width: 75px;
+            width: 75px !important;
+            min-width: 75px !important;
+            max-width: 75px !important;
             white-space: nowrap;
         }
 
         /* Последний столбец (Всього) */
-        .pnl-table th:last-child, .pnl-table td:last-child {
-            min-width: 95px;
-            width: 95px;
+        .pnl-table th:last-child, 
+        .pnl-table td:last-child {
+            width: 95px !important;
+            min-width: 95px !important;
+            max-width: 95px !important;
             font-weight: 700;
             background-color: #f8fafc;
             border-left: 2px solid #cbd5e1;
             white-space: nowrap;
         }
+
+        /* Явные фоны первого столбца для каждого типа строк */
+        .pnl-row-inc td:first-child { background-color: #d1e7dd !important; color: #0f5132 !important; }
+        .pnl-row-exp-header td:first-child { background-color: #f8d7da !important; color: #842029 !important; }
+        .pnl-row-exp-total td:first-child { background-color: #fff3cd !important; color: #664d03 !important; }
+        .pnl-row-cash td:first-child { background-color: #e2e3e5 !important; color: #383d41 !important; }
+        .pnl-row-grp td:first-child { background-color: #e2e8f0 !important; }
+        .pnl-row-sub td:first-child { background-color: #ffffff !important; padding-left: 20px !important; font-weight: 400 !important; color: #374151 !important; }
 
         /* ИНДИКАТОР КОММЕНТАРИЯ (уголок Excel + подсветка) */
         .has-comment {
@@ -1506,17 +1519,7 @@ elif st.session_state["active_tab"] == "Сличительная":
             font-weight: 700 !important;
             border-top: 1px solid #cbd5e1 !important;
         }
-        .pnl-row-grp td:first-child {
-            background-color: #e2e8f0 !important;
-        }
 
-        /* Подкатегории */
-        .pnl-row-sub td:first-child {
-            padding-left: 20px !important;
-            font-weight: 400 !important;
-            color: #374151 !important;
-            background-color: #ffffff;
-        }
         .pnl-row-sub:nth-child(even) td:not(:first-child):not(:last-child):not(.has-comment) {
             background-color: #f9fafb;
         }
