@@ -60,12 +60,11 @@ def render_tableware_tab(selected_date, can_edit):
         draft_session_key = f"tableware_inv_draft_{inv_date_str}"
         editor_key = f"tableware_editor_{inv_date_str}"
 
-        # 1. Загрузка данных: сначала черновик, если его нет — финальная инвентаризация из tableware_inventories
+        # 1. Загрузка данных: черновик или ранее сохраненная инвентаризация
         if draft_session_key not in st.session_state:
             st.session_state[draft_session_key] = {}
             loaded_data = False
 
-            # Пробуем загрузить незавершенный черновик
             try:
                 res_draft = requests.get(
                     f"{SUPABASE_URL}/rest/v1/tableware_drafts?date=eq.{inv_date_str}",
@@ -80,7 +79,6 @@ def render_tableware_tab(selected_date, can_edit):
             except Exception:
                 pass
 
-            # Если черновика нет, подтягиваем ранее сохраненную финальную инвентаризацию
             if not loaded_data:
                 try:
                     res_inv = requests.get(
@@ -106,7 +104,7 @@ def render_tableware_tab(selected_date, can_edit):
                     item_id = catalog_items[row_idx]["id"]
                     st.session_state[draft_session_key][item_id] = get_int(changes["fact_qty"])
 
-        # 3. Поиск предыдущей инвентаризации для динамического периода операций
+        # 3. Поиск предыдущей инвентаризации
         last_inv_date = None
         try:
             res_prev_inv = requests.get(
@@ -157,7 +155,6 @@ def render_tableware_tab(selected_date, can_edit):
                 lambda x: get_int(st.session_state[draft_session_key].get(x, 0))
             )
 
-            # Расчетные столбцы
             df["calc_qty"] = df["prev_month_qty"] + df["arrived"] - df["broken"]
             df["diff"] = df["fact_qty"] - df["calc_qty"]
             df["shortage_uah"] = df.apply(
@@ -176,7 +173,7 @@ def render_tableware_tab(selected_date, can_edit):
                         }
                         upsert_headers = {**headers, "Prefer": "resolution=merge-duplicates"}
                         res_post = requests.post(
-                            f"{SUPABASE_URL}/rest/v1/tableware_drafts",
+                            f"{SUPABASE_URL}/rest/v1/tableware_drafts?on_conflict=date",
                             headers=upsert_headers,
                             json={
                                 "date": inv_date_str,
@@ -266,10 +263,9 @@ def render_tableware_tab(selected_date, can_edit):
                 if st.button("🚀 Зберегти фінальну інвентаризацію", type="primary", use_container_width=True):
                     payload_data = sanitize_df(edited_df)
                     
-                    # Сохраняем/обновляем в tableware_inventories (UPSERT)
                     upsert_inv_headers = {**headers, "Prefer": "resolution=merge-duplicates"}
-                    requests.post(
-                        f"{SUPABASE_URL}/rest/v1/tableware_inventories",
+                    res_inv_post = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/tableware_inventories?on_conflict=date",
                         headers=upsert_inv_headers,
                         json={
                             "date": inv_date_str,
@@ -279,8 +275,8 @@ def render_tableware_tab(selected_date, can_edit):
                             "total_surplus_uah": int(tot_surplus),
                         },
                     )
+                    res_inv_post.raise_for_status()
 
-                    # Перенос факта в базовый остаток для последующих расчетов
                     for _, r in edited_df.iterrows():
                         requests.patch(
                             f"{SUPABASE_URL}/rest/v1/tableware_catalog?id=eq.{r['id']}",
@@ -479,7 +475,7 @@ def render_tableware_tab(selected_date, can_edit):
                             
                             upsert_h = {**headers, "Prefer": "resolution=merge-duplicates"}
                             res_post = requests.post(
-                                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses",
+                                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?on_conflict=month_year",
                                 headers=upsert_h,
                                 json=payload,
                             )
