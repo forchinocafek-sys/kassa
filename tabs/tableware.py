@@ -453,9 +453,7 @@ def render_tableware_tab(selected_date, can_edit):
             except Exception:
                 pass
 
-            # Извлекаем ранее сохраненную итоговую сумму
             saved_total = get_int(loss_record.get("actual_staff_deduction", 0))
-            # Вычисляем сохраненную ручную часть
             default_manual_val = max(0, saved_total - calculated_debt_sum) if saved_total > 0 else 0
 
             with st.form("save_monthly_deductions_form"):
@@ -601,7 +599,29 @@ def render_tableware_tab(selected_date, can_edit):
         start_d = f"{sel_y}-{m_num:02d}-01"
         end_d = f"{sel_y+1}-01-01" if m_num == 12 else f"{sel_y}-{m_num+1:02d}-01"
 
-        v_start = sum(get_int(it.get("prev_month_qty", 0)) * get_int(it.get("cost_price", 0)) for it in catalog_items)
+        v_start = 0
+        v_fact = 0
+        has_inv = False
+
+        # Поиск сохраненной инвентаризации
+        try:
+            res_inv = requests.get(
+                f"{SUPABASE_URL}/rest/v1/tableware_inventories?date=gte.{start_d}&date=lt.{end_d}&order=date.desc&limit=1",
+                headers=headers,
+            ).json()
+            if isinstance(res_inv, list) and len(res_inv) > 0:
+                has_inv = True
+                inv_items = res_inv[0].get("payload", [])
+                if isinstance(inv_items, list):
+                    # Берем начальный и фактический остаток из зафиксированного отчета ревизии
+                    v_start = sum(get_int(row.get("prev_month_qty", 0)) * get_int(row.get("cost_price", 0)) for row in inv_items)
+                    v_fact = sum(get_int(row.get("fact_qty", 0)) * get_int(row.get("cost_price", 0)) for row in inv_items)
+        except Exception:
+            pass
+
+        # Если инвентаризация за текущий месяц еще не проводилась, считаем текущий v_start из справочника
+        if not has_inv:
+            v_start = sum(get_int(it.get("prev_month_qty", 0)) * get_int(it.get("cost_price", 0)) for it in catalog_items)
 
         v_deliv = 0
         m_guest_auto = 0
@@ -617,20 +637,6 @@ def render_tableware_tab(selected_date, can_edit):
                         v_deliv += get_int(ev.get("total_amount", 0))
                     elif ev.get("event_type") == "breakage":
                         m_guest_auto += get_int(ev.get("paid_amount", 0))
-        except Exception:
-            pass
-
-        v_fact = 0
-        has_inv = False
-        try:
-            res_inv = requests.get(
-                f"{SUPABASE_URL}/rest/v1/tableware_inventories?date=gte.{start_d}&date=lt.{end_d}&order=date.desc&limit=1",
-                headers=headers,
-            ).json()
-            if isinstance(res_inv, list) and len(res_inv) > 0:
-                has_inv = True
-                inv_items = res_inv[0].get("payload", [])
-                v_fact = sum(get_int(row.get("fact_qty", 0)) * get_int(row.get("cost_price", 0)) for row in inv_items)
         except Exception:
             pass
 
