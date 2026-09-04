@@ -16,6 +16,7 @@ from tabs.kassa import render_kassa_tab
 from tabs.archive import render_archive_tab
 from tabs.pnl import render_pnl_tab
 from tabs.supplies import render_supplies_tab
+from tabs.tableware import render_tableware_tab
 
 # --- НАЛАШТУВАННЯ СТОРІНКИ ---
 st.set_page_config(
@@ -163,9 +164,12 @@ elif active_tab == "Сличительная":
     render_pnl_tab()
 elif active_tab == "Закупки":
     render_supplies_tab(selected_date, can_edit)
+elif active_tab == "Посуда":
+    render_tableware_tab(selected_date, can_edit)
 
 # --- ПЛАВАЮЧЕ МЕНЮ РОУТИНГ ---
-fc1, fc2, fc3, fc4, fc5, fc6 = st.columns(6)
+fc1, fc2, fc3, fc4, fc5, fc6, fc7 = st.columns(7)
+
 with fc1:
     st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
     if (
@@ -175,6 +179,7 @@ with fc1:
         if st.button("🧮", key="nav_kas"):
             st.session_state["active_tab"] = "Касса"
             st.rerun()
+
 with fc2:
     if (
         "Архів" in st.session_state["allowed_tabs"]
@@ -183,6 +188,7 @@ with fc2:
         if st.button("🗃️", key="nav_arch"):
             st.session_state["active_tab"] = "Архів"
             st.rerun()
+
 with fc3:
     if (
         "Сличительная" in st.session_state["allowed_tabs"]
@@ -191,6 +197,7 @@ with fc3:
         if st.button("📊", key="nav_pnl"):
             st.session_state["active_tab"] = "Сличительная"
             st.rerun()
+
 with fc4:
     if (
         "Закупки" in st.session_state["allowed_tabs"]
@@ -199,7 +206,17 @@ with fc4:
         if st.button("🧹", key="nav_supplies"):
             st.session_state["active_tab"] = "Закупки"
             st.rerun()
+
 with fc5:
+    if (
+        "Посуда" in st.session_state["allowed_tabs"]
+        and active_tab != "Посуда"
+    ):
+        if st.button("🍽️", key="nav_tableware"):
+            st.session_state["active_tab"] = "Посуда"
+            st.rerun()
+
+with fc6:
     with st.popover("📅"):
         d = st.date_input(
             "Оберіть дату",
@@ -211,6 +228,7 @@ with fc5:
             st.session_state["form_date"] = d
             prefetch_week_window(d)
             st.rerun()
+            
     if active_tab == "Касса" and can_edit:
         if st.button("💾", key="fab_save"):
             try:
@@ -227,7 +245,8 @@ with fc5:
                     st.toast("✅ Чернетку збережено!", icon="💾")
             except Exception:
                 st.error("Помилка даних.")
-with fc6:
+
+with fc7:
     if st.button("🚫", key="fab_logout"):
         log_audit("Вийшов з системи")
         st.session_state.clear()
