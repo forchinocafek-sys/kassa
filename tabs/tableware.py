@@ -58,15 +58,14 @@ def render_tableware_tab(selected_date, can_edit):
             inv_date_str = inv_date.strftime("%Y-%m-%d")
 
         draft_session_key = f"tableware_inv_draft_{inv_date_str}"
-        supabase_draft_date = f"tableware_{inv_date_str}"
         editor_key = f"tableware_editor_{inv_date_str}"
 
-        # 1. Загрузка черновика при первом открытии
+        # 1. Загрузка черновика из таблицы tableware_drafts
         if draft_session_key not in st.session_state:
             st.session_state[draft_session_key] = {}
             try:
                 res_draft = requests.get(
-                    f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
+                    f"{SUPABASE_URL}/rest/v1/tableware_drafts?date=eq.{inv_date_str}",
                     headers=headers,
                 ).json()
                 if isinstance(res_draft, list) and len(res_draft) > 0:
@@ -77,7 +76,7 @@ def render_tableware_tab(selected_date, can_edit):
             except Exception:
                 pass
 
-        # 2. Мгновенная синхронизация ввода из st.data_editor ДО расчета формул
+        # 2. Синхронизация ввода ДО расчета формул
         if editor_key in st.session_state and "edited_rows" in st.session_state[editor_key]:
             edited_rows = st.session_state[editor_key]["edited_rows"]
             for row_idx_str, changes in edited_rows.items():
@@ -86,13 +85,32 @@ def render_tableware_tab(selected_date, can_edit):
                     item_id = catalog_items[row_idx]["id"]
                     st.session_state[draft_session_key][item_id] = get_int(changes["fact_qty"])
 
-        # Загрузка приходов и боев
-        events_summary = {}
+        # 3. Умный поиск предыдущей инвентаризации для динамического периода операций
+        last_inv_date = None
         try:
-            res_ev = requests.get(
-                f"{SUPABASE_URL}/rest/v1/tableware_events?select=*",
+            res_prev_inv = requests.get(
+                f"{SUPABASE_URL}/rest/v1/tableware_inventories?date=lt.{inv_date_str}&order=date.desc&limit=1",
                 headers=headers,
             ).json()
+            if isinstance(res_prev_inv, list) and len(res_prev_inv) > 0:
+                last_inv_date = res_prev_inv[0].get("date")
+        except Exception:
+            pass
+
+        # Формирование SQL-фильтра событий: от последней ревизии до текущей даты
+        inv_year_num = inv_date.year
+        inv_month_num = inv_date.month
+        inv_month_start = f"{inv_year_num}-{inv_month_num:02d}-01"
+
+        events_query = f"{SUPABASE_URL}/rest/v1/tableware_events?date=lte.{inv_date_str}"
+        if last_inv_date:
+            events_query += f"&date=gt.{last_inv_date}"
+        else:
+            events_query += f"&date=gte.{inv_month_start}"
+
+        events_summary = {}
+        try:
+            res_ev = requests.get(events_query, headers=headers).json()
             if isinstance(res_ev, list):
                 for ev in res_ev:
                     item_id = ev.get("item_id")
@@ -119,7 +137,7 @@ def render_tableware_tab(selected_date, can_edit):
                 lambda x: get_int(st.session_state[draft_session_key].get(x, 0))
             )
 
-            # Строгий расчет формул
+            # Расчетные столбцы
             df["calc_qty"] = df["prev_month_qty"] + df["arrived"] - df["broken"]
             df["diff"] = df["fact_qty"] - df["calc_qty"]
             df["shortage_uah"] = df.apply(
@@ -136,33 +154,28 @@ def render_tableware_tab(selected_date, can_edit):
                         draft_payload = {
                             str(k): v for k, v in st.session_state[draft_session_key].items()
                         }
-                        check_draft = requests.get(
-                            f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
-                            headers=headers,
-                        ).json()
+                        upsert_headers = {**headers, "Prefer": "resolution=merge-duplicates"}
+                        res_post = requests.post(
+                            f"{SUPABASE_URL}/rest/v1/tableware_drafts",
+                            headers=upsert_headers,
+                            json={
+                                "date": inv_date_str,
+                                "payload": draft_payload,
+                                "updated_at": (datetime.utcnow() + timedelta(hours=3)).isoformat(),
+                            },
+                        )
+                        res_post.raise_for_status()
 
-                        if isinstance(check_draft, list) and len(check_draft) > 0:
-                            requests.patch(
-                                f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
-                                headers=headers,
-                                json={"payload": draft_payload},
-                            )
-                        else:
-                            requests.post(
-                                f"{SUPABASE_URL}/rest/v1/drafts",
-                                headers=headers,
-                                json={"date": supabase_draft_date, "payload": draft_payload},
-                            )
                         log_audit("Збережено чернетку посуду", f"Дата: {inv_date_str}")
                         st.toast("✅ Черновик сохранен в облаке!", icon="💾")
                     except Exception as e:
-                        st.error(f"Ошибка сохранения: {e}")
+                        st.error(f"❌ Ошибка сохранения черновика: {e}")
 
             with c_dr2:
                 if st.button("🗑️ Очистить ввод", use_container_width=True, disabled=not can_edit):
                     st.session_state[draft_session_key] = {}
                     requests.delete(
-                        f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
+                        f"{SUPABASE_URL}/rest/v1/tableware_drafts?date=eq.{inv_date_str}",
                         headers=headers,
                     )
                     st.rerun()
@@ -173,7 +186,6 @@ def render_tableware_tab(selected_date, can_edit):
 
             st.write("")
 
-            # Блокировка всех расчетных колонок (редактируется ТОЛЬКО Fact)
             disabled_columns = [
                 "name",
                 "cost_price",
@@ -245,6 +257,7 @@ def render_tableware_tab(selected_date, can_edit):
                         },
                     )
 
+                    # Перенос факта в базовый остаток для последующих расчетов
                     for _, r in edited_df.iterrows():
                         requests.patch(
                             f"{SUPABASE_URL}/rest/v1/tableware_catalog?id=eq.{r['id']}",
@@ -253,7 +266,7 @@ def render_tableware_tab(selected_date, can_edit):
                         )
 
                     requests.delete(
-                        f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{supabase_draft_date}",
+                        f"{SUPABASE_URL}/rest/v1/tableware_drafts?date=eq.{inv_date_str}",
                         headers=headers,
                     )
                     st.session_state[draft_session_key] = {}
@@ -375,22 +388,108 @@ def render_tableware_tab(selected_date, can_edit):
 
         st.divider()
 
-        # --- 3. ОБЩАЯ ВЕДОМОСТЬ БОЯ ЗА МЕСЯЦ ---
-        st.markdown("### 📋 Общая ведомость боя за месяц")
-
+        # Выбор месяца для отчетов
         months = {
             "Січень": 1, "Лютий": 2, "Березень": 3, "Квітень": 4,
             "Травень": 5, "Червень": 6, "Липень": 7, "Серпень": 8,
             "Вересень": 9, "Жовтень": 10, "Листопад": 11, "Грудень": 12,
         }
         col_m1, col_y1 = st.columns(2)
-        sel_m_name = col_m1.selectbox("Выберите месяц для отчета", list(months.keys()), index=st.session_state["form_date"].month - 1)
+        sel_m_name = col_m1.selectbox("Выберите месяц отчетности", list(months.keys()), index=st.session_state["form_date"].month - 1)
         sel_y_num = col_y1.selectbox("Выберите год", [2025, 2026, 2027], index=1, key="rep_year_sel")
 
         m_idx = months[sel_m_name]
         month_key = f"{sel_y_num}-{m_idx:02d}"
         start_d = f"{sel_y_num}-{m_idx:02d}-01"
         end_d = f"{sel_y_num+1}-01-01" if m_idx == 12 else f"{sel_y_num}-{m_idx+1:02d}-01"
+
+        # --- 3. УДЕРЖАНИЯ С ПЕРСОНАЛА И КОМПЕНСАЦИИ ЗА МЕСЯЦ ---
+        st.markdown("### 💰 Удержания с персонала и компенсации за месяц")
+
+        loss_record = {"actual_staff_deduction": 0, "guest_payments": 0}
+        try:
+            res_loss = requests.get(
+                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{month_key}",
+                headers=headers,
+            ).json()
+            if isinstance(res_loss, list) and len(res_loss) > 0:
+                loss_record = res_loss[0]
+        except Exception:
+            pass
+
+        col_w1, col_w2 = st.columns([2, 1])
+
+        with col_w1:
+            st.markdown("#### 🧾 Расчет удержаний с персонала (50% от боя)")
+            try:
+                res_debts = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/tableware_events?event_type=eq.breakage&waiter_debt=gt.0&date=gte.{start_d}&date=lt.{end_d}",
+                    headers=headers,
+                ).json()
+                if isinstance(res_debts, list) and len(res_debts) > 0:
+                    df_debts = pd.DataFrame(res_debts)
+                    summary_debts = df_debts.groupby("waiter_name")["waiter_debt"].sum().reset_index()
+                    summary_debts.columns = ["Сотрудник", "Начислено к удержанию (грн)"]
+                    st.dataframe(summary_debts, hide_index=True, use_container_width=True)
+                else:
+                    st.info("🎉 В этом месяце удержаний с персонала нет!")
+            except Exception:
+                pass
+
+            with st.form("save_monthly_deductions_form"):
+                st.caption("Укажите сумму, которая реально списывается из ЗП персонала в конце месяца:")
+                actual_staff_val = st.number_input(
+                    "Фактически удержано из ЗП персонала за месяц (грн):",
+                    min_value=0,
+                    value=get_int(loss_record.get("actual_staff_deduction", 0)),
+                    disabled=not can_edit,
+                )
+
+                if can_edit:
+                    if st.form_submit_button("💾 Сохранить сумму удержаний", type="primary", use_container_width=True):
+                        try:
+                            payload = {
+                                "month_year": month_key,
+                                "actual_staff_deduction": actual_staff_val,
+                                "guest_payments": get_int(loss_record.get("guest_payments", 0)),
+                                "updated_at": (datetime.utcnow() + timedelta(hours=3)).isoformat(),
+                            }
+                            
+                            upsert_h = {**headers, "Prefer": "resolution=merge-duplicates"}
+                            res_post = requests.post(
+                                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses",
+                                headers=upsert_h,
+                                json=payload,
+                            )
+                            res_post.raise_for_status()
+
+                            log_audit("Сохранены удержания с персонала", f"Месяц: {month_key}, Сумма: {actual_staff_val}")
+                            st.success("✅ Удержание из ЗП успешно сохранено!")
+                            time.sleep(1)
+                            st.rerun()
+                        except Exception as ex:
+                            st.error(f"❌ Ошибка сохранения в Supabase: {ex}")
+
+        with col_w2:
+            st.markdown("#### 👤 Справочник персонала")
+            if can_edit:
+                with st.form("add_waiter_form", clear_on_submit=True):
+                    new_w_name = st.text_input("Имя сотрудника")
+                    if st.form_submit_button("➕ Добавить"):
+                        if new_w_name.strip():
+                            requests.post(
+                                f"{SUPABASE_URL}/rest/v1/tableware_waiters",
+                                headers=headers,
+                                json={"name": new_w_name.strip()},
+                            )
+                            st.success("Добавлено!")
+                            time.sleep(1)
+                            st.rerun()
+
+        st.divider()
+
+        # --- 4. ОБЩАЯ ВЕДОМОСТЬ БОЯ ЗА МЕСЯЦ ---
+        st.markdown("### 📋 Общая ведомость боя за месяц")
 
         try:
             res_breakage = requests.get(
@@ -449,91 +548,6 @@ def render_tableware_tab(selected_date, can_edit):
                 st.info(f"ℹ️ В {sel_m_name} {sel_y_num} г. случаев боя не зафиксировано.")
         except Exception as e:
             st.error(f"Ошибка загрузки отчета: {e}")
-
-        st.divider()
-
-        # --- 4. ДОЛГИ И ФАКТИЧЕСКИЕ УДЕРЖАНИЯ С ПЕРСОНАЛА ---
-        st.markdown("### 💰 Удержания с персонала и компенсации за месяц")
-
-        loss_record = {"actual_staff_deduction": 0, "guest_payments": 0}
-        try:
-            res_loss = requests.get(
-                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?month_year=eq.{month_key}",
-                headers=headers,
-            ).json()
-            if isinstance(res_loss, list) and len(res_loss) > 0:
-                loss_record = res_loss[0]
-        except Exception:
-            pass
-
-        col_w1, col_w2 = st.columns([2, 1])
-
-        with col_w1:
-            st.markdown("#### 🧾 Расчет удержаний с персонала (50% от боя)")
-            try:
-                res_debts = requests.get(
-                    f"{SUPABASE_URL}/rest/v1/tableware_events?event_type=eq.breakage&waiter_debt=gt.0&date=gte.{start_d}&date=lt.{end_d}",
-                    headers=headers,
-                ).json()
-                if isinstance(res_debts, list) and len(res_debts) > 0:
-                    df_debts = pd.DataFrame(res_debts)
-                    summary_debts = df_debts.groupby("waiter_name")["waiter_debt"].sum().reset_index()
-                    summary_debts.columns = ["Сотрудник", "Начислено к удержанию (грн)"]
-                    st.dataframe(summary_debts, hide_index=True, use_container_width=True)
-                else:
-                    st.info("🎉 В этом месяце удержаний с персонала нет!")
-            except Exception:
-                pass
-
-            with st.form("save_monthly_deductions_form"):
-                st.caption("Укажите сумму, которая реально списывается из ЗП персонала в конце месяца:")
-                actual_staff_val = st.number_input(
-                    "Фактически удержано из ЗП персонала за месяц (грн):",
-                    min_value=0,
-                    value=get_int(loss_record.get("actual_staff_deduction", 0)),
-                    disabled=not can_edit,
-                )
-
-                if can_edit:
-                    if st.form_submit_button("💾 Сохранить сумму удержаний", type="primary", use_container_width=True):
-                        payload = {
-                            "month_year": month_key,
-                            "actual_staff_deduction": actual_staff_val,
-                            "guest_payments": get_int(loss_record.get("guest_payments", 0)),
-                            "updated_at": (datetime.utcnow() + timedelta(hours=3)).isoformat(),
-                        }
-                        if loss_record.get("id"):
-                            requests.patch(
-                                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses?id=eq.{loss_record['id']}",
-                                headers=headers,
-                                json=payload,
-                            )
-                        else:
-                            requests.post(
-                                f"{SUPABASE_URL}/rest/v1/tableware_monthly_losses",
-                                headers=headers,
-                                json=payload,
-                            )
-                        log_audit("Сохранены удержания с персонала", f"Месяц: {month_key}, Сумма: {actual_staff_val}")
-                        st.success("✅ Удержание из ЗП сохранено!")
-                        time.sleep(1)
-                        st.rerun()
-
-        with col_w2:
-            st.markdown("#### 👤 Справочник персонала")
-            if can_edit:
-                with st.form("add_waiter_form", clear_on_submit=True):
-                    new_w_name = st.text_input("Имя сотрудника")
-                    if st.form_submit_button("➕ Добавить"):
-                        if new_w_name.strip():
-                            requests.post(
-                                f"{SUPABASE_URL}/rest/v1/tableware_waiters",
-                                headers=headers,
-                                json={"name": new_w_name.strip()},
-                            )
-                            st.success("Добавлено!")
-                            time.sleep(1)
-                            st.rerun()
 
     # -------------------------------------------------------------------
     # ВЕК 3: ФИНАНСОВЫЙ УЧЕТ ПОТЕРЬ
