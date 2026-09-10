@@ -51,10 +51,22 @@ components.html(
 st.markdown(
     """
 <style>
-    .block-container { padding-top: 1rem !important; padding-bottom: 1rem !important; }
+    /* Минимальный верхний отступ страницы */
+    .block-container { 
+        padding-top: 0.2rem !important; 
+        padding-bottom: 1rem !important; 
+    }
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
     header[data-testid="stHeader"], #MainMenu, footer { display: none !important; }
-    h1 { font-family: 'Permanent Marker', cursive !important; font-size: 3em !important; margin-top: 0 !important; padding-top: 0 !important; }
+    
+    /* Заголовок подтянут максимально к верху */
+    h1 { 
+        font-family: 'Permanent Marker', cursive !important; 
+        font-size: 3em !important; 
+        margin-top: 0 !important; 
+        margin-bottom: 0.5rem !important;
+        padding-top: 0 !important; 
+    }
     .stApp { background-color: #FAF0E6 !important; }
     .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #ffffff !important; border: 1px solid #d1d5db !important; }
@@ -64,7 +76,7 @@ st.markdown(
 
     /* GHOST MENU */
     #is-floating { display: none; }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) { position: fixed !important; top: 30px !important; right: 15px !important; z-index: 99999 !important; width: 50px !important; display: flex !important; flex-direction: column !important; gap: 12px !important; background: transparent !important; padding: 0 !important; opacity: 0.35 !important; transition: opacity 0.3s ease !important; }
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) { position: fixed !important; top: 15px !important; right: 15px !important; z-index: 99999 !important; width: 50px !important; display: flex !important; flex-direction: column !important; gap: 12px !important; background: transparent !important; padding: 0 !important; opacity: 0.35 !important; transition: opacity 0.3s ease !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating):hover { opacity: 1 !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] { width: 50px !important; min-width: 50px !important; height: 50px !important; flex: 0 0 50px !important; margin: 0 !important; padding: 0 !important; }
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button { width: 50px !important; height: 50px !important; border-radius: 12px !important; background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; }
@@ -74,14 +86,6 @@ st.markdown(
 )
 
 st.title("Cafe Forchino🍋")
-
-with st.popover("🚀 Версія: 3.1.0 (Оновлений PnL)"):
-    st.markdown("""
-    **Останні оновлення:**
-    * **v3.1.0:** У вкладці «Сличительная» закріплено першу колонку з назвами статей при горизонтальній прокрутці, вирівняно однакову ширину колонок днів та зроблено відображення таблиці на повну висоту.
-    * **v3.0.0:** Додано інтерактивний модуль закупівлі господарських товарів та упаковки з генерацією текстових повідомлень і збереженням історії замовлень.
-    * **v2.9.0:** Впроваджено рівні доступу та журнал аудиту.
-    """)
 
 # --- АВТОРИЗАЦІЯ ---
 auth_token = st.query_params.get("auth")
