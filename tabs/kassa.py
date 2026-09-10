@@ -211,46 +211,75 @@ def render_kassa_tab(selected_date, can_edit):
         with st.container(border=True):
             fact_header = st.empty()
 
-            col_f1, col_f2 = st.columns(2)
+            # Сетка ввода купюр и монет в 2 колонки
+            fc1, fc2 = st.columns(2)
 
-            def cash_row(col, label, mult):
-                c1, c2 = col.columns([1, 2.5])
-                with c1:
-                    st.markdown(
-                        f"<div style='margin-top:6px;font-weight:600;font-size:14px;color:#374151;'>{label}</div>",
-                        unsafe_allow_html=True,
-                    )
-                with c2:
-                    qty = get_int(
-                        st.text_input(
-                            f"q{label}",
-                            label_visibility="collapsed",
-                            placeholder="0",
-                            key=f"qty_{label}_{selected_date}",
-                            disabled=not can_edit,
-                        )
-                    )
-                return qty, qty * mult
-
-            with col_f1:
-                st.caption("🪙 Монети (сума)")
+            with fc1:
                 m_coins = get_int(
                     st.text_input(
-                        "Монети",
-                        label_visibility="collapsed",
+                        "🪙 Монети (сума)",
                         placeholder="0",
                         key=f"coins_live_{selected_date}",
                         disabled=not can_edit,
                     )
                 )
-                q_20, v_20 = cash_row(col_f1, "20 грн", 20)
-                q_50, v_50 = cash_row(col_f1, "50 грн", 50)
-                q_100, v_100 = cash_row(col_f1, "100 грн", 100)
+                q_20 = get_int(
+                    st.text_input(
+                        "💵 20 грн",
+                        placeholder="0",
+                        key=f"qty_20_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_50 = get_int(
+                    st.text_input(
+                        "💵 50 грн",
+                        placeholder="0",
+                        key=f"qty_50_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_100 = get_int(
+                    st.text_input(
+                        "💵 100 грн",
+                        placeholder="0",
+                        key=f"qty_100_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
 
-            with col_f2:
-                q_200, v_200 = cash_row(col_f2, "200 грн", 200)
-                q_500, v_500 = cash_row(col_f2, "500 грн", 500)
-                q_1000, v_1000 = cash_row(col_f2, "1000 грн", 1000)
+            with fc2:
+                q_200 = get_int(
+                    st.text_input(
+                        "💵 200 грн",
+                        placeholder="0",
+                        key=f"qty_200_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_500 = get_int(
+                    st.text_input(
+                        "💵 500 грн",
+                        placeholder="0",
+                        key=f"qty_500_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_1000 = get_int(
+                    st.text_input(
+                        "💵 1000 грн",
+                        placeholder="0",
+                        key=f"qty_1000_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+
+            v_20 = q_20 * 20
+            v_50 = q_50 * 50
+            v_100 = q_100 * 100
+            v_200 = q_200 * 200
+            v_500 = q_500 * 500
+            v_1000 = q_1000 * 1000
 
             cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
 
