@@ -273,6 +273,14 @@ def render_kassa_tab(selected_date, can_edit):
                         disabled=not can_edit,
                     )
                 )
+                q_2000 = get_int(
+                    st.text_input(
+                        "💵 2000 грн",
+                        placeholder="0",
+                        key=f"qty_2000_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
 
             v_20 = q_20 * 20
             v_50 = q_50 * 50
@@ -280,8 +288,18 @@ def render_kassa_tab(selected_date, can_edit):
             v_200 = q_200 * 200
             v_500 = q_500 * 500
             v_1000 = q_1000 * 1000
+            v_2000 = q_2000 * 2000
 
-            cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
+            cash_pure = (
+                m_coins
+                + v_20
+                + v_50
+                + v_100
+                + v_200
+                + v_500
+                + v_1000
+                + v_2000
+            )
 
             fact_header.markdown(
                 f"""
@@ -327,6 +345,7 @@ def render_kassa_tab(selected_date, can_edit):
             "200": q_200,
             "500": q_500,
             "1000": q_1000,
+            "2000": q_2000,
         },
     }
 
@@ -350,6 +369,7 @@ def render_kassa_tab(selected_date, can_edit):
                         "200": q_200,
                         "500": q_500,
                         "1000": q_1000,
+                        "2000": q_2000,
                     },
                 }
                 try:
