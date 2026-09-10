@@ -128,7 +128,6 @@ def render_kassa_tab(selected_date, can_edit):
                         "Стаття надходження",
                         options=INCOME_CHOICES,
                         required=False,
-                        placeholder="",
                     ),
                     "Сума": st.column_config.NumberColumn(
                         "Сума", min_value=0, step=1, format="%d грн", placeholder=""
@@ -178,7 +177,6 @@ def render_kassa_tab(selected_date, can_edit):
                         "Стаття витрат",
                         options=SHORT_EXPENSE_CHOICES,
                         required=False,
-                        placeholder="",
                     ),
                     "Сума": st.column_config.NumberColumn(
                         "Сума", min_value=0, step=1, format="%d грн", placeholder=""
