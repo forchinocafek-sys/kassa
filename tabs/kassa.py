@@ -132,9 +132,7 @@ def render_kassa_tab(selected_date, can_edit):
                     "Сума": st.column_config.NumberColumn(
                         "Сума", min_value=0, step=1, format="%d грн"
                     ),
-                    "Примітка": st.column_config.TextColumn(
-                        "Деталі", placeholder=""
-                    ),
+                    "Примітка": st.column_config.TextColumn("Деталі"),
                 },
                 num_rows="dynamic",
                 use_container_width=True,
@@ -181,9 +179,7 @@ def render_kassa_tab(selected_date, can_edit):
                     "Сума": st.column_config.NumberColumn(
                         "Сума", min_value=0, step=1, format="%d грн"
                     ),
-                    "Примітка": st.column_config.TextColumn(
-                        "Деталі", placeholder=""
-                    ),
+                    "Примітка": st.column_config.TextColumn("Деталі"),
                 },
                 num_rows="dynamic",
                 use_container_width=True,
@@ -220,15 +216,11 @@ def render_kassa_tab(selected_date, can_edit):
             edited_adv_df = st.data_editor(
                 adv_df,
                 column_config={
-                    "Співробітник": st.column_config.TextColumn(
-                        "Співробітник", placeholder=""
-                    ),
+                    "Співробітник": st.column_config.TextColumn("Співробітник"),
                     "Сума": st.column_config.NumberColumn(
                         "Сума", min_value=0, step=1, format="%d грн"
                     ),
-                    "Примітка": st.column_config.TextColumn(
-                        "Деталі", placeholder=""
-                    ),
+                    "Примітка": st.column_config.TextColumn("Деталі"),
                 },
                 num_rows="dynamic",
                 use_container_width=True,
@@ -242,7 +234,7 @@ def render_kassa_tab(selected_date, can_edit):
                 f"""
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 19px; font-weight: 700; color: #111827;">💸 Аванси</span>
-                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
+                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 15px;">
                         {subtotal_adv} грн
                     </span>
                 </div>
