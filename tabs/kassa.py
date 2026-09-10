@@ -21,10 +21,10 @@ def render_kassa_tab(selected_date, can_edit):
 
     start_balance = get_int(get_start_balance(selected_date))
 
-    # --- СТИЛИЗОВАННЫЙ БЛОК: "На початок дня" В ОДНУ СТРОКУ ---
+    # --- СТИЛИЗОВАННЫЙ БЛОК: "На початок дня" ---
     st.markdown(
         f"""
-        <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; margin-bottom: 12px;">
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 0px; margin-bottom: 4px;">
             <span style="font-size: 20px; font-weight: 700; color: #111827;">🏦 На початок дня:</span>
             <span style="
                 background-color: #ffffff; 
@@ -43,7 +43,9 @@ def render_kassa_tab(selected_date, can_edit):
         unsafe_allow_html=True,
     )
 
-    st.divider()
+    # Компактный разделитель (На початок дня ➔ Надходження)
+    st.markdown("<hr style='margin: 8px 0 12px 0; border: none; border-top: 1px solid #d1d5db;'>", unsafe_allow_html=True)
+
     col_t1, col_t2 = st.columns(2)
     with col_t1:
         st.subheader("📈Надходження:")
@@ -72,7 +74,7 @@ def render_kassa_tab(selected_date, can_edit):
             get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows()
         )
         st.markdown(
-            f"<p style='font-weight: bold; color: #2e7d32;'>Загалом: {subtotal_inc} грн</p>",
+            f"<p style='font-weight: bold; color: #2e7d32; margin-top: 4px; margin-bottom: 0px;'>Загалом: {subtotal_inc} грн</p>",
             unsafe_allow_html=True,
         )
 
@@ -101,11 +103,13 @@ def render_kassa_tab(selected_date, can_edit):
             get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows()
         )
         st.markdown(
-            f"<p style='font-weight: bold; color: #c62828;'>Загалом: {subtotal_exp} грн</p>",
+            f"<p style='font-weight: bold; color: #c62828; margin-top: 4px; margin-bottom: 0px;'>Загалом: {subtotal_exp} грн</p>",
             unsafe_allow_html=True,
         )
 
-    st.divider()
+    # Компактный разделитель (Загалом ➔ Аванси)
+    st.markdown("<hr style='margin: 10px 0 12px 0; border: none; border-top: 1px solid #d1d5db;'>", unsafe_allow_html=True)
+
     col_b1, col_b2 = st.columns(2)
     with col_b1:
         st.subheader("💸Аванси:")
@@ -124,7 +128,7 @@ def render_kassa_tab(selected_date, can_edit):
             get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows()
         )
         st.markdown(
-            f"<p style='font-weight: bold; color: #ef6c00;'>Загалом: {subtotal_adv} грн</p>",
+            f"<p style='font-weight: bold; color: #ef6c00; margin-top: 4px; margin-bottom: 0px;'>Загалом: {subtotal_adv} грн</p>",
             unsafe_allow_html=True,
         )
 
@@ -170,7 +174,8 @@ def render_kassa_tab(selected_date, can_edit):
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
         st.markdown(f"## 💵Разом в касі: {cash_pure} грн")
 
-    st.divider()
+    st.markdown("<hr style='margin: 12px 0 16px 0; border: none; border-top: 1px solid #d1d5db;'>", unsafe_allow_html=True)
+
     calculated_end = start_balance + subtotal_inc - subtotal_exp
     total_actual = cash_pure + subtotal_adv
     discrepancy = total_actual - calculated_end
@@ -188,7 +193,6 @@ def render_kassa_tab(selected_date, can_edit):
 
     st.write("")
 
-    # Сохраняем текущее состояние для кнопки сохранения плавающего меню
     st.session_state["kassa_current_payload"] = {
         "edited_inc_df": edited_inc_df,
         "edited_exp_df": edited_exp_df,
