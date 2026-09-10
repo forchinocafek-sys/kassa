@@ -209,7 +209,7 @@ def render_supplies_tab(selected_date, can_edit):
 
             with col_code:
                 msg_lines = [
-                    f"Привет! Заказ для Cafe Forchino ({selected_date}):"
+                    f"Вітаю! Замовлення для ФОП Розумна І.В. (Forchino):"
                 ]
                 for _, r in sup_df.iterrows():
                     sku_str = str(r["sku"]).strip()
@@ -222,7 +222,7 @@ def render_supplies_tab(selected_date, can_edit):
                         msg_lines.append(
                             f"• {r['name']} — {int(r['qty'])} {r['unit']}"
                         )
-                msg_lines.append("\nСпасибо!")
+                msg_lines.append("\nДякую!")
 
                 full_msg = "\n".join(msg_lines)
                 st.code(full_msg, language="markdown")
