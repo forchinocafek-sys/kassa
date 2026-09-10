@@ -199,7 +199,7 @@ def render_kassa_tab(selected_date, can_edit):
                 f"""
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 19px; font-weight: 700; color: #111827;">💸 Аванси</span>
-                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 15px;">
+                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
                         {subtotal_adv} грн
                     </span>
                 </div>
@@ -209,24 +209,15 @@ def render_kassa_tab(selected_date, can_edit):
 
     with col_b2:
         with st.container(border=True):
-            st.markdown(
-                '<div style="font-size: 19px; font-weight: 700; color: #111827; margin-bottom: 12px;">💰 Факт</div>',
-                unsafe_allow_html=True,
-            )
-            m_coins = get_int(
-                st.text_input(
-                    "Монети (загальна сума):",
-                    placeholder="0",
-                    key=f"coins_live_{selected_date}",
-                    disabled=not can_edit,
-                )
-            )
+            fact_header = st.empty()
 
-            def cash_row(label, mult):
-                c1, c2 = st.columns([1, 4])
+            col_f1, col_f2 = st.columns(2)
+
+            def cash_row(col, label, mult):
+                c1, c2 = col.columns([1, 2.5])
                 with c1:
                     st.markdown(
-                        f"<div style='margin-top:8px;font-weight:bold;'>{label}</div>",
+                        f"<div style='margin-top:6px;font-weight:600;font-size:14px;color:#374151;'>{label}</div>",
                         unsafe_allow_html=True,
                     )
                 with c2:
@@ -241,18 +232,35 @@ def render_kassa_tab(selected_date, can_edit):
                     )
                 return qty, qty * mult
 
-            q_20, v_20 = cash_row("20", 20)
-            q_50, v_50 = cash_row("50", 50)
-            q_100, v_100 = cash_row("100", 100)
-            q_200, v_200 = cash_row("200", 200)
-            q_500, v_500 = cash_row("500", 500)
-            q_1000, v_1000 = cash_row("1000", 1000)
+            with col_f1:
+                st.caption("🪙 Монети (сума)")
+                m_coins = get_int(
+                    st.text_input(
+                        "Монети",
+                        label_visibility="collapsed",
+                        placeholder="0",
+                        key=f"coins_live_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_20, v_20 = cash_row(col_f1, "20 грн", 20)
+                q_50, v_50 = cash_row(col_f1, "50 грн", 50)
+                q_100, v_100 = cash_row(col_f1, "100 грн", 100)
+
+            with col_f2:
+                q_200, v_200 = cash_row(col_f2, "200 грн", 200)
+                q_500, v_500 = cash_row(col_f2, "500 грн", 500)
+                q_1000, v_1000 = cash_row(col_f2, "1000 грн", 1000)
 
             cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
-            st.markdown(
+
+            fact_header.markdown(
                 f"""
-                <div style="margin-top: 14px; padding-top: 10px; border-top: 1px solid #f3f4f6; text-align: right;">
-                    <span style="font-size: 18px; font-weight: 800; color: #111827;">💵 Разом в касі: {cash_pure} грн</span>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <span style="font-size: 19px; font-weight: 700; color: #111827;">💰 Факт</span>
+                    <span style="background-color: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
+                        {cash_pure} грн
+                    </span>
                 </div>
                 """,
                 unsafe_allow_html=True,
