@@ -15,7 +15,7 @@ from utils import (
 
 def get_short_cat(cat_str):
     """Извлекает подкатегорию после стрелки ➔ или ->."""
-    if not cat_str:
+    if not cat_str or pd.isna(cat_str):
         return ""
     cat_str = str(cat_str).strip()
     if "➔" in cat_str:
@@ -25,16 +25,19 @@ def get_short_cat(cat_str):
     return cat_str
 
 
-# --- АВТОМАТИЧЕСКИЙ МАППИНГ ПОДКТЕГОРИЙ ---
+# --- АВТОМАППИНГ КАТЕГОРИЙ ---
 EXPENSE_SHORT_TO_FULL = {}
-SHORT_EXPENSE_CHOICES = []
+SHORT_EXPENSE_CHOICES = [""]  # Начинаем с пустой строки для чистых ячеек
 
 for full_cat in EXPENSE_CHOICES:
     short_cat = get_short_cat(full_cat)
-    SHORT_EXPENSE_CHOICES.append(short_cat)
-    EXPENSE_SHORT_TO_FULL[short_cat] = full_cat
+    if short_cat and short_cat not in SHORT_EXPENSE_CHOICES:
+        SHORT_EXPENSE_CHOICES.append(short_cat)
+        EXPENSE_SHORT_TO_FULL[short_cat] = full_cat
 
 EXPENSE_FULL_TO_SHORT = {v: k for k, v in EXPENSE_SHORT_TO_FULL.items()}
+
+INCOME_CHOICES = [""] + [c for c in INCOME_CATEGORIES if c]
 
 
 def clean_df_for_editor(df):
@@ -48,7 +51,7 @@ def clean_df_for_editor(df):
                 df[col]
                 .fillna("")
                 .astype(str)
-                .replace(["None", "nan", "NaN", "<NA>", "NoneType"], "")
+                .replace(["None", "nan", "NaN", "<NA>", "NoneType", "none"], "")
             )
     return df
 
@@ -123,13 +126,16 @@ def render_kassa_tab(selected_date, can_edit):
                 column_config={
                     "Категорія": st.column_config.SelectboxColumn(
                         "Стаття надходження",
-                        options=INCOME_CATEGORIES,
-                        required=True,
+                        options=INCOME_CHOICES,
+                        required=False,
+                        placeholder="",
                     ),
                     "Сума": st.column_config.NumberColumn(
-                        "Сума", min_value=0, step=1, format="%d грн"
+                        "Сума", min_value=0, step=1, format="%d грн", placeholder=""
                     ),
-                    "Примітка": st.column_config.TextColumn("Деталі"),
+                    "Примітка": st.column_config.TextColumn(
+                        "Деталі", placeholder=""
+                    ),
                 },
                 num_rows="dynamic",
                 use_container_width=True,
@@ -171,12 +177,15 @@ def render_kassa_tab(selected_date, can_edit):
                     "Категорія": st.column_config.SelectboxColumn(
                         "Стаття витрат",
                         options=SHORT_EXPENSE_CHOICES,
-                        required=True,
+                        required=False,
+                        placeholder="",
                     ),
                     "Сума": st.column_config.NumberColumn(
-                        "Сума", min_value=0, step=1, format="%d грн"
+                        "Сума", min_value=0, step=1, format="%d грн", placeholder=""
                     ),
-                    "Примітка": st.column_config.TextColumn("Деталі"),
+                    "Примітка": st.column_config.TextColumn(
+                        "Деталі", placeholder=""
+                    ),
                 },
                 num_rows="dynamic",
                 use_container_width=True,
@@ -213,11 +222,15 @@ def render_kassa_tab(selected_date, can_edit):
             edited_adv_df = st.data_editor(
                 adv_df,
                 column_config={
-                    "Співробітник": st.column_config.TextColumn("Співробітник"),
-                    "Сума": st.column_config.NumberColumn(
-                        "Сума", min_value=0, step=1, format="%d грн"
+                    "Співробітник": st.column_config.TextColumn(
+                        "Співробітник", placeholder=""
                     ),
-                    "Примітка": st.column_config.TextColumn("Деталі"),
+                    "Сума": st.column_config.NumberColumn(
+                        "Сума", min_value=0, step=1, format="%d грн", placeholder=""
+                    ),
+                    "Примітка": st.column_config.TextColumn(
+                        "Деталі", placeholder=""
+                    ),
                 },
                 num_rows="dynamic",
                 use_container_width=True,
@@ -364,7 +377,7 @@ def render_kassa_tab(selected_date, can_edit):
         else:
             res_c3.error(f"{discrepancy} грн")
 
-    # Готовим версию расходов с полными именами категорий для сохранения
+    # Перевод коротких наименований обратно в полные категории перед сохранением
     exp_df_full = edited_exp_df.copy()
     if "Категорія" in exp_df_full.columns:
         exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
