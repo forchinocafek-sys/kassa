@@ -48,7 +48,7 @@ def render_kassa_tab(selected_date, can_edit):
 
     col_t1, col_t2 = st.columns(2)
     with col_t1:
-        st.subheader("📈Надходження:")
+        st.subheader("📈 Надходження:")
         inc_df = prepare_df(
             st.session_state["inc_data"], ["Категорія", "Сума", "Примітка"]
         )
@@ -61,7 +61,7 @@ def render_kassa_tab(selected_date, can_edit):
                     required=True,
                 ),
                 "Сума": st.column_config.NumberColumn(
-                    "Сума", min_value=0, step=1
+                    "Сума", min_value=0, step=1, format="%d грн"
                 ),
                 "Примітка": st.column_config.TextColumn("Деталі"),
             },
@@ -74,12 +74,12 @@ def render_kassa_tab(selected_date, can_edit):
             get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows()
         )
         st.markdown(
-            f"<p style='font-weight: bold; color: #2e7d32; margin-top: 4px; margin-bottom: 0px;'>Загалом: {subtotal_inc} грн</p>",
+            f"<p style='font-weight: bold; color: #2e7d32; margin-top: 6px; margin-bottom: 0px;'>Загалом: {subtotal_inc} грн</p>",
             unsafe_allow_html=True,
         )
 
     with col_t2:
-        st.subheader("📉Витрати:")
+        st.subheader("📉 Витрати:")
         exp_df = prepare_df(
             st.session_state["exp_data"], ["Категорія", "Сума", "Примітка"]
         )
@@ -90,7 +90,7 @@ def render_kassa_tab(selected_date, can_edit):
                     "Стаття витрат", options=EXPENSE_CHOICES, required=True
                 ),
                 "Сума": st.column_config.NumberColumn(
-                    "Сума", min_value=0, step=1
+                    "Сума", min_value=0, step=1, format="%d грн"
                 ),
                 "Примітка": st.column_config.TextColumn("Деталі"),
             },
@@ -103,7 +103,7 @@ def render_kassa_tab(selected_date, can_edit):
             get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows()
         )
         st.markdown(
-            f"<p style='font-weight: bold; color: #c62828; margin-top: 4px; margin-bottom: 0px;'>Загалом: {subtotal_exp} грн</p>",
+            f"<p style='font-weight: bold; color: #c62828; margin-top: 6px; margin-bottom: 0px;'>Загалом: {subtotal_exp} грн</p>",
             unsafe_allow_html=True,
         )
 
@@ -112,13 +112,20 @@ def render_kassa_tab(selected_date, can_edit):
 
     col_b1, col_b2 = st.columns(2)
     with col_b1:
-        st.subheader("💸Аванси:")
+        st.subheader("💸 Аванси:")
         adv_df = prepare_df(
             st.session_state["adv_data"],
             ["Співробітник", "Сума", "Примітка"],
         )
         edited_adv_df = st.data_editor(
             adv_df,
+            column_config={
+                "Співробітник": st.column_config.TextColumn("Співробітник"),
+                "Сума": st.column_config.NumberColumn(
+                    "Сума", min_value=0, step=1, format="%d грн"
+                ),
+                "Примітка": st.column_config.TextColumn("Деталі"),
+            },
             num_rows="dynamic",
             use_container_width=True,
             key=f"adv_editor_{selected_date}",
@@ -128,12 +135,12 @@ def render_kassa_tab(selected_date, can_edit):
             get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows()
         )
         st.markdown(
-            f"<p style='font-weight: bold; color: #ef6c00; margin-top: 4px; margin-bottom: 0px;'>Загалом: {subtotal_adv} грн</p>",
+            f"<p style='font-weight: bold; color: #ef6c00; margin-top: 6px; margin-bottom: 0px;'>Загалом: {subtotal_adv} грн</p>",
             unsafe_allow_html=True,
         )
 
     with col_b2:
-        st.subheader("💰Факт")
+        st.subheader("💰 Факт")
         m_coins = get_int(
             st.text_input(
                 "Монети (загальна сума):",
@@ -172,7 +179,7 @@ def render_kassa_tab(selected_date, can_edit):
         st.markdown("</div>", unsafe_allow_html=True)
 
         cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
-        st.markdown(f"## 💵Разом в касі: {cash_pure} грн")
+        st.markdown(f"## 💵 Разом в касі: {cash_pure} грн")
 
     st.markdown("<hr style='margin: 12px 0 16px 0; border: none; border-top: 1px solid #d1d5db;'>", unsafe_allow_html=True)
 
