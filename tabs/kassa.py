@@ -20,10 +20,27 @@ def render_kassa_tab(selected_date, can_edit):
         )
 
     start_balance = get_int(get_start_balance(selected_date))
-    st.text_input(
-        "Залишок на початок дня (автоматично):",
-        value=str(start_balance),
-        disabled=True,
+
+    # --- СТИЛИЗОВАННЫЙ БЛОК: "На початок дня" В ОДНУ СТРОКУ ---
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 8px; margin-bottom: 12px;">
+            <span style="font-size: 20px; font-weight: 700; color: #111827;">🏦 На початок дня:</span>
+            <span style="
+                background-color: #ffffff; 
+                padding: 6px 16px; 
+                border-radius: 10px; 
+                border: 1px solid #d1d5db; 
+                font-size: 20px; 
+                font-weight: 800; 
+                color: #111827; 
+                box-shadow: 0 2px 4px rgba(0, 0, 0, 0.06);
+            ">
+                {start_balance} грн
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     st.divider()
