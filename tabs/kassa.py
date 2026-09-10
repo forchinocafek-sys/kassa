@@ -45,26 +45,27 @@ def render_kassa_tab(selected_date, can_edit):
 
     start_balance = get_int(get_start_balance(selected_date))
 
-    # --- 1. БЛОК: "НА ПОЧАТОК ДНЯ" ---
-    with st.container(border=True):
-        st.markdown(
-            f"""
-            <div style="display: flex; align-items: center; gap: 12px;">
-                <span style="font-size: 19px; font-weight: 700; color: #111827;">🏦 На початок дня:</span>
-                <span style="
-                    background-color: #f3f4f6; 
-                    padding: 4px 14px; 
-                    border-radius: 8px; 
-                    font-size: 19px; 
-                    font-weight: 800; 
-                    color: #111827;
-                ">
-                    {start_balance} грн
-                </span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    # --- 1. БЛОК: "НА ПОЧАТОК ДНЯ" (без громоздкой карточки) ---
+    st.markdown(
+        f"""
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; margin-bottom: 16px;">
+            <span style="font-size: 20px; font-weight: 700; color: #111827;">🏦 На початок дня:</span>
+            <span style="
+                background-color: #ffffff; 
+                padding: 6px 18px; 
+                border-radius: 10px; 
+                border: 1px solid #eaeaea; 
+                font-size: 20px; 
+                font-weight: 800; 
+                color: #111827; 
+                box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+            ">
+                {start_balance} грн
+            </span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     # --- 2. БЛОКИ: НАДХОДЖЕННЯ ТА ВИ ТРАТИ ---
     col_t1, col_t2 = st.columns(2)
@@ -75,6 +76,9 @@ def render_kassa_tab(selected_date, can_edit):
             inc_df = prepare_df(
                 st.session_state["inc_data"], ["Категорія", "Сума", "Примітка"]
             )
+            # Очищаем None / NaN из таблицы для отображения пустых ячеек
+            inc_df = inc_df.fillna("").replace(["None", "nan", "NaN", None], "")
+
             edited_inc_df = st.data_editor(
                 inc_df,
                 column_config={
@@ -114,6 +118,9 @@ def render_kassa_tab(selected_date, can_edit):
             exp_df = prepare_df(
                 st.session_state["exp_data"], ["Категорія", "Сума", "Примітка"]
             )
+            # Очищаем None / NaN из таблицы для отображения пустых ячеек
+            exp_df = exp_df.fillna("").replace(["None", "nan", "NaN", None], "")
+
             edited_exp_df = st.data_editor(
                 exp_df,
                 column_config={
@@ -155,6 +162,9 @@ def render_kassa_tab(selected_date, can_edit):
                 st.session_state["adv_data"],
                 ["Співробітник", "Сума", "Примітка"],
             )
+            # Очищаем None / NaN из таблицы для отображения пустых ячеек
+            adv_df = adv_df.fillna("").replace(["None", "nan", "NaN", None], "")
+
             edited_adv_df = st.data_editor(
                 adv_df,
                 column_config={
