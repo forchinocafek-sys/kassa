@@ -130,7 +130,7 @@ def render_kassa_tab(selected_date, can_edit):
                         required=False,
                     ),
                     "Сума": st.column_config.NumberColumn(
-                        "Сума", min_value=0, step=1, format="%d грн", placeholder=""
+                        "Сума", min_value=0, step=1, format="%d грн"
                     ),
                     "Примітка": st.column_config.TextColumn(
                         "Деталі", placeholder=""
@@ -179,7 +179,7 @@ def render_kassa_tab(selected_date, can_edit):
                         required=False,
                     ),
                     "Сума": st.column_config.NumberColumn(
-                        "Сума", min_value=0, step=1, format="%d грн", placeholder=""
+                        "Сума", min_value=0, step=1, format="%d грн"
                     ),
                     "Примітка": st.column_config.TextColumn(
                         "Деталі", placeholder=""
@@ -224,7 +224,7 @@ def render_kassa_tab(selected_date, can_edit):
                         "Співробітник", placeholder=""
                     ),
                     "Сума": st.column_config.NumberColumn(
-                        "Сума", min_value=0, step=1, format="%d грн", placeholder=""
+                        "Сума", min_value=0, step=1, format="%d грн"
                     ),
                     "Примітка": st.column_config.TextColumn(
                         "Деталі", placeholder=""
