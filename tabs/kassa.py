@@ -13,6 +13,22 @@ from utils import (
 )
 
 
+def clean_df_for_editor(df):
+    """Безопасная очистка DataFrame от 'None' и 'nan' без ошибок типов в pandas."""
+    df = df.copy()
+    for col in df.columns:
+        if col == "Сума":
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        else:
+            df[col] = (
+                df[col]
+                .fillna("")
+                .astype(str)
+                .replace(["None", "nan", "NaN", "<NA>", "NoneType"], "")
+            )
+    return df
+
+
 def render_kassa_tab(selected_date, can_edit):
     # CSS для превращения контейнеров в воздушные мягкие карточки
     st.markdown(
@@ -45,7 +61,7 @@ def render_kassa_tab(selected_date, can_edit):
 
     start_balance = get_int(get_start_balance(selected_date))
 
-    # --- 1. БЛОК: "НА ПОЧАТОК ДНЯ" (без громоздкой карточки) ---
+    # --- 1. БЛОК: "НА ПОЧАТОК ДНЯ" ---
     st.markdown(
         f"""
         <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; margin-bottom: 16px;">
@@ -76,8 +92,7 @@ def render_kassa_tab(selected_date, can_edit):
             inc_df = prepare_df(
                 st.session_state["inc_data"], ["Категорія", "Сума", "Примітка"]
             )
-            # Очищаем None / NaN из таблицы для отображения пустых ячеек
-            inc_df = inc_df.fillna("").replace(["None", "nan", "NaN", None], "")
+            inc_df = clean_df_for_editor(inc_df)
 
             edited_inc_df = st.data_editor(
                 inc_df,
@@ -118,8 +133,7 @@ def render_kassa_tab(selected_date, can_edit):
             exp_df = prepare_df(
                 st.session_state["exp_data"], ["Категорія", "Сума", "Примітка"]
             )
-            # Очищаем None / NaN из таблицы для отображения пустых ячеек
-            exp_df = exp_df.fillna("").replace(["None", "nan", "NaN", None], "")
+            exp_df = clean_df_for_editor(exp_df)
 
             edited_exp_df = st.data_editor(
                 exp_df,
@@ -162,8 +176,7 @@ def render_kassa_tab(selected_date, can_edit):
                 st.session_state["adv_data"],
                 ["Співробітник", "Сума", "Примітка"],
             )
-            # Очищаем None / NaN из таблицы для отображения пустых ячеек
-            adv_df = adv_df.fillna("").replace(["None", "nan", "NaN", None], "")
+            adv_df = clean_df_for_editor(adv_df)
 
             edited_adv_df = st.data_editor(
                 adv_df,
@@ -186,7 +199,7 @@ def render_kassa_tab(selected_date, can_edit):
                 f"""
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 19px; font-weight: 700; color: #111827;">💸 Аванси</span>
-                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
+                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 15px;">
                         {subtotal_adv} грн
                     </span>
                 </div>
