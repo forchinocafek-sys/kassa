@@ -234,7 +234,7 @@ def render_kassa_tab(selected_date, can_edit):
                 f"""
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 19px; font-weight: 700; color: #111827;">💸 Аванси</span>
-                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 15px;">
+                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
                         {subtotal_adv} грн
                     </span>
                 </div>
@@ -352,20 +352,66 @@ def render_kassa_tab(selected_date, can_edit):
     total_actual = cash_pure + subtotal_adv
     discrepancy = total_actual - calculated_end
 
+    # Цветовые акценты для статуса схождения
+    if discrepancy == 0:
+        disc_color = "#2e7d32"  # Зеленый
+        disc_bg = "#e8f5e9"
+        disc_border = "#c8e6c9"
+        disc_title = "Зійшлася"
+        disc_val = "0 грн"
+    elif discrepancy > 0:
+        disc_color = "#ef6c00"  # Оранжевый
+        disc_bg = "#fff3e0"
+        disc_border = "#ffe0b2"
+        disc_title = "Надлишок"
+        disc_val = f"+{discrepancy} грн"
+    else:
+        disc_color = "#c62828"  # Красный
+        disc_bg = "#ffebee"
+        disc_border = "#ffcdd2"
+        disc_title = "Різниця (нестача)"
+        disc_val = f"{discrepancy} грн"
+
     with st.container(border=True):
         st.markdown(
-            '<div style="font-size: 19px; font-weight: 700; color: #111827; margin-bottom: 12px;">🏁 Підсумки зміни</div>',
+            '<div style="font-size: 19px; font-weight: 700; color: #111827; margin-bottom: 14px;">🏁 Підсумки зміни</div>',
             unsafe_allow_html=True,
         )
+
         res_c1, res_c2, res_c3 = st.columns(3)
-        res_c1.metric("Розрахунок", f"{calculated_end} грн")
-        res_c2.metric("Факт", f"{total_actual} грн")
-        if discrepancy == 0:
-            res_c3.success("Зійшлася!")
-        elif discrepancy > 0:
-            res_c3.warning(f"+{discrepancy} грн")
-        else:
-            res_c3.error(f"{discrepancy} грн")
+
+        with res_c1:
+            st.markdown(
+                f"""
+                <div style="background-color: #fafafa; padding: 12px 16px; border-radius: 12px; border: 1px solid #f0f0f0;">
+                    <div style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 4px;">Розрахунок</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #111827;">{calculated_end} грн</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with res_c2:
+            st.markdown(
+                f"""
+                <div style="background-color: #fafafa; padding: 12px 16px; border-radius: 12px; border: 1px solid #f0f0f0;">
+                    <div style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 4px;">Факт</div>
+                    <div style="font-size: 24px; font-weight: 800; color: #111827;">{total_actual} грн</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+        with res_c3:
+            st.markdown(
+                f"""
+                <div style="background-color: {disc_bg}; padding: 12px 16px; border-radius: 12px; border: 1px solid {disc_border};">
+                    <div style="font-size: 13px; font-weight: 700; color: {disc_color}; margin-bottom: 4px;">{disc_title}</div>
+                    <div style="font-size: 24px; font-weight: 800; color: {disc_color};">{disc_val}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     # Перевод коротких наименований обратно в полные категории перед сохранением
     exp_df_full = edited_exp_df.copy()
