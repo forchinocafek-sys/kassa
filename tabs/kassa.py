@@ -1,4 +1,5 @@
 import json
+import textwrap
 import pandas as pd
 import requests
 import streamlit as st
@@ -59,7 +60,7 @@ def clean_df_for_editor(df):
 def render_kassa_tab(selected_date, can_edit):
     # CSS для превращения контейнеров в воздушные мягкие карточки
     st.markdown(
-        """
+        textwrap.dedent("""
         <style>
             /* Белые карточки на бежевом фоне */
             div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -77,7 +78,7 @@ def render_kassa_tab(selected_date, can_edit):
                 box-shadow: none !important;
             }
         </style>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
@@ -90,7 +91,7 @@ def render_kassa_tab(selected_date, can_edit):
 
     # --- 1. БЛОК: "НА ПОЧАТОК ДНЯ" ---
     st.markdown(
-        f"""
+        textwrap.dedent(f"""
         <div style="display: flex; align-items: center; gap: 12px; margin-top: 4px; margin-bottom: 16px;">
             <span style="font-size: 20px; font-weight: 700; color: #111827;">🏦 На початок дня:</span>
             <span style="
@@ -106,7 +107,7 @@ def render_kassa_tab(selected_date, can_edit):
                 {start_balance} грн
             </span>
         </div>
-        """,
+        """),
         unsafe_allow_html=True,
     )
 
@@ -143,14 +144,14 @@ def render_kassa_tab(selected_date, can_edit):
                 get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows()
             )
             inc_header.markdown(
-                f"""
+                textwrap.dedent(f"""
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 19px; font-weight: 700; color: #111827;">📈 Надходження</span>
                     <span style="background-color: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
                         {subtotal_inc} грн
                     </span>
                 </div>
-                """,
+                """),
                 unsafe_allow_html=True,
             )
 
@@ -162,7 +163,6 @@ def render_kassa_tab(selected_date, can_edit):
             )
             exp_df = clean_df_for_editor(exp_df)
 
-            # Конвертируем полные категории в короткие для отображения в таблице
             if "Категорія" in exp_df.columns:
                 exp_df["Категорія"] = exp_df["Категорія"].map(
                     lambda x: EXPENSE_FULL_TO_SHORT.get(str(x).strip(), get_short_cat(x))
@@ -190,14 +190,14 @@ def render_kassa_tab(selected_date, can_edit):
                 get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows()
             )
             exp_header.markdown(
-                f"""
+                textwrap.dedent(f"""
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 19px; font-weight: 700; color: #111827;">📉 Витрати</span>
                     <span style="background-color: #ffebee; color: #c62828; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
                         {subtotal_exp} грн
                     </span>
                 </div>
-                """,
+                """),
                 unsafe_allow_html=True,
             )
 
@@ -231,14 +231,14 @@ def render_kassa_tab(selected_date, can_edit):
                 get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows()
             )
             adv_header.markdown(
-                f"""
+                textwrap.dedent(f"""
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 19px; font-weight: 700; color: #111827;">💸 Аванси</span>
                     <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
                         {subtotal_adv} грн
                     </span>
                 </div>
-                """,
+                """),
                 unsafe_allow_html=True,
             )
 
@@ -336,14 +336,14 @@ def render_kassa_tab(selected_date, can_edit):
             )
 
             fact_header.markdown(
-                f"""
+                textwrap.dedent(f"""
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                     <span style="font-size: 19px; font-weight: 700; color: #111827;">💰 Факт</span>
                     <span style="background-color: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
                         {cash_pure} грн
                     </span>
                 </div>
-                """,
+                """),
                 unsafe_allow_html=True,
             )
 
@@ -352,7 +352,6 @@ def render_kassa_tab(selected_date, can_edit):
     total_actual = cash_pure + subtotal_adv
     discrepancy = total_actual - calculated_end
 
-    # Цветовые акценты для статуса схождения
     if discrepancy == 0:
         disc_color = "#2e7d32"  # Зеленый
         disc_bg = "#e8f5e9"
@@ -382,34 +381,34 @@ def render_kassa_tab(selected_date, can_edit):
 
         with res_c1:
             st.markdown(
-                f"""
-                <div style="background-color: #fafafa; padding: 12px 16px; border-radius: 12px; border: 1px solid #f0f0f0;">
+                textwrap.dedent(f"""
+                <div style="background-color: #fafafa; padding: 12px 16px; border-radius: 12px; border: 1px solid #e5e7eb;">
                     <div style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 4px;">Розрахунок</div>
                     <div style="font-size: 24px; font-weight: 800; color: #111827;">{calculated_end} грн</div>
                 </div>
-                """,
+                """),
                 unsafe_allow_html=True,
             )
 
         with res_c2:
             st.markdown(
-                f"""
-                <div style="background-color: #fafafa; padding: 12px 16px; border-radius: 12px; border: 1px solid #f0f0f0;">
+                textwrap.dedent(f"""
+                <div style="background-color: #fafafa; padding: 12px 16px; border-radius: 12px; border: 1px solid #e5e7eb;">
                     <div style="font-size: 13px; font-weight: 600; color: #6b7280; margin-bottom: 4px;">Факт</div>
                     <div style="font-size: 24px; font-weight: 800; color: #111827;">{total_actual} грн</div>
                 </div>
-                """,
+                """),
                 unsafe_allow_html=True,
             )
 
         with res_c3:
             st.markdown(
-                f"""
+                textwrap.dedent(f"""
                 <div style="background-color: {disc_bg}; padding: 12px 16px; border-radius: 12px; border: 1px solid {disc_border};">
                     <div style="font-size: 13px; font-weight: 700; color: {disc_color}; margin-bottom: 4px;">{disc_title}</div>
                     <div style="font-size: 24px; font-weight: 800; color: {disc_color};">{disc_val}</div>
                 </div>
-                """,
+                """),
                 unsafe_allow_html=True,
             )
 
