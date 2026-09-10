@@ -13,6 +13,30 @@ from utils import (
 )
 
 
+def get_short_cat(cat_str):
+    """Извлекает подкатегорию после стрелки ➔ или ->."""
+    if not cat_str:
+        return ""
+    cat_str = str(cat_str).strip()
+    if "➔" in cat_str:
+        return cat_str.split("➔")[-1].strip()
+    elif "->" in cat_str:
+        return cat_str.split("->")[-1].strip()
+    return cat_str
+
+
+# --- АВТОМАТИЧЕСКИЙ МАППИНГ ПОДКТЕГОРИЙ ---
+EXPENSE_SHORT_TO_FULL = {}
+SHORT_EXPENSE_CHOICES = []
+
+for full_cat in EXPENSE_CHOICES:
+    short_cat = get_short_cat(full_cat)
+    SHORT_EXPENSE_CHOICES.append(short_cat)
+    EXPENSE_SHORT_TO_FULL[short_cat] = full_cat
+
+EXPENSE_FULL_TO_SHORT = {v: k for k, v in EXPENSE_SHORT_TO_FULL.items()}
+
+
 def clean_df_for_editor(df):
     """Безопасная очистка DataFrame от 'None' и 'nan' без ошибок типов в pandas."""
     df = df.copy()
@@ -135,11 +159,19 @@ def render_kassa_tab(selected_date, can_edit):
             )
             exp_df = clean_df_for_editor(exp_df)
 
+            # Конвертируем полные категории в короткие для отображения в таблице
+            if "Категорія" in exp_df.columns:
+                exp_df["Категорія"] = exp_df["Категорія"].map(
+                    lambda x: EXPENSE_FULL_TO_SHORT.get(str(x).strip(), get_short_cat(x))
+                )
+
             edited_exp_df = st.data_editor(
                 exp_df,
                 column_config={
                     "Категорія": st.column_config.SelectboxColumn(
-                        "Стаття витрат", options=EXPENSE_CHOICES, required=True
+                        "Стаття витрат",
+                        options=SHORT_EXPENSE_CHOICES,
+                        required=True,
                     ),
                     "Сума": st.column_config.NumberColumn(
                         "Сума", min_value=0, step=1, format="%d грн"
@@ -211,7 +243,6 @@ def render_kassa_tab(selected_date, can_edit):
         with st.container(border=True):
             fact_header = st.empty()
 
-            # Сетка ввода купюр и монет в 2 колонки
             fc1, fc2 = st.columns(2)
 
             with fc1:
@@ -333,9 +364,16 @@ def render_kassa_tab(selected_date, can_edit):
         else:
             res_c3.error(f"{discrepancy} грн")
 
+    # Готовим версию расходов с полными именами категорий для сохранения
+    exp_df_full = edited_exp_df.copy()
+    if "Категорія" in exp_df_full.columns:
+        exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
+            lambda x: EXPENSE_SHORT_TO_FULL.get(str(x).strip(), str(x).strip())
+        )
+
     st.session_state["kassa_current_payload"] = {
         "edited_inc_df": edited_inc_df,
-        "edited_exp_df": edited_exp_df,
+        "edited_exp_df": exp_df_full,
         "edited_adv_df": edited_adv_df,
         "m_coins": m_coins,
         "q_dict": {
@@ -359,7 +397,7 @@ def render_kassa_tab(selected_date, can_edit):
             with st.spinner("Стерилізація та відправка звіту..."):
                 payload = {
                     "inc": sanitize_df(edited_inc_df),
-                    "exp": sanitize_df(edited_exp_df),
+                    "exp": sanitize_df(exp_df_full),
                     "adv": sanitize_df(edited_adv_df),
                     "cash": {
                         "coins": m_coins,
@@ -439,7 +477,7 @@ def render_kassa_tab(selected_date, can_edit):
                             })
 
                     exp_rows = []
-                    for _, r in edited_exp_df.iterrows():
+                    for _, r in exp_df_full.iterrows():
                         amt = get_int(r.get("Сума", 0))
                         cat = str(r.get("Категорія", "")).strip()
                         note = str(r.get("Примітка", "")).strip()
