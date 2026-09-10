@@ -16,8 +16,30 @@ def render_supplies_tab(selected_date, can_edit):
         )
 
     draft_key = f"supplies_draft_qty_{selected_date}"
+    draft_loaded_key = f"supplies_draft_loaded_{selected_date}"
+
     if draft_key not in st.session_state:
         st.session_state[draft_key] = {}
+
+    # --- АВТОЗАГРУЗКА ЧЕРНОВИКА ИЗ SUPABASE ---
+    if not st.session_state.get(draft_loaded_key, False):
+        try:
+            res_draft = requests.get(
+                f"{SUPABASE_URL}/rest/v1/supplies_drafts?date=eq.{selected_date}&select=draft_data",
+                headers=headers,
+            )
+            if res_draft.status_code == 200:
+                data = res_draft.json()
+                if isinstance(data, list) and len(data) > 0:
+                    raw_draft = data[0].get("draft_data", {})
+                    # Приводим ключи к int, если ID товаров числовые
+                    st.session_state[draft_key] = {
+                        int(k) if str(k).isdigit() else k: v 
+                        for k, v in raw_draft.items()
+                    }
+        except Exception:
+            pass
+        st.session_state[draft_loaded_key] = True
 
     catalog_items = []
     try:
@@ -65,14 +87,45 @@ def render_supplies_tab(selected_date, can_edit):
         total_selected = sum(1 for q in st.session_state[draft_key].values() if q > 0)
 
         col_dr1, col_dr2, col_dr3 = st.columns([2, 2, 3])
+        
+        # --- СОХРАНЕНИЕ ЧЕРНОВИКА В ОБЛАКО ---
         with col_dr1:
             if st.button("💾 Сохранить черновик", type="primary", use_container_width=True, disabled=not can_edit):
-                st.toast("✅ Черновик заказа сохранен!", icon="💾")
-                log_audit("Сохранен черновик закупки", f"Дата: {selected_date}")
+                draft_payload = {
+                    "date": str(selected_date),
+                    "draft_data": st.session_state[draft_key],
+                    "updated_at": (datetime.utcnow() + timedelta(hours=3)).isoformat(),
+                    "updated_by": st.session_state.get("user_name", "Неизвестный")
+                }
+                upsert_headers = {**headers, "Prefer": "resolution=merge-duplicates"}
+                
+                try:
+                    res_save = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/supplies_drafts",
+                        headers=upsert_headers,
+                        json=draft_payload
+                    )
+                    if res_save.status_code in [200, 201, 204]:
+                        st.toast("✅ Черновик заказа сохранен в облаке!", icon="💾")
+                        log_audit("Сохранен облачный черновик закупки", f"Дата: {selected_date}")
+                    else:
+                        st.error(f"❌ Ошибка сохранения в Supabase: {res_save.text}")
+                except Exception as e:
+                    st.error(f"❌ Сетевая ошибка при сохранении: {e}")
+
+        # --- ОЧИСТКА ВВОДА И УДАЛЕНИЕ ЧЕРНОВИКА ИЗ ОБЛАКА ---
         with col_dr2:
             if st.button("🗑️ Очистить ввод", use_container_width=True, disabled=not can_edit):
                 st.session_state[draft_key] = {}
+                try:
+                    requests.delete(
+                        f"{SUPABASE_URL}/rest/v1/supplies_drafts?date=eq.{selected_date}",
+                        headers=headers
+                    )
+                except Exception:
+                    pass
                 st.rerun()
+
         with col_dr3:
             st.markdown(f"**Всего выбрано позиций:** `{total_selected}`")
 
@@ -193,7 +246,7 @@ def render_supplies_tab(selected_date, can_edit):
                     )
 
                     order_payload = {
-                        "date": selected_date,
+                        "date": str(selected_date),
                         "created_by": st.session_state["user_name"],
                         "items": order_records,
                     }
@@ -202,7 +255,7 @@ def render_supplies_tab(selected_date, can_edit):
                         f"{SUPABASE_URL}/rest/v1/supplies_orders",
                         headers=headers,
                         json={
-                            "date": selected_date,
+                            "date": str(selected_date),
                             "payload": order_payload,
                             "created_at": (
                                 datetime.utcnow() + timedelta(hours=3)
@@ -210,11 +263,26 @@ def render_supplies_tab(selected_date, can_edit):
                         },
                     )
 
-                    log_audit(
-                        "Сформирован заказ хозов",
-                        f"Дата: {selected_date}, Позиций: {len(order_records)}",
-                    )
-                    st.success("🎉 Закупка успешно зафиксирована в истории!")
+                    if res_order.status_code in [200, 201]:
+                        # Очищаем черновик из локального состояния и удаляем из Supabase
+                        st.session_state[draft_key] = {}
+                        try:
+                            requests.delete(
+                                f"{SUPABASE_URL}/rest/v1/supplies_drafts?date=eq.{selected_date}",
+                                headers=headers,
+                            )
+                        except Exception:
+                            pass
+
+                        log_audit(
+                            "Сформирован заказ хозов",
+                            f"Дата: {selected_date}, Позиций: {len(order_records)}",
+                        )
+                        st.success("🎉 Закупка успешно зафиксирована в истории!")
+                        time.sleep(1)
+                        st.rerun()
+                    else:
+                        st.error(f"❌ Ошибка отправки в историю: {res_order.text}")
 
     with col_history:
         with st.popover("📜 Просмотреть историю прошлых закупок"):
