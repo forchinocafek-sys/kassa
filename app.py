@@ -223,7 +223,7 @@ with st.expander("📅 Обрати дату або переглянути зв�
         prefetch_week_window(d)
         st.rerun()
 
-# --- ГЕНЕРАЦИЯ HTML ДЛЯ ПЛАВАЮЩЕГО DOCK ---
+# --- ГЕНЕРАЦИЯ HTML ДЛЯ ПЛАВАЮЩЕГО DOCK (ЧЕРЕЗ ST.MARKDOWN) ---
 allowed = st.session_state.get("allowed_tabs", [])
 is_kassa = active_tab == "Касса"
 can_save = is_kassa and can_edit
@@ -255,84 +255,71 @@ if can_save:
 
 dock_html_buttons += f"""<a href="?auth={auth_token}&action=logout" target="_self" class="dock-btn logout-btn" title="Вийти">🚫</a>"""
 
-# Рендерим плавающий док внизу экрана
-components.html(
+# Рендерим плавающий док прямо в тело документа Streamlit
+st.markdown(
     f"""
-<!DOCTYPE html>
-<html>
-<head>
 <style>
-    body {{
-        margin: 0;
-        padding: 0;
-        background: transparent;
-        overflow: hidden;
+    .floating-dock-wrapper {{
+        position: fixed !important;
+        bottom: 16px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        display: flex !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        background: rgba(255, 255, 255, 0.88) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.95) !important;
+        border-radius: 22px !important;
+        padding: 6px 10px !important;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+        z-index: 999999 !important;
     }}
-    .dock-container {{
-        position: fixed;
-        bottom: 16px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        flex-direction: row;
-        align-items: center;
-        justify-content: center;
-        gap: 6px;
-        background: rgba(255, 255, 255, 0.88);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.95);
-        border-radius: 22px;
-        padding: 6px 10px;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06);
-        z-index: 999999;
+    .floating-dock-wrapper .dock-btn {{
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        min-height: 42px !important;
+        border-radius: 14px !important;
+        border: 1px solid transparent !important;
+        background: rgba(241, 245, 249, 0.85) !important;
+        font-size: 20px !important;
+        text-decoration: none !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        color: #111827 !important;
     }}
-    .dock-btn {{
-        width: 42px;
-        height: 42px;
-        min-width: 42px;
-        min-height: 42px;
-        border-radius: 14px;
-        border: 1px solid transparent;
-        background: rgba(241, 245, 249, 0.85);
-        font-size: 20px;
-        text-decoration: none;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        padding: 0;
-        margin: 0;
+    .floating-dock-wrapper .dock-btn:hover {{
+        background: #ffffff !important;
+        border-color: #cbd5e1 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
     }}
-    .dock-btn:hover {{
-        background: #ffffff;
-        border-color: #cbd5e1;
-        transform: translateY(-2px);
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+    .floating-dock-wrapper .dock-btn.active {{
+        background: #e2e8f0 !important;
+        border-color: #94a3b8 !important;
+        box-shadow: inset 0 2px 4px rgba(0,0,0,0.06) !important;
     }}
-    .dock-btn.active {{
-        background: #e2e8f0;
-        border-color: #94a3b8;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.06);
-    }}
-    .save-btn {{
+    .floating-dock-wrapper .save-btn {{
         background: rgba(220, 252, 231, 0.9) !important;
     }}
-    .logout-btn {{
+    .floating-dock-wrapper .logout-btn {{
         background: rgba(254, 226, 226, 0.9) !important;
     }}
 </style>
-</head>
-<body>
-    <div class="dock-container">
-        {dock_html_buttons}
-    </div>
-</body>
-</html>
+<div class="floating-dock-wrapper">
+    {dock_html_buttons}
+</div>
 """,
-    height=75,
-    width=380,
+    unsafe_allow_html=True,
 )
 
 st.write("---")
