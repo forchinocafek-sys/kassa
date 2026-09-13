@@ -132,18 +132,32 @@ st.markdown(
         flex: 0 0 42px !important;
         margin: 0 !important;
         padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
     }
 
-    /* Оформление кнопок и поповера календаря */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button,
+    /* Оформление кнопок и контейнера поповера */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] {
+        width: 42px !important;
+        height: 42px !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Убираем стрелочку у поповера календаря */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] button svg {
+        display: none !important;
+    }
+
+    /* Выравнивание обычных кнопок и кнопки popover */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] > button {
         width: 42px !important;
         height: 42px !important;
         min-width: 42px !important;
         min-height: 42px !important;
-    }
-
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button {
         border-radius: 14px !important;
         border: 1px solid transparent !important;
         background: rgba(241, 245, 249, 0.85) !important;
@@ -156,7 +170,8 @@ st.markdown(
         transition: all 0.2s ease !important;
     }
 
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button * {
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button *,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] > button * {
         font-size: 20px !important;
         line-height: 1 !important;
         margin: 0 !important;
@@ -164,7 +179,8 @@ st.markdown(
         color: #111827 !important;
     }
 
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button:hover {
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button:hover,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] > button:hover {
         background: #ffffff !important;
         border-color: #cbd5e1 !important;
         transform: translateY(-2px) !important;
@@ -263,7 +279,11 @@ elif active_tab == "Посуда":
 
 # --- ДИНАМИЧЕСКИЙ ПЛАВАЮЩИЙ DOCK (НАТИВНЫЙ STREAMLIT — БЕЗ ПЕРЕЗАГРУЗОК) ---
 allowed = st.session_state.get("allowed_tabs", [])
-dock_items = ["calendar"]
+dock_items = []
+
+# Показываем календарь только если не на вкладках PnL (Сличительная) или Посуда
+if active_tab not in ["Сличительная", "Посуда"]:
+    dock_items.append("calendar")
 
 if "Касса" in allowed:
     dock_items.append("Касса")
