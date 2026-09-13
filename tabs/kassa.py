@@ -82,14 +82,14 @@ def render_kassa_tab(selected_date, can_edit):
                 margin-bottom: 16px;
             }
 
-            /* Красивые плашки итогов */
+            /* Красивые плашки итогов — ВПРИТЫК К ТАБЛИЦЕ */
             .subtotal-badge {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
-                padding: 10px 14px;
+                padding: 8px 14px;
                 border-radius: 10px;
-                margin-top: 10px;
+                margin-top: -8px; /* <--- Притягивает плашку впритык к st.data_editor */
                 font-size: 14px;
                 font-weight: 700;
             }
