@@ -82,14 +82,18 @@ def render_kassa_tab(selected_date, can_edit):
                 margin-bottom: 16px;
             }
 
-            /* Красивые плашки итогов — ВПРИТЫК К ТАБЛИЦЕ */
+            /* 1. ПОДТЯГИВАЕМ ВНЕШНИЙ КОНТЕЙНЕР STREAMLIT К ТАБЛИЦЕ */
+            div[data-testid="stElementContainer"]:has(.subtotal-badge) {
+                margin-top: -16px !important;
+            }
+
+            /* 2. СТИЛИ САМОЙ ПЛАШКИ ИТОГОВ */
             .subtotal-badge {
                 display: flex;
                 justify-content: space-between;
                 align-items: center;
                 padding: 8px 14px;
                 border-radius: 10px;
-                margin-top: -8px; /* <--- Притягивает плашку впритык к st.data_editor */
                 font-size: 14px;
                 font-weight: 700;
             }
