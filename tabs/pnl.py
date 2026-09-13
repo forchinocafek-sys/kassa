@@ -7,8 +7,6 @@ from utils import log_audit, get_int
 
 
 def render_pnl_tab():
-    st.subheader("📊 Сличительная ведомость")
-
     months = {
         "Січень": 1,
         "Лютий": 2,
@@ -23,13 +21,27 @@ def render_pnl_tab():
         "Листопад": 11,
         "Грудень": 12,
     }
-    c_m, c_y = st.columns(2)
-    sel_m = c_m.selectbox(
-        "Місяць",
-        list(months.keys()),
-        index=st.session_state["form_date"].month - 1,
+
+    # --- ЗАГОЛОВОК И СЕЛЕКТОРЫ В ОДНУ СТРОКУ ---
+    col_title, col_m, col_y = st.columns(
+        [3, 2, 1.5], vertical_alignment="bottom"
     )
-    sel_y = c_y.selectbox("Рік", [2025, 2026, 2027], index=1)
+
+    with col_title:
+        st.markdown(
+            '<h3 style="margin: 0; padding-bottom: 6px; color: #111827; font-weight: 700;">📊 Сличительная ведомость</h3>',
+            unsafe_allow_html=True,
+        )
+
+    with col_m:
+        sel_m = st.selectbox(
+            "Місяць",
+            list(months.keys()),
+            index=st.session_state["form_date"].month - 1,
+        )
+
+    with col_y:
+        sel_y = st.selectbox("Рік", [2025, 2026, 2027], index=1)
 
     with st.spinner("Динамічний розрахунок даних..."):
         log_audit("Перегляд PnL", f"Період: {sel_m} {sel_y}")
@@ -199,16 +211,13 @@ def render_pnl_tab():
             else None
         )
 
-        # 1. Расчет месячных итогов по каждой строке
         month_totals = {
             r: sum(report_data[r][str(d)]["sum"] for d in range(1, num_days + 1))
             for r in order_full
         }
 
-        # 2. Активные строки с ненулевой суммой
         active_rows = {r for r, total in month_totals.items() if total != 0}
 
-        # 3. Обязательные системные строки
         structural_headers = {
             "Касса на начало дня",
             "🟢 НАДХОДЖЕННЯ",
@@ -217,13 +226,11 @@ def render_pnl_tab():
             "Касса на конец дня",
         }
 
-        # 4. Формирование списка видимых строк
         visible_rows = set(structural_headers)
         for r in order_full:
             if r in active_rows:
                 visible_rows.add(r)
 
-        # Папка показывается только если в ней есть хотя бы одна активная подкатегория
         for grp, subs in EXPENSE_TREE.items():
             grp_key = f"📁 {grp}"
             has_active_sub = any(f"↳ {sub}" in active_rows for sub in subs)
@@ -536,7 +543,6 @@ def render_pnl_tab():
         table_parts.append("<th>Всього</th></tr></thead><tbody>")
 
         for r in order_full:
-            # Скрываем неактивные строки и пустые папки
             if r not in visible_rows:
                 continue
 
