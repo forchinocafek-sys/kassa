@@ -58,7 +58,7 @@ st.markdown(
     }
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
     
-    /* Жесткое скрытие элементов шапки, деплоя и статус-бара Streamlit */
+    /* Скрытие элементов шапки Streamlit */
     header[data-testid="stHeader"], 
     [data-testid="stToolbar"], 
     [data-testid="stStatusWidget"],
@@ -81,6 +81,95 @@ st.markdown(
     .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #ffffff !important; border: 1px solid #d1d5db !important; }
     input, .stSelectbox span { color: #111827 !important; }
+
+    /* ========================================================= */
+    /* ПРАВИЛЬНЫЙ ИЗОЛИРОВАННЫЙ STREAMLIT DOCK (БЕЗ ПЕРЕЗАГРУЗОК) */
+    /* ========================================================= */
+    #floating-dock-anchor { display: none; }
+
+    /* Превращаем блок колонок в плавающий Glassmorphism Dock */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
+        position: fixed !important;
+        bottom: 16px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
+        z-index: 999999 !important;
+        
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        width: auto !important;
+        
+        background: rgba(255, 255, 255, 0.88) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.95) !important;
+        border-radius: 22px !important;
+        padding: 6px 10px !important;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
+    }
+
+    /* Адаптируем смещение влево на мобильных телефонах */
+    @media (max-width: 768px) {
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
+            left: 12px !important;
+            transform: none !important;
+            max-width: calc(100vw - 100px) !important;
+            overflow-x: auto !important;
+            justify-content: flex-start !important;
+        }
+    }
+
+    /* Жестко фиксируем размер колонок внутри дока */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) > div[data-testid="column"] {
+        width: 42px !important;
+        min-width: 42px !important;
+        max-width: 42px !important;
+        height: 42px !important;
+        flex: 0 0 42px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Оформление кнопок и поповера календаря */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        min-height: 42px !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button {
+        border-radius: 14px !important;
+        border: 1px solid transparent !important;
+        background: rgba(241, 245, 249, 0.85) !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: none !important;
+        transition: all 0.2s ease !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button * {
+        font-size: 20px !important;
+        line-height: 1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        color: #111827 !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button:hover {
+        background: #ffffff !important;
+        border-color: #cbd5e1 !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -172,198 +261,102 @@ elif active_tab == "Закупки":
 elif active_tab == "Посуда":
     render_tableware_tab(selected_date, can_edit)
 
-# Обработка действий от плавающего HTML-дока через query_params / сессию
-query_action = st.query_params.get("action")
-if query_action == "toggle_calendar":
-    st.session_state["show_calendar_popup"] = not st.session_state.get(
-        "show_calendar_popup", False
-    )
-    del st.query_params["action"]
-    st.rerun()
-elif query_action == "tab_kas":
-    st.session_state["active_tab"] = "Касса"
-    del st.query_params["action"]
-    st.rerun()
-elif query_action == "tab_arch":
-    st.session_state["active_tab"] = "Архів"
-    del st.query_params["action"]
-    st.rerun()
-elif query_action == "tab_pnl":
-    st.session_state["active_tab"] = "Сличительная"
-    del st.query_params["action"]
-    st.rerun()
-elif query_action == "tab_sup":
-    st.session_state["active_tab"] = "Закупки"
-    del st.query_params["action"]
-    st.rerun()
-elif query_action == "tab_tab":
-    st.session_state["active_tab"] = "Посуда"
-    del st.query_params["action"]
-    st.rerun()
-elif query_action == "save_draft":
-    if active_tab == "Касса" and can_edit:
-        try:
-            kp = st.session_state.get("kassa_current_payload", {})
-            if kp:
-                save_kassa_draft_to_supabase(
-                    selected_date,
-                    kp["edited_inc_df"],
-                    kp["edited_exp_df"],
-                    kp["edited_adv_df"],
-                    kp["m_coins"],
-                    kp["q_dict"],
-                )
-                st.toast("📝 Чернетку успішно збережено!", icon="✅")
-        except Exception as e:
-            st.toast(f"❌ Помилка збереження: {e}", icon="⚠️")
-    del st.query_params["action"]
-elif query_action == "logout":
-    log_audit("Вийшов з системи")
-    st.session_state.clear()
-    if "auth" in st.query_params:
-        del st.query_params["auth"]
-    if "action" in st.query_params:
-        del st.query_params["action"]
-    st.rerun()
-
-# --- ВЫПАДАЮЩИЙ КАЛЕНДАРЬ (ОТКРЫВАЕТСЯ ПО КЛИКУ ИЗ ПЛАВАЮЩЕГО МЕНЮ) ---
-if st.session_state.get("show_calendar_popup", False):
-    with st.container(border=True):
-        st.markdown(
-            "<h4 style='margin:0 0 8px 0; font-size:16px;'>📅 Виберіть дату зміни</h4>",
-            unsafe_allow_html=True,
-        )
-        d = st.date_input(
-            "Оберіть дату",
-            st.session_state["form_date"],
-            format="DD/MM/YYYY",
-            label_visibility="collapsed",
-        )
-        col_close, col_ok = st.columns([1, 1])
-        with col_close:
-            if st.button("Закрити", use_container_width=True):
-                st.session_state["show_calendar_popup"] = False
-                st.rerun()
-        with col_ok:
-            if d != st.session_state["form_date"]:
-                st.session_state["form_date"] = d
-                prefetch_week_window(d)
-                st.session_state["show_calendar_popup"] = False
-                st.rerun()
-
-# --- ГЕНЕРАЦИЯ HTML ДЛЯ ПЛАВАЮЩЕГО DOCK (ЧЕРЕЗ ST.MARKDOWN) ---
+# --- ДИНАМИЧЕСКИЙ ПЛАВАЮЩИЙ DOCK (НАТИВНЫЙ STREAMLIT — БЕЗ ПЕРЕЗАГРУЗОК) ---
 allowed = st.session_state.get("allowed_tabs", [])
-is_kassa = active_tab == "Касса"
-can_save = is_kassa and can_edit
-
-dock_html_buttons = ""
-
-# Кнопка календаря
-dock_html_buttons += f"""<a href="?auth={auth_token}&action=toggle_calendar" target="_self" class="dock-btn" title="Обрати дату">📅</a>"""
+dock_items = ["calendar"]
 
 if "Касса" in allowed:
-    active_cls = "active" if is_kassa else ""
-    dock_html_buttons += f"""<a href="?auth={auth_token}&action=tab_kas" target="_self" class="dock-btn {active_cls}" title="Каса">🧮</a>"""
-
+    dock_items.append("Касса")
 if "Архів" in allowed:
-    active_cls = "active" if active_tab == "Архів" else ""
-    dock_html_buttons += f"""<a href="?auth={auth_token}&action=tab_arch" target="_self" class="dock-btn {active_cls}" title="Архів">🗃️</a>"""
-
+    dock_items.append("Архів")
 if "Сличительная" in allowed:
-    active_cls = "active" if active_tab == "Сличительная" else ""
-    dock_html_buttons += f"""<a href="?auth={auth_token}&action=tab_pnl" target="_self" class="dock-btn {active_cls}" title="Звіт PnL">📊</a>"""
-
+    dock_items.append("Сличительная")
 if "Закупки" in allowed:
-    active_cls = "active" if active_tab == "Закупки" else ""
-    dock_html_buttons += f"""<a href="?auth={auth_token}&action=tab_sup" target="_self" class="dock-btn {active_cls}" title="Закупки">🧹</a>"""
-
+    dock_items.append("Закупки")
 if "Посуда" in allowed:
-    active_cls = "active" if active_tab == "Посуда" else ""
-    dock_html_buttons += f"""<a href="?auth={auth_token}&action=tab_tab" target="_self" class="dock-btn {active_cls}" title="Посуд">🍽️</a>"""
+    dock_items.append("Посуда")
 
-if can_save:
-    dock_html_buttons += f"""<a href="?auth={auth_token}&action=save_draft" target="_self" class="dock-btn save-btn" title="Зберегти чернетку">💾</a>"""
+if active_tab == "Касса" and can_edit:
+    dock_items.append("save")
 
-dock_html_buttons += f"""<a href="?auth={auth_token}&action=logout" target="_self" class="dock-btn logout-btn" title="Вийти">🚫</a>"""
+dock_items.append("logout")
 
-# Рендерим плавающий док прямо в тело документа Streamlit
-st.markdown(
-    f"""
-<style>
-    .floating-dock-wrapper {{
-        position: fixed !important;
-        bottom: 16px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        display: flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 6px !important;
-        background: rgba(255, 255, 255, 0.88) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.95) !important;
-        border-radius: 22px !important;
-        padding: 6px 10px !important;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
-        z-index: 999999 !important;
-    }}
+# Создаем ровно столько колонок, сколько элементов в меню
+dock_cols = st.columns(len(dock_items))
 
-    /* Сдвиг влево на мобильных устройствах, чтобы не перекрывать иконки Streamlit */
-    @media (max-width: 768px) {{
-        .floating-dock-wrapper {{
-            left: 16px !important;
-            transform: none !important;
-            max-width: calc(100vw - 110px) !important;
-            overflow-x: auto !important;
-            justify-content: flex-start !important;
-        }}
-    }}
+for idx, item in enumerate(dock_items):
+    with dock_cols[idx]:
+        if idx == 0:
+            # Anchor для CSS
+            st.markdown('<div id="floating-dock-anchor"></div>', unsafe_allow_html=True)
 
-    .floating-dock-wrapper .dock-btn {{
-        width: 42px !important;
-        height: 42px !important;
-        min-width: 42px !important;
-        min-height: 42px !important;
-        border-radius: 14px !important;
-        border: 1px solid transparent !important;
-        background: rgba(241, 245, 249, 0.85) !important;
-        font-size: 20px !important;
-        text-decoration: none !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        cursor: pointer !important;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        color: #111827 !important;
-    }}
-    .floating-dock-wrapper .dock-btn:hover {{
-        background: #ffffff !important;
-        border-color: #cbd5e1 !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
-    }}
-    .floating-dock-wrapper .dock-btn.active {{
-        background: #e2e8f0 !important;
-        border-color: #94a3b8 !important;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.06) !important;
-    }}
-    .floating-dock-wrapper .save-btn {{
-        background: rgba(220, 252, 231, 0.9) !important;
-    }}
-    .floating-dock-wrapper .logout-btn {{
-        background: rgba(254, 226, 226, 0.9) !important;
-    }}
-</style>
-<div class="floating-dock-wrapper">
-    {dock_html_buttons}
-</div>
-""",
-    unsafe_allow_html=True,
-)
+        if item == "calendar":
+            with st.popover("📅", help="Оберіть дату"):
+                d = st.date_input(
+                    "Оберіть дату",
+                    st.session_state["form_date"],
+                    format="DD/MM/YYYY",
+                    label_visibility="collapsed",
+                )
+                if d != st.session_state["form_date"]:
+                    st.session_state["form_date"] = d
+                    prefetch_week_window(d)
+                    st.rerun()
+
+        elif item == "Касса":
+            if st.button("🧮", key="btn_dock_kas", help="Каса"):
+                if active_tab != "Касса":
+                    st.session_state["active_tab"] = "Касса"
+                    st.rerun()
+
+        elif item == "Архів":
+            if st.button("🗃️", key="btn_dock_arch", help="Архів"):
+                if active_tab != "Архів":
+                    st.session_state["active_tab"] = "Архів"
+                    st.rerun()
+
+        elif item == "Сличительная":
+            if st.button("📊", key="btn_dock_pnl", help="Звіт PnL"):
+                if active_tab != "Сличительная":
+                    st.session_state["active_tab"] = "Сличительная"
+                    st.rerun()
+
+        elif item == "Закупки":
+            if st.button("🧹", key="btn_dock_sup", help="Закупки"):
+                if active_tab != "Закупки":
+                    st.session_state["active_tab"] = "Закупки"
+                    st.rerun()
+
+        elif item == "Посуда":
+            if st.button("🍽️", key="btn_dock_tab", help="Посуд"):
+                if active_tab != "Посуда":
+                    st.session_state["active_tab"] = "Посуда"
+                    st.rerun()
+
+        elif item == "save":
+            if st.button("💾", key="btn_dock_save", help="Зберегти чернетку"):
+                try:
+                    kp = st.session_state.get("kassa_current_payload", {})
+                    if kp:
+                        save_kassa_draft_to_supabase(
+                            selected_date,
+                            kp["edited_inc_df"],
+                            kp["edited_exp_df"],
+                            kp["edited_adv_df"],
+                            kp["m_coins"],
+                            kp["q_dict"],
+                        )
+                        st.toast("📝 Чернетку успішно збережено!", icon="✅")
+                except Exception as e:
+                    st.toast(f"❌ Помилка збереження: {e}", icon="⚠️")
+
+        elif item == "logout":
+            if st.button("🚫", key="btn_dock_logout", help="Вийти"):
+                log_audit("Вийшов з системи")
+                st.session_state.clear()
+                if "auth" in st.query_params:
+                    del st.query_params["auth"]
+                st.rerun()
 
 st.write("---")
 st.markdown(
