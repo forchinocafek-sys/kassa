@@ -57,14 +57,16 @@ st.markdown(
         padding-bottom: 6rem !important; 
     }
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
-    header[data-testid="stHeader"], #MainMenu, footer { display: none !important; }
-
-    /* Скрываем кнопку деплоя (красную с короной) и виджет обратной связи Streamlit справа внизу */
-    .stDeployButton, 
-    [data-testid="stToolbar"],
-    #MainMenu,
-    footer {
-        display: none !important;
+    
+    /* Жесткое скрытие элементов шапки, деплоя и статус-бара Streamlit */
+    header[data-testid="stHeader"], 
+    [data-testid="stToolbar"], 
+    [data-testid="stStatusWidget"],
+    .stAppDeployButton,
+    #MainMenu, 
+    footer { 
+        display: none !important; 
+        visibility: hidden !important; 
     }
     
     /* Заголовок подтянут максимально к верху */
