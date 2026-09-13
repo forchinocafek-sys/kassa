@@ -187,7 +187,7 @@ def render_pnl_tab():
 
                 running_balance = calc_end
 
-        # --- CSS ТАБЛИЦЫ PnL С ОГРАНИЧЕНИЕМ ВЫСОТЫ И ВСЕГДА ВИДИМЫМ СКРОЛЛОМ ---
+        # --- CSS ТАБЛИЦЫ PnL ---
         pnl_css = """
         <style>
         .pnl-wrapper {
@@ -380,18 +380,19 @@ def render_pnl_tab():
                 if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"] or r.startswith("📁 "):
                     table_parts.append("<td></td>")
                 elif r in ["Касса на начало дня", "Касса на конец дня", "🔴 ВСЬОГО ВИТРАТ"]:
-                    val_str = str(cell["sum"]) if cell["set"] else ""
+                    val_str = str(cell["sum"]) if (cell["set"] and cell["sum"] != 0) else ""
                     row_total += cell["sum"] if cell["set"] else 0
                     table_parts.append(f"<td>{val_str}</td>")
                 else:
                     sum_val = cell["sum"]
                     row_total += sum_val
-                    valid_notes = [n for n in cell["notes"] if n]
 
-                    if sum_val == 0 and not valid_notes:
+                    # При нулевом значении ячейка остается абсолютно пустой
+                    if sum_val == 0:
                         table_parts.append("<td></td>")
                     else:
                         val_str = str(sum_val)
+                        valid_notes = [n for n in cell["notes"] if n]
                         if valid_notes:
                             note_lines = "\n• " + "\n• ".join(valid_notes)
                             safe_title = f"{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
@@ -410,7 +411,7 @@ def render_pnl_tab():
             if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"] or r.startswith("📁 "):
                 table_parts.append("<td></td>")
             else:
-                vsyogo_val = str(row_total) if row_total > 0 else ""
+                vsyogo_val = str(row_total) if row_total != 0 else ""
                 table_parts.append(f"<td>{vsyogo_val}</td>")
 
             table_parts.append("</tr>")
