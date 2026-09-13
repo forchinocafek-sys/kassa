@@ -58,7 +58,7 @@ def clean_df_for_editor(df):
 
 
 def render_kassa_tab(selected_date, can_edit):
-    # CSS для превращения контейнеров в воздушные мягкие карточки
+    # CSS для превращения контейнеров в воздушные мягкие карточки и кастомизации кнопки
     st.markdown(
         textwrap.dedent("""
         <style>
@@ -76,6 +76,24 @@ def render_kassa_tab(selected_date, can_edit):
                 border-radius: 10px !important;
                 border: 1px solid #f3f4f6 !important;
                 box-shadow: none !important;
+            }
+            /* Фирменная кнопка сохранения #1E3557 */
+            div.stButton > button[kind="primary"],
+            div.stButton > button[data-testid="baseButton-primary"] {
+                background-color: #1E3557 !important;
+                color: #ffffff !important;
+                border: none !important;
+                border-radius: 12px !important;
+                font-weight: 700 !important;
+                padding: 0.65rem 1rem !important;
+                box-shadow: 0 4px 12px rgba(30, 53, 87, 0.25) !important;
+                transition: all 0.2s ease !important;
+            }
+            div.stButton > button[kind="primary"]:hover,
+            div.stButton > button[data-testid="baseButton-primary"]:hover {
+                background-color: #14243b !important;
+                color: #ffffff !important;
+                box-shadow: 0 6px 16px rgba(30, 53, 87, 0.35) !important;
             }
         </style>
         """),
