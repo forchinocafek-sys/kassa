@@ -57,80 +57,31 @@ st.markdown(
         padding-bottom: 6rem !important; 
     }
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
-    header[data-testid="stHeader"], #MainMenu, footer { display: none !important; }
     
-    /* Базовое положение меню для ПК (по центру) */
-    .floating-dock-wrapper {
-        position: fixed !important;
-        bottom: 16px !important;
-        left: 50% !important;
-        transform: translateX(-50%) !important;
-        display: flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        justify-content: center !important;
-        gap: 6px !important;
-        background: rgba(255, 255, 255, 0.88) !important;
-        backdrop-filter: blur(16px) !important;
-        -webkit-backdrop-filter: blur(16px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.95) !important;
-        border-radius: 22px !important;
-        padding: 6px 10px !important;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
-        z-index: 999999 !important;
+    /* Жесткое скрытие элементов шапки, деплоя и статус-бара Streamlit */
+    header[data-testid="stHeader"], 
+    [data-testid="stToolbar"], 
+    [data-testid="stStatusWidget"],
+    .stAppDeployButton,
+    #MainMenu, 
+    footer { 
+        display: none !important; 
+        visibility: hidden !important; 
     }
-
-    /* ИСКЛЮЧИТЕЛЬНО ДЛЯ МОБИЛЬНЫХ ТЕЛЕФОНОВ (экраны уже 768px) */
-    @media (max-width: 768px) {
-        .floating-dock-wrapper {
-            left: 16px !important;
-            transform: none !important;
-            max-width: calc(100vw - 110px) !important; /* Оставляем место справа для иконок Streamlit */
-            overflow-x: auto !important; /* Если кнопок много, появится аккуратный скролл */
-            justify-content: flex-start !important;
-        }
+    
+    /* Заголовок подтянут максимально к верху */
+    h1 { 
+        font-family: 'Permanent Marker', cursive !important; 
+        font-size: 3em !important; 
+        margin-top: 0 !important; 
+        margin-bottom: 0.5rem !important;
+        padding-top: 0 !important; 
     }
-
-    .floating-dock-wrapper .dock-btn {
-        width: 42px !important;
-        height: 42px !important;
-        min-width: 42px !important;
-        min-height: 42px !important;
-        border-radius: 14px !important;
-        border: 1px solid transparent !important;
-        background: rgba(241, 245, 249, 0.85) !important;
-        font-size: 20px !important;
-        text-decoration: none !important;
-        display: flex !important;
-        align-items: center !important;
-        justify-content: center !important;
-        cursor: pointer !important;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        padding: 0 !important;
-        margin: 0 !important;
-        color: #111827 !important;
-    }
-    .floating-dock-wrapper .dock-btn:hover {
-        background: #ffffff !important;
-        border-color: #cbd5e1 !important;
-        transform: translateY(-2px) !important;
-        box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
-    }
-    .floating-dock-wrapper .dock-btn.active {
-        background: #e2e8f0 !important;
-        border-color: #94a3b8 !important;
-        box-shadow: inset 0 2px 4px rgba(0,0,0,0.06) !important;
-    }
-    .floating-dock-wrapper .save-btn {
-        background: rgba(220, 252, 231, 0.9) !important;
-    }
-    .floating-dock-wrapper .logout-btn {
-        background: rgba(254, 226, 226, 0.9) !important;
-    }
+    .stApp { background-color: #FAF0E6 !important; }
+    .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
+    div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #ffffff !important; border: 1px solid #d1d5db !important; }
+    input, .stSelectbox span { color: #111827 !important; }
 </style>
-<div class="floating-dock-wrapper">
-    {dock_html_buttons}
-</div>
 """,
     unsafe_allow_html=True,
 )
