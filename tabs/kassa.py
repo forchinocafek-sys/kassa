@@ -60,7 +60,6 @@ def clean_df_for_editor(df):
 # ============================================================
 @st.fragment
 def render_kassa_tab(selected_date, can_edit):
-    # Полный пакет стабильных CSS-стилей + Glassmorphism плавающее меню
     st.markdown(
         """
         <style>
@@ -121,7 +120,7 @@ def render_kassa_tab(selected_date, can_edit):
             .subtotal-adv { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
             .subtotal-cash { background-color: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
 
-            /* ТОЧЕЧНЫЙ СТИЛЬ ТОЛЬКО ДЛЯ КНОПКИ СОХРАНЕНИЯ (PRIMARY) */
+            /* СТИЛЬ КНОПКИ СОХРАНЕНИЯ ВНИЗУ */
             div[data-testid="stButton"] > button[kind="primary"],
             div[data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
                 background: #1E3557 !important;
@@ -146,73 +145,64 @@ def render_kassa_tab(selected_date, can_edit):
             }
 
             /* ========================================================= */
-            /* GLASSMORPHISM FLOATING DOCK (ПЛАВАЮЩЕЕ МЕНЮ)              */
+            /* FLOATING DOCK СТИЛИ                                       */
             /* ========================================================= */
-            div[data-testid="stElementContainer"]:has(.floating-dock) {
+            
+            div[data-testid="stElementContainer"]:has(.dock-marker) {
+                display: none !important;
+            }
+
+            div[data-testid="stVerticalBlock"]:has(.dock-marker) {
                 position: fixed !important;
                 right: 18px !important;
                 top: 50% !important;
                 transform: translateY(-50%) !important;
                 z-index: 999999 !important;
-            }
-
-            .floating-dock {
-                background: rgba(255, 255, 255, 0.75) !important;
-                backdrop-filter: blur(12px) !important;
-                -webkit-backdrop-filter: blur(12px) !important;
-                border: 1px solid rgba(255, 255, 255, 0.8) !important;
-                border-radius: 22px !important;
+                background: rgba(255, 255, 255, 0.8) !important;
+                backdrop-filter: blur(14px) !important;
+                -webkit-backdrop-filter: blur(14px) !important;
+                border: 1px solid rgba(255, 255, 255, 0.9) !important;
+                border-radius: 20px !important;
                 padding: 10px 8px !important;
                 display: flex !important;
                 flex-direction: column !important;
                 gap: 8px !important;
-                box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1), 
+                box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 
                             0 2px 8px rgba(15, 23, 42, 0.04) !important;
             }
 
-            .floating-dock div[data-testid="stButton"] > button {
+            div[data-testid="stVerticalBlock"]:has(.dock-marker) div[data-testid="stButton"] > button {
                 width: 44px !important;
                 height: 44px !important;
                 min-width: 44px !important;
                 min-height: 44px !important;
                 border-radius: 14px !important;
                 border: 1px solid transparent !important;
-                background: rgba(241, 245, 249, 0.7) !important;
+                background: rgba(241, 245, 249, 0.8) !important;
                 padding: 0 !important;
                 display: flex !important;
                 align-items: center !important;
                 justify-content: center !important;
-                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
                 box-shadow: none !important;
             }
 
-            .floating-dock div[data-testid="stButton"] > button * {
-                font-size: 19px !important;
+            div[data-testid="stVerticalBlock"]:has(.dock-marker) div[data-testid="stButton"] > button * {
+                font-size: 20px !important;
                 line-height: 1 !important;
                 margin: 0 !important;
                 padding: 0 !important;
-                transition: transform 0.25s ease !important;
             }
 
-            .floating-dock div[data-testid="stButton"] > button:hover {
+            div[data-testid="stVerticalBlock"]:has(.dock-marker) div[data-testid="stButton"] > button:hover {
                 background: #ffffff !important;
                 border-color: #cbd5e1 !important;
-                transform: scale(1.14) translateX(-2px) !important;
-                box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12) !important;
+                transform: scale(1.15) translateX(-2px) !important;
+                box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14) !important;
             }
 
-            .floating-dock div[data-testid="stButton"] > button:hover * {
-                transform: scale(1.1);
-            }
-
-            .floating-dock div[data-testid="stButton"] > button:active {
+            div[data-testid="stVerticalBlock"]:has(.dock-marker) div[data-testid="stButton"] > button:active {
                 transform: scale(0.95) !important;
-            }
-
-            .dock-divider {
-                height: 1px;
-                background: rgba(226, 232, 240, 0.8);
-                margin: 2px 4px;
             }
         </style>
         """,
@@ -226,7 +216,7 @@ def render_kassa_tab(selected_date, can_edit):
 
     start_balance = get_int(get_start_balance(selected_date))
 
-    # --- КЭШИРОВАНИЕ ДАТАФРЕЙМОВ (Защита от пересоздания таблиц) ---
+    # --- КЭШИРОВАНИЕ ДАТАФРЕЙМОВ ---
     cache_key = f"kassa_dfs_{selected_date}"
     if cache_key not in st.session_state:
         inc_init = clean_df_for_editor(
@@ -541,7 +531,7 @@ def render_kassa_tab(selected_date, can_edit):
                 unsafe_allow_html=True,
             )
 
-    # --- 5. КНОПКА СОХРАНЕНИЯ ---
+    # --- 5. КНОПКА СОХРАНЕНИЯ ФИНАЛЬНОГО ОТЧЕТА ---
     if can_edit:
         st.write("")
         if st.button(
@@ -591,7 +581,10 @@ def render_kassa_tab(selected_date, can_edit):
                         json={"date": selected_date, "payload": payload},
                     )
 
+                if "drafts_cache" in st.session_state:
+                    st.session_state["drafts_cache"][selected_date] = payload
                 st.session_state.pop(cache_key, None)
+                st.cache_data.clear()
 
                 requests.delete(
                     f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}",
@@ -693,65 +686,75 @@ def render_kassa_tab(selected_date, can_edit):
                 else:
                     st.error(f"❌ Помилка: {res_shift.text}")
 
-    # --- 6. GLASSMORPHISM FLOATING DOCK (ПЛАВАЮЩЕЕ МЕНЮ СПРАВА) ---
-    st.markdown('<div class="floating-dock">', unsafe_allow_html=True)
+    # --- 6. GLASSMORPHISM FLOATING DOCK (ПЛАВАЮЩЕЕ МЕНЮ С ЧЕРНОВИКОМ) ---
+    with st.container():
+        st.markdown('<span class="dock-marker"></span>', unsafe_allow_html=True)
 
-    if st.button("📝", key="dock_draft", help="Зберегти черновик"):
-        if can_edit:
-            exp_df_full = edited_exp_df.copy()
-            if "Категорія" in exp_df_full.columns:
-                exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
-                    lambda x: EXPENSE_SHORT_TO_FULL.get(
-                        str(x).strip(), str(x).strip()
-                    )
-                )
+        if st.button("📝", key="dock_draft", help="Зберегти чернетку"):
+            if can_edit:
+                try:
+                    exp_df_full = edited_exp_df.copy()
+                    if "Категорія" in exp_df_full.columns:
+                        exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
+                            lambda x: EXPENSE_SHORT_TO_FULL.get(
+                                str(x).strip(), str(x).strip()
+                            )
+                        )
 
-            draft_payload = {
-                "inc": sanitize_df(edited_inc_df),
-                "exp": sanitize_df(exp_df_full),
-                "adv": sanitize_df(edited_adv_df),
-                "cash": {
-                    "coins": m_coins,
-                    "20": q_20,
-                    "50": q_50,
-                    "100": q_100,
-                    "200": q_200,
-                    "500": q_500,
-                    "1000": q_1000,
-                    "2000": q_2000,
-                },
-            }
+                    draft_payload = {
+                        "inc": sanitize_df(edited_inc_df),
+                        "exp": sanitize_df(exp_df_full),
+                        "adv": sanitize_df(edited_adv_df),
+                        "cash": {
+                            "coins": m_coins,
+                            "20": q_20,
+                            "50": q_50,
+                            "100": q_100,
+                            "200": q_200,
+                            "500": q_500,
+                            "1000": q_1000,
+                            "2000": q_2000,
+                        },
+                    }
 
-            check_draft = requests.get(
-                f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
-                headers=headers,
-            ).json()
+                    check_draft = requests.get(
+                        f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+                        headers=headers,
+                    ).json()
 
-            if isinstance(check_draft, list) and len(check_draft) > 0:
-                res = requests.patch(
-                    f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
-                    headers=headers,
-                    json={"payload": draft_payload},
-                )
+                    if isinstance(check_draft, list) and len(check_draft) > 0:
+                        res = requests.patch(
+                            f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+                            headers=headers,
+                            json={"payload": draft_payload},
+                        )
+                    else:
+                        res = requests.post(
+                            f"{SUPABASE_URL}/rest/v1/drafts",
+                            headers=headers,
+                            json={"date": selected_date, "payload": draft_payload},
+                        )
+
+                    if res.status_code in [200, 201, 204]:
+                        # Обновляем все уровни кэшей приложения
+                        if "drafts_cache" in st.session_state:
+                            st.session_state["drafts_cache"][selected_date] = draft_payload
+                        
+                        st.session_state.pop(cache_key, None)
+                        st.cache_data.clear()
+                        
+                        log_audit("Збережено чернетку", f"Дата: {selected_date}")
+                        st.toast("📝 Чернетку успішно збережено!", icon="✅")
+                    else:
+                        st.toast(f"❌ Помилка сервера: {res.status_code}", icon="⚠️")
+                except Exception as e:
+                    st.toast(f"❌ Помилка збереження: {e}", icon="⚠️")
             else:
-                res = requests.post(
-                    f"{SUPABASE_URL}/rest/v1/drafts",
-                    headers=headers,
-                    json={"date": selected_date, "payload": draft_payload},
-                )
+                st.toast("🔒 Режим «Тільки читання»", icon="⚠️")
 
-            if res.status_code in [200, 201, 204]:
-                st.toast("📝 Черновик успішно збережено!", icon="✅")
-            else:
-                st.toast("❌ Помилка збереження черновика", icon="⚠️")
+        if st.button("📅", key="dock_calendar", help="Обрати дату"):
+            st.session_state["show_calendar_modal"] = True
 
-    if st.button("📅", key="dock_calendar", help="Обрати дату"):
-        st.session_state["show_calendar_modal"] = True
-
-    st.markdown('<div class="dock-divider"></div>', unsafe_allow_html=True)
-
-    if st.button("🔒", key="dock_lock", help="Заблокувати зміну"):
-        st.session_state["kassa_locked"] = True
-        st.toast("🔒 Касу заблоковано", icon="ℹ️")
-
-    st.markdown("</div>", unsafe_allow_html=True)
+        if st.button("🔒", key="dock_lock", help="Заблокувати зміну"):
+            st.session_state["kassa_locked"] = True
+            st.toast("🔒 Касу заблоковано", icon="ℹ️")
