@@ -145,29 +145,29 @@ def render_kassa_tab(selected_date, can_edit):
             }
 
             /* ========================================================= */
-            /* ТОЧЕЧНЫЙ БЕЗОПАСНЫЙ СТИЛЬ FLOATING DOCK                    */
+            /* ИЗОЛИРОВАННЫЙ FLOATING DOCK                               */
             /* ========================================================= */
             
-            /* Скрываем технические маркеры */
+            /* Скрываем служебные маркеры */
             div[data-testid="stElementContainer"]:has(.floating-btn-draft),
             div[data-testid="stElementContainer"]:has(.floating-btn-calendar),
             div[data-testid="stElementContainer"]:has(.floating-btn-lock) {
                 display: none !important;
             }
 
-            /* Подложка для дока (Glassmorphism) */
+            /* Фоновая карточка дока */
             div[data-testid="stElementContainer"]:has(.floating-dock-bg) {
                 display: block !important;
                 position: fixed !important;
                 right: 18px !important;
                 top: 50% !important;
                 transform: translateY(-50%) !important;
-                width: 60px !important;
-                height: 172px !important;
-                background: rgba(255, 255, 255, 0.8) !important;
+                width: 62px !important;
+                height: 184px !important;
+                background: rgba(255, 255, 255, 0.85) !important;
                 backdrop-filter: blur(14px) !important;
                 -webkit-backdrop-filter: blur(14px) !important;
-                border: 1px solid rgba(255, 255, 255, 0.9) !important;
+                border: 1px solid rgba(255, 255, 255, 0.95) !important;
                 border-radius: 20px !important;
                 z-index: 999990 !important;
                 box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 
@@ -175,32 +175,30 @@ def render_kassa_tab(selected_date, can_edit):
                 pointer-events: none !important;
             }
 
-            /* Кнопка 1: Черновик */
+            /* Позиционирование кнопок относительно центра */
             div[data-testid="stElementContainer"]:has(.floating-btn-draft) + div[data-testid="stElementContainer"] {
                 position: fixed !important;
-                right: 26px !important;
-                top: calc(50% - 60px) !important;
+                right: 27px !important;
+                top: calc(50% - 58px) !important;
                 z-index: 999999 !important;
             }
 
-            /* Кнопка 2: Календарь */
             div[data-testid="stElementContainer"]:has(.floating-btn-calendar) + div[data-testid="stElementContainer"] {
                 position: fixed !important;
-                right: 26px !important;
+                right: 27px !important;
                 top: 50% !important;
                 transform: translateY(-50%) !important;
                 z-index: 999999 !important;
             }
 
-            /* Кнопка 3: Заблокировать */
             div[data-testid="stElementContainer"]:has(.floating-btn-lock) + div[data-testid="stElementContainer"] {
                 position: fixed !important;
-                right: 26px !important;
-                top: calc(50% + 16px) !important;
+                right: 27px !important;
+                top: calc(50% + 14px) !important;
                 z-index: 999999 !important;
             }
 
-            /* Внешний вид плавающих кнопок */
+            /* Оформление плавающих кнопок */
             div[data-testid="stElementContainer"]:has(.floating-btn-draft) + div[data-testid="stElementContainer"] button,
             div[data-testid="stElementContainer"]:has(.floating-btn-calendar) + div[data-testid="stElementContainer"] button,
             div[data-testid="stElementContainer"]:has(.floating-btn-lock) + div[data-testid="stElementContainer"] button {
@@ -718,7 +716,7 @@ def render_kassa_tab(selected_date, can_edit):
                 else:
                     st.error(f"❌ Помилка: {res_shift.text}")
 
-    # --- 6. БЕЗОПАСНЫЙ FLOATING DOCK СПРАВА ---
+    # --- 6. РЕНДЕР ПЛАВАЮЩЕГО DOCK ---
     st.markdown('<div class="floating-dock-bg"></div>', unsafe_allow_html=True)
 
     # Кнопка черновика
