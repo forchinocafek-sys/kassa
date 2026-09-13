@@ -173,9 +173,14 @@ elif active_tab == "Посуда":
     render_tableware_tab(selected_date, can_edit)
 
 # Обработка действий от плавающего HTML-дока через query_params / сессию
-# (Чтобы кнопки внутри components.html могли безопасно управлять Streamlit)
 query_action = st.query_params.get("action")
-if query_action == "tab_kas":
+if query_action == "toggle_calendar":
+    st.session_state["show_calendar_popup"] = not st.session_state.get(
+        "show_calendar_popup", False
+    )
+    del st.query_params["action"]
+    st.rerun()
+elif query_action == "tab_kas":
     st.session_state["active_tab"] = "Касса"
     del st.query_params["action"]
     st.rerun()
@@ -221,17 +226,30 @@ elif query_action == "logout":
         del st.query_params["action"]
     st.rerun()
 
-# --- ВЫПАДАЮЩИЙ КАЛЕНДАРЬ (УБРАН ИЗ ДОКА НАВЕРХ ДЛЯ УДОБСТВА НА МОБИЛЬНЫХ) ---
-with st.expander("📅 Обрати дату або переглянути звіт", expanded=False):
-    d = st.date_input(
-        "Оберіть дату",
-        st.session_state["form_date"],
-        format="DD/MM/YYYY",
-    )
-    if d != st.session_state["form_date"]:
-        st.session_state["form_date"] = d
-        prefetch_week_window(d)
-        st.rerun()
+# --- ВЫПАДАЮЩИЙ КАЛЕНДАРЬ (ОТКРЫВАЕТСЯ ПО КЛИКУ ИЗ ПЛАВАЮЩЕГО МЕНЮ) ---
+if st.session_state.get("show_calendar_popup", False):
+    with st.container(border=True):
+        st.markdown(
+            "<h4 style='margin:0 0 8px 0; font-size:16px;'>📅 Виберіть дату зміни</h4>",
+            unsafe_allow_html=True,
+        )
+        d = st.date_input(
+            "Оберіть дату",
+            st.session_state["form_date"],
+            format="DD/MM/YYYY",
+            label_visibility="collapsed",
+        )
+        col_close, col_ok = st.columns([1, 1])
+        with col_close:
+            if st.button("Закрити", use_container_width=True):
+                st.session_state["show_calendar_popup"] = False
+                st.rerun()
+        with col_ok:
+            if d != st.session_state["form_date"]:
+                st.session_state["form_date"] = d
+                prefetch_week_window(d)
+                st.session_state["show_calendar_popup"] = False
+                st.rerun()
 
 # --- ГЕНЕРАЦИЯ HTML ДЛЯ ПЛАВАЮЩЕГО DOCK (ЧЕРЕЗ ST.MARKDOWN) ---
 allowed = st.session_state.get("allowed_tabs", [])
@@ -239,6 +257,9 @@ is_kassa = active_tab == "Касса"
 can_save = is_kassa and can_edit
 
 dock_html_buttons = ""
+
+# Кнопка календаря
+dock_html_buttons += f"""<a href="?auth={auth_token}&action=toggle_calendar" target="_self" class="dock-btn" title="Обрати дату">📅</a>"""
 
 if "Касса" in allowed:
     active_cls = "active" if is_kassa else ""
@@ -288,6 +309,18 @@ st.markdown(
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
         z-index: 999999 !important;
     }}
+
+    /* Сдвиг влево на мобильных устройствах, чтобы не перекрывать иконки Streamlit */
+    @media (max-width: 768px) {{
+        .floating-dock-wrapper {{
+            left: 16px !important;
+            transform: none !important;
+            max-width: calc(100vw - 110px) !important;
+            overflow-x: auto !important;
+            justify-content: flex-start !important;
+        }}
+    }}
+
     .floating-dock-wrapper .dock-btn {{
         width: 42px !important;
         height: 42px !important;
