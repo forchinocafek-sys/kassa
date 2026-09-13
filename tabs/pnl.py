@@ -441,7 +441,6 @@ def render_pnl_tab():
             background: #ffefad !important;
         }}
 
-        /* --- ВЫДЕЛЕНИЕ СЕГОДНЯШНЕГО ДНЯ --- */
         .pnl-table th.pnl-today {{
             background: #1E3557 !important;
             color: #ffffff !important;
@@ -506,6 +505,27 @@ def render_pnl_tab():
         table_parts.append("<th>Всього</th></tr></thead><tbody>")
 
         for r in order_full:
+            # --- ФИЛЬТРАЦИЯ ПУСТЫХ СТРОК ---
+            row_month_sum = sum(
+                report_data[r][str(d)]["sum"] for d in range(1, num_days + 1)
+            )
+            row_has_notes = any(
+                len(report_data[r][str(d)]["notes"]) > 0
+                for d in range(1, num_days + 1)
+            )
+
+            is_structural_header = r in [
+                "Касса на начало дня",
+                "🟢 НАДХОДЖЕННЯ",
+                "🔴 ВИТРАТИ",
+                "🔴 ВСЬОГО ВИТРАТ",
+                "Касса на конец дня",
+            ]
+
+            # Если по строке нет суммы и примечаний — скрываем ее
+            if not is_structural_header and row_month_sum == 0 and not row_has_notes:
+                continue
+
             if r == "🟢 НАДХОДЖЕННЯ":
                 row_cls = "pnl-row-inc"
             elif r == "🔴 ВИТРАТИ":
