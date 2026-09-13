@@ -5,18 +5,18 @@ from datetime import datetime, timedelta
 import streamlit as st
 import streamlit.components.v1 as components
 
-from config import USERS, ICON_URL
-from utils import (
-    log_audit,
-    prefetch_week_window,
-    load_draft_or_init,
-    save_kassa_draft_to_supabase,
-)
-from tabs.kassa import render_kassa_tab
+from config import ICON_URL, USERS
 from tabs.archive import render_archive_tab
+from tabs.kassa import render_kassa_tab
 from tabs.pnl import render_pnl_tab
 from tabs.supplies import render_supplies_tab
 from tabs.tableware import render_tableware_tab
+from utils import (
+    load_draft_or_init,
+    log_audit,
+    prefetch_week_window,
+    save_kassa_draft_to_supabase,
+)
 
 # --- НАЛАШТУВАННЯ СТОРІНКИ ---
 st.set_page_config(
@@ -71,15 +71,78 @@ st.markdown(
     .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #ffffff !important; border: 1px solid #d1d5db !important; }
     input, .stSelectbox span { color: #111827 !important; }
-    .fact-block [data-testid="stHorizontalBlock"] { flex-direction: row !important; flex-wrap: nowrap !important; align-items: center !important; }
-    .fact-block [data-testid="column"] { width: auto !important; flex: 1 1 0% !important; min-width: 0 !important; }
 
-    /* GHOST MENU */
+    /* ========================================================= */
+    /* ПРЕМИАЛЬНОЕ ПЛАВАЮЩЕЕ МЕНЮ (GLASSMORPHISM DOCK)           */
+    /* ========================================================= */
     #is-floating { display: none; }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) { position: fixed !important; top: 15px !important; right: 15px !important; z-index: 99999 !important; width: 50px !important; display: flex !important; flex-direction: column !important; gap: 12px !important; background: transparent !important; padding: 0 !important; opacity: 0.35 !important; transition: opacity 0.3s ease !important; }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating):hover { opacity: 1 !important; }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] { width: 50px !important; min-width: 50px !important; height: 50px !important; flex: 0 0 50px !important; margin: 0 !important; padding: 0 !important; }
-    div[data-testid="stHorizontalBlock"]:has(#is-floating) button { width: 50px !important; height: 50px !important; border-radius: 12px !important; background: linear-gradient(135deg, #f3f4f6, #e5e7eb) !important; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important; }
+    
+    /* Превращаем блок колонок в фиксированный док */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) {
+        position: fixed !important;
+        top: 50% !important;
+        right: 18px !important;
+        transform: translateY(-50%) !important;
+        z-index: 999999 !important;
+        
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 8px !important;
+        width: 60px !important;
+        
+        background: rgba(255, 255, 255, 0.8) !important;
+        backdrop-filter: blur(14px) !important;
+        -webkit-backdrop-filter: blur(14px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.9) !important;
+        border-radius: 20px !important;
+        padding: 10px 8px !important;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+    }
+
+    /* Нормализуем размер колонок внутри дока */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
+        width: 44px !important;
+        min-width: 44px !important;
+        height: 44px !important;
+        flex: 0 0 44px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Все кнопки (включая popover даты) внутри дока */
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
+        width: 44px !important;
+        height: 44px !important;
+        min-width: 44px !important;
+        min-height: 44px !important;
+        border-radius: 14px !important;
+        border: 1px solid transparent !important;
+        background: rgba(241, 245, 249, 0.85) !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: none !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button * {
+        font-size: 19px !important;
+        line-height: 1 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button:hover {
+        background: #ffffff !important;
+        border-color: #cbd5e1 !important;
+        transform: scale(1.15) translateX(-2px) !important;
+        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14) !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#is-floating) button:active {
+        transform: scale(0.95) !important;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -171,16 +234,17 @@ elif active_tab == "Закупки":
 elif active_tab == "Посуда":
     render_tableware_tab(selected_date, can_edit)
 
-# --- ПЛАВАЮЧЕ МЕНЮ РОУТИНГ ---
-fc1, fc2, fc3, fc4, fc5, fc6, fc7 = st.columns(7)
+# --- ЕДИНЫЙ ПЛАВАЮЩИЙ DOCK (РОУТИНГ + ДЕЙСТВИЯ) ---
+fc1, fc2, fc3, fc4, fc5, fc6, fc7, fc8 = st.columns(8)
 
 with fc1:
+    # Маркер для CSS-селектора
     st.markdown('<div id="is-floating"></div>', unsafe_allow_html=True)
     if (
         "Касса" in st.session_state["allowed_tabs"]
         and active_tab != "Касса"
     ):
-        if st.button("🧮", key="nav_kas"):
+        if st.button("🧮", key="nav_kas", help="Каса"):
             st.session_state["active_tab"] = "Касса"
             st.rerun()
 
@@ -189,7 +253,7 @@ with fc2:
         "Архів" in st.session_state["allowed_tabs"]
         and active_tab != "Архів"
     ):
-        if st.button("🗃️", key="nav_arch"):
+        if st.button("🗃️", key="nav_arch", help="Архів"):
             st.session_state["active_tab"] = "Архів"
             st.rerun()
 
@@ -198,7 +262,7 @@ with fc3:
         "Сличительная" in st.session_state["allowed_tabs"]
         and active_tab != "Сличительная"
     ):
-        if st.button("📊", key="nav_pnl"):
+        if st.button("📊", key="nav_pnl", help="Звіт PnL"):
             st.session_state["active_tab"] = "Сличительная"
             st.rerun()
 
@@ -207,7 +271,7 @@ with fc4:
         "Закупки" in st.session_state["allowed_tabs"]
         and active_tab != "Закупки"
     ):
-        if st.button("🧹", key="nav_supplies"):
+        if st.button("🧹", key="nav_supplies", help="Закупки"):
             st.session_state["active_tab"] = "Закупки"
             st.rerun()
 
@@ -216,12 +280,12 @@ with fc5:
         "Посуда" in st.session_state["allowed_tabs"]
         and active_tab != "Посуда"
     ):
-        if st.button("🍽️", key="nav_tableware"):
+        if st.button("🍽️", key="nav_tableware", help="Посуд"):
             st.session_state["active_tab"] = "Посуда"
             st.rerun()
 
 with fc6:
-    with st.popover("📅"):
+    with st.popover("📅", help="Обрати дату"):
         d = st.date_input(
             "Оберіть дату",
             st.session_state["form_date"],
@@ -232,9 +296,10 @@ with fc6:
             st.session_state["form_date"] = d
             prefetch_week_window(d)
             st.rerun()
-            
+
+with fc7:
     if active_tab == "Касса" and can_edit:
-        if st.button("💾", key="fab_save"):
+        if st.button("💾", key="fab_save", help="Зберегти чернетку"):
             try:
                 kp = st.session_state.get("kassa_current_payload", {})
                 if kp:
@@ -246,12 +311,12 @@ with fc6:
                         kp["m_coins"],
                         kp["q_dict"],
                     )
-                    st.toast("✅ Чернетку збережено!", icon="💾")
-            except Exception:
-                st.error("Помилка даних.")
+                    st.toast("📝 Чернетку успішно збережено!", icon="✅")
+            except Exception as e:
+                st.toast(f"❌ Помилка збереження: {e}", icon="⚠️")
 
-with fc7:
-    if st.button("🚫", key="fab_logout"):
+with fc8:
+    if st.button("🚫", key="fab_logout", help="Вийти з системи"):
         log_audit("Вийшов з системи")
         st.session_state.clear()
         if "auth" in st.query_params:
