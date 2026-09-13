@@ -58,7 +58,7 @@ def clean_df_for_editor(df):
 
 
 def render_kassa_tab(selected_date, can_edit):
-    # CSS для карточек и надежной перекраски главной кнопки в #1E3557
+    # CSS для карточек и принудительного контрастного белого текста на кнопке #1E3557
     st.markdown(
         textwrap.dedent("""
         <style>
@@ -77,29 +77,31 @@ def render_kassa_tab(selected_date, can_edit):
                 border: 1px solid #f3f4f6 !important;
                 box-shadow: none !important;
             }
-            /* Точная перекраска кнопки сохранения в темный синий #1E3557 */
-            button[data-testid="stBaseButton-primary"],
-            button[data-testid="baseButton-primary"],
-            button[kind="primary"],
+            /* Контейнер кнопки */
             div[data-testid="stButton"] > button {
                 background-color: #1E3557 !important;
                 background: #1E3557 !important;
-                color: #ffffff !important;
                 border: none !important;
                 border-radius: 12px !important;
-                font-weight: 700 !important;
-                padding: 0.65rem 1rem !important;
+                padding: 0.75rem 1rem !important;
                 box-shadow: 0 4px 12px rgba(30, 53, 87, 0.25) !important;
                 transition: all 0.2s ease !important;
             }
-            button[data-testid="stBaseButton-primary"]:hover,
-            button[data-testid="baseButton-primary"]:hover,
-            button[kind="primary"]:hover,
+            /* Принудительно ярко-белый и читаемый текст внутри кнопки */
+            div[data-testid="stButton"] > button * {
+                color: #ffffff !important;
+                font-weight: 800 !important;
+                font-size: 16px !important;
+                letter-spacing: 0.5px !important;
+            }
+            /* Эффект наведения */
             div[data-testid="stButton"] > button:hover {
                 background-color: #14243b !important;
                 background: #14243b !important;
-                color: #ffffff !important;
                 box-shadow: 0 6px 16px rgba(30, 53, 87, 0.35) !important;
+            }
+            div[data-testid="stButton"] > button:hover * {
+                color: #ffffff !important;
             }
         </style>
         """),
