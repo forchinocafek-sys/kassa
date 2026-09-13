@@ -121,8 +121,9 @@ def render_kassa_tab(selected_date, can_edit):
             .subtotal-adv { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
             .subtotal-cash { background-color: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
 
-            /* Кнопка сохранения */
-            div[data-testid="stButton"] > button {
+            /* ТОЧЕЧНЫЙ СТИЛЬ ТОЛЬКО ДЛЯ КНОПКИ СОХРАНЕНИЯ (PRIMARY) — НЕ ТРОГАЕТ ПЛАВАЮЩЕЕ МЕНЮ */
+            div[data-testid="stButton"] > button[kind="primary"],
+            div[data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
                 background: #1E3557 !important;
                 border: none !important;
                 border-radius: 12px !important;
@@ -130,13 +131,15 @@ def render_kassa_tab(selected_date, can_edit):
                 box-shadow: 0 4px 14px rgba(30, 53, 87, 0.25) !important;
                 transition: all 0.2s ease-in-out !important;
             }
-            div[data-testid="stButton"] > button * {
+            div[data-testid="stButton"] > button[kind="primary"] *,
+            div[data-testid="stButton"] > button[data-testid="stBaseButton-primary"] * {
                 color: #ffffff !important;
                 font-weight: 800 !important;
                 font-size: 15px !important;
                 letter-spacing: 0.4px !important;
             }
-            div[data-testid="stButton"] > button:hover {
+            div[data-testid="stButton"] > button[kind="primary"]:hover,
+            div[data-testid="stButton"] > button[data-testid="stBaseButton-primary"]:hover {
                 background: #14243b !important;
                 transform: translateY(-1px);
                 box-shadow: 0 6px 18px rgba(30, 53, 87, 0.35) !important;
