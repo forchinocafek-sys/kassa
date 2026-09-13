@@ -54,7 +54,7 @@ st.markdown(
     /* Минимальный верхний отступ страницы */
     .block-container { 
         padding-top: 0.2rem !important; 
-        padding-bottom: 1rem !important; 
+        padding-bottom: 5rem !important; 
     }
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
     header[data-testid="stHeader"], #MainMenu, footer { display: none !important; }
@@ -77,57 +77,61 @@ st.markdown(
     /* ========================================================= */
     #is-floating { display: none; }
     
-    /* Превращаем блок колонок в фиксированный док */
+    /* Превращаем блок колонок в горизонтальный плавающий док снизу или сбоку */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) {
         position: fixed !important;
-        top: 50% !important;
-        right: 18px !important;
-        transform: translateY(-50%) !important;
+        bottom: 20px !important;
+        left: 50% !important;
+        transform: translateX(-50%) !important;
         z-index: 999999 !important;
         
         display: flex !important;
-        flex-direction: column !important;
-        gap: 8px !important;
-        width: 60px !important;
+        flex-direction: row !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 6px !important;
+        width: auto !important;
+        max-width: 95vw !important;
+        overflow-x: auto !important;
         
-        background: rgba(255, 255, 255, 0.8) !important;
+        background: rgba(255, 255, 255, 0.82) !important;
         backdrop-filter: blur(14px) !important;
         -webkit-backdrop-filter: blur(14px) !important;
         border: 1px solid rgba(255, 255, 255, 0.9) !important;
         border-radius: 20px !important;
-        padding: 10px 8px !important;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04) !important;
+        padding: 8px 10px !important;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15), 0 2px 8px rgba(15, 23, 42, 0.05) !important;
     }
 
     /* Нормализуем размер колонок внутри дока */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        width: 44px !important;
-        min-width: 44px !important;
-        height: 44px !important;
-        flex: 0 0 44px !important;
+        width: 42px !important;
+        min-width: 42px !important;
+        height: 42px !important;
+        flex: 0 0 42px !important;
         margin: 0 !important;
         padding: 0 !important;
     }
 
     /* Все кнопки (включая popover даты) внутри дока */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
-        width: 44px !important;
-        height: 44px !important;
-        min-width: 44px !important;
-        min-height: 44px !important;
-        border-radius: 14px !important;
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        min-height: 42px !important;
+        border-radius: 12px !important;
         border: 1px solid transparent !important;
         background: rgba(241, 245, 249, 0.85) !important;
         padding: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
         box-shadow: none !important;
     }
 
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button * {
-        font-size: 19px !important;
+        font-size: 18px !important;
         line-height: 1 !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -136,7 +140,7 @@ st.markdown(
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button:hover {
         background: #ffffff !important;
         border-color: #cbd5e1 !important;
-        transform: scale(1.15) translateX(-2px) !important;
+        transform: translateY(-3px) scale(1.08) !important;
         box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14) !important;
     }
 
