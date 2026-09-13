@@ -60,7 +60,7 @@ def clean_df_for_editor(df):
 # ============================================================
 @st.fragment
 def render_kassa_tab(selected_date, can_edit):
-    # Современные стабильные стили (БЕЗ ломающих layout отступов)
+    # Полный пакет стабильных CSS-стилей + Glassmorphism плавающее меню
     st.markdown(
         """
         <style>
@@ -69,7 +69,7 @@ def render_kassa_tab(selected_date, can_edit):
                 display: none !important;
             }
             
-            /* 1. УМЕНЬШАЕМ ВЕРХНИЙ ОТСТУП ВНУТРИ КАРТОЧЕК */
+            /* 1. УМЕНЬШАЕМ ВЕРХНИЙ И НИЖНИЙ ОТСТУП ВНУТРИ КАРТОЧЕК */
             div[data-testid="stVerticalBlockBorderWrapper"] {
                 padding-top: 10px !important;
                 padding-bottom: 10px !important;
@@ -121,7 +121,7 @@ def render_kassa_tab(selected_date, can_edit):
             .subtotal-adv { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
             .subtotal-cash { background-color: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
 
-            /* ТОЧЕЧНЫЙ СТИЛЬ ТОЛЬКО ДЛЯ КНОПКИ СОХРАНЕНИЯ (PRIMARY) — НЕ ТРОГАЕТ ПЛАВАЮЩЕЕ МЕНЮ */
+            /* ТОЧЕЧНЫЙ СТИЛЬ ТОЛЬКО ДЛЯ КНОПКИ СОХРАНЕНИЯ (PRIMARY) */
             div[data-testid="stButton"] > button[kind="primary"],
             div[data-testid="stButton"] > button[data-testid="stBaseButton-primary"] {
                 background: #1E3557 !important;
@@ -143,6 +143,76 @@ def render_kassa_tab(selected_date, can_edit):
                 background: #14243b !important;
                 transform: translateY(-1px);
                 box-shadow: 0 6px 18px rgba(30, 53, 87, 0.35) !important;
+            }
+
+            /* ========================================================= */
+            /* GLASSMORPHISM FLOATING DOCK (ПЛАВАЮЩЕЕ МЕНЮ)              */
+            /* ========================================================= */
+            div[data-testid="stElementContainer"]:has(.floating-dock) {
+                position: fixed !important;
+                right: 18px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                z-index: 999999 !important;
+            }
+
+            .floating-dock {
+                background: rgba(255, 255, 255, 0.75) !important;
+                backdrop-filter: blur(12px) !important;
+                -webkit-backdrop-filter: blur(12px) !important;
+                border: 1px solid rgba(255, 255, 255, 0.8) !important;
+                border-radius: 22px !important;
+                padding: 10px 8px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 8px !important;
+                box-shadow: 0 10px 30px rgba(15, 23, 42, 0.1), 
+                            0 2px 8px rgba(15, 23, 42, 0.04) !important;
+            }
+
+            .floating-dock div[data-testid="stButton"] > button {
+                width: 44px !important;
+                height: 44px !important;
+                min-width: 44px !important;
+                min-height: 44px !important;
+                border-radius: 14px !important;
+                border: 1px solid transparent !important;
+                background: rgba(241, 245, 249, 0.7) !important;
+                padding: 0 !important;
+                display: flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+                box-shadow: none !important;
+            }
+
+            .floating-dock div[data-testid="stButton"] > button * {
+                font-size: 19px !important;
+                line-height: 1 !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                transition: transform 0.25s ease !important;
+            }
+
+            .floating-dock div[data-testid="stButton"] > button:hover {
+                background: #ffffff !important;
+                border-color: #cbd5e1 !important;
+                transform: scale(1.14) translateX(-2px) !important;
+                box-shadow: 0 6px 16px rgba(15, 23, 42, 0.12) !important;
+            }
+
+            .floating-dock div[data-testid="stButton"] > button:hover * {
+                transform: scale(1.1);
+            }
+
+            .floating-dock div[data-testid="stButton"] > button:active {
+                transform: scale(0.95) !important;
+            }
+
+            .dock-divider {
+                height: 1px;
+                background: rgba(226, 232, 240, 0.8);
+                margin: 2px 4px;
             }
         </style>
         """,
@@ -622,3 +692,66 @@ def render_kassa_tab(selected_date, can_edit):
                     st.success("🎉 Звіт успішно збережено в хмарі!")
                 else:
                     st.error(f"❌ Помилка: {res_shift.text}")
+
+    # --- 6. GLASSMORPHISM FLOATING DOCK (ПЛАВАЮЩЕЕ МЕНЮ СПРАВА) ---
+    st.markdown('<div class="floating-dock">', unsafe_allow_html=True)
+
+    if st.button("📝", key="dock_draft", help="Зберегти черновик"):
+        if can_edit:
+            exp_df_full = edited_exp_df.copy()
+            if "Категорія" in exp_df_full.columns:
+                exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
+                    lambda x: EXPENSE_SHORT_TO_FULL.get(
+                        str(x).strip(), str(x).strip()
+                    )
+                )
+
+            draft_payload = {
+                "inc": sanitize_df(edited_inc_df),
+                "exp": sanitize_df(exp_df_full),
+                "adv": sanitize_df(edited_adv_df),
+                "cash": {
+                    "coins": m_coins,
+                    "20": q_20,
+                    "50": q_50,
+                    "100": q_100,
+                    "200": q_200,
+                    "500": q_500,
+                    "1000": q_1000,
+                    "2000": q_2000,
+                },
+            }
+
+            check_draft = requests.get(
+                f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+                headers=headers,
+            ).json()
+
+            if isinstance(check_draft, list) and len(check_draft) > 0:
+                res = requests.patch(
+                    f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+                    headers=headers,
+                    json={"payload": draft_payload},
+                )
+            else:
+                res = requests.post(
+                    f"{SUPABASE_URL}/rest/v1/drafts",
+                    headers=headers,
+                    json={"date": selected_date, "payload": draft_payload},
+                )
+
+            if res.status_code in [200, 201, 204]:
+                st.toast("📝 Черновик успішно збережено!", icon="✅")
+            else:
+                st.toast("❌ Помилка збереження черновика", icon="⚠️")
+
+    if st.button("📅", key="dock_calendar", help="Обрати дату"):
+        st.session_state["show_calendar_modal"] = True
+
+    st.markdown('<div class="dock-divider"></div>', unsafe_allow_html=True)
+
+    if st.button("🔒", key="dock_lock", help="Заблокувати зміну"):
+        st.session_state["kassa_locked"] = True
+        st.toast("🔒 Касу заблоковано", icon="ℹ️")
+
+    st.markdown("</div>", unsafe_allow_html=True)
