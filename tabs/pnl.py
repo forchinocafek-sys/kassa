@@ -1,4 +1,5 @@
 import calendar
+from datetime import datetime
 import requests
 import streamlit as st
 from config import SUPABASE_URL, headers, EXPENSE_TREE, INCOME_CATEGORIES
@@ -187,170 +188,315 @@ def render_pnl_tab():
 
                 running_balance = calc_end
 
-        # --- CSS ТАБЛИЦЫ PnL ---
-        pnl_css = """
-        <style>
-        .pnl-wrapper {
-            overflow: auto !important;
-            max-height: 80vh;
-            width: 100%;
-            margin-top: 15px;
-            margin-bottom: 25px;
-            border: 1px solid #d1d5db;
-            border-radius: 10px;
-            background-color: #ffffff;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-        }
+        # ============================================================
+        # PnL TABLE — UI
+        # ============================================================
 
-        .pnl-wrapper::-webkit-scrollbar {
+        today = datetime.today()
+        today_day = (
+            today.day
+            if today.year == sel_y and today.month == m_num
+            else None
+        )
+
+        hover_column_css = ""
+        for d in range(1, num_days + 1):
+            col_index = d + 1
+            hover_column_css += f"""
+            .pnl-table:has(td:nth-child({col_index}):hover) td:nth-child({col_index}),
+            .pnl-table:has(th:nth-child({col_index}):hover) th:nth-child({col_index}) {{
+                background-color: #eef3f8 !important;
+            }}
+            """
+
+        pnl_css = f"""
+        <style>
+        .pnl-wrapper {{
+            position: relative;
+            overflow: auto !important;
+            max-height: 78vh;
+            width: 100%;
+            margin-top: 12px;
+            margin-bottom: 22px;
+            border: 1px solid #d6d3d1;
+            border-radius: 10px;
+            background: #ffffff;
+            box-shadow: 0 2px 8px rgba(30, 53, 87, 0.04);
+            scrollbar-width: thin;
+            scrollbar-color: #b8c1cc #f5f5f4;
+        }}
+
+        .pnl-wrapper::-webkit-scrollbar {{
             width: 8px;
             height: 8px;
-        }
-        .pnl-wrapper::-webkit-scrollbar-track {
-            background: #f1f5f9;
-            border-radius: 4px;
-        }
-        .pnl-wrapper::-webkit-scrollbar-thumb {
-            background: #94a3b8;
-            border-radius: 4px;
-        }
-        .pnl-wrapper::-webkit-scrollbar-thumb:hover {
-            background: #64748b;
-        }
+        }}
 
-        .pnl-table {
+        .pnl-wrapper::-webkit-scrollbar-track {{
+            background: #f5f5f4;
+            border-radius: 5px;
+        }}
+
+        .pnl-wrapper::-webkit-scrollbar-thumb {{
+            background: #b8c1cc;
+            border-radius: 5px;
+        }}
+
+        .pnl-wrapper::-webkit-scrollbar-thumb:hover {{
+            background: #8e9aaa;
+        }}
+
+        .pnl-table {{
             border-collapse: separate;
             border-spacing: 0;
             width: max-content;
+            min-width: 100%;
             table-layout: fixed !important;
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             font-size: 13px;
-            color: #111827;
-        }
-        .pnl-table th, .pnl-table td {
-            padding: 7px 6px;
-            border-bottom: 1px solid #e5e7eb;
-            border-right: 1px solid #e5e7eb;
-            text-align: center;
+            color: #1e293b;
+        }}
+
+        .pnl-table th,
+        .pnl-table td {{
             box-sizing: border-box !important;
+            padding: 8px 7px;
+            height: 36px;
+            border-bottom: 1px solid #e7e5e4;
+            border-right: 1px solid #ecebea;
+            text-align: center;
             vertical-align: middle;
-        }
-        .pnl-table th {
-            background-color: #f3f4f6;
-            font-weight: 700;
-            border-bottom: 2px solid #cbd5e1;
+            white-space: nowrap;
+        }}
+
+        .pnl-table th {{
             position: sticky;
             top: 0;
-            z-index: 3;
-            white-space: nowrap;
-        }
-        .pnl-table th:first-child, 
-        .pnl-table td:first-child {
-            position: sticky;
-            left: 0;
-            z-index: 5 !important;
-            text-align: left;
-            width: 320px !important;
-            min-width: 320px !important;
-            max-width: 320px !important;
-            border-right: 2px solid #cbd5e1 !important;
-            white-space: normal;
-            word-break: break-word;
-            line-height: 1.25;
-            background-color: #ffffff;
-        }
-        .pnl-table th:first-child {
-            z-index: 6 !important;
-            background-color: #e2e8f0 !important;
-            white-space: nowrap;
-        }
+            z-index: 10;
+            background: #f1f3f5;
+            color: #1e3557;
+            font-weight: 700;
+            border-bottom: 2px solid #cbd3dc;
+            height: 40px;
+            box-shadow: 0 1px 0 rgba(30, 53, 87, 0.04);
+        }}
 
-        .pnl-table th:not(:first-child):not(:last-child), 
-        .pnl-table td:not(:first-child):not(:last-child) {
+        .pnl-table th:not(:first-child):not(:last-child) {{
             width: 75px !important;
             min-width: 75px !important;
             max-width: 75px !important;
-            white-space: nowrap;
-        }
+        }}
 
-        .pnl-table th:last-child, 
-        .pnl-table td:last-child {
-            width: 95px !important;
-            min-width: 95px !important;
-            max-width: 95px !important;
+        .pnl-table th:first-child,
+        .pnl-table td:first-child {{
+            position: sticky;
+            left: 0;
+            width: 320px !important;
+            min-width: 320px !important;
+            max-width: 320px !important;
+            text-align: left;
+            white-space: normal;
+            word-break: break-word;
+            line-height: 1.25;
+            border-right: 2px solid #cbd3dc;
+            z-index: 11;
+            background: #ffffff;
+        }}
+
+        .pnl-table th:first-child {{
+            z-index: 20;
+            background: #e5eaf0 !important;
+            color: #1e3557;
+            white-space: nowrap;
+        }}
+
+        .pnl-table th:last-child,
+        .pnl-table td:last-child {{
+            position: sticky;
+            right: 0;
+            width: 105px !important;
+            min-width: 105px !important;
+            max-width: 105px !important;
+            z-index: 12;
             font-weight: 700;
-            background-color: #f8fafc;
-            border-left: 2px solid #cbd5e1;
-            white-space: nowrap;
-        }
+            background: #f6f7f8;
+            border-left: 2px solid #cbd3dc;
+        }}
 
-        .pnl-row-inc td:first-child { background-color: #d1e7dd !important; color: #0f5132 !important; }
-        .pnl-row-exp-header td:first-child { background-color: #f8d7da !important; color: #842029 !important; }
-        .pnl-row-exp-total td:first-child { background-color: #fff3cd !important; color: #664d03 !important; }
-        .pnl-row-cash td:first-child { background-color: #e2e3e5 !important; color: #383d41 !important; }
-        .pnl-row-grp td:first-child { background-color: #e2e8f0 !important; }
-        .pnl-row-sub td:first-child { background-color: #ffffff !important; padding-left: 20px !important; font-weight: 400 !important; color: #374151 !important; }
+        .pnl-table th:last-child {{
+            z-index: 20;
+            background: #e5eaf0 !important;
+            color: #1e3557;
+        }}
 
-        .has-comment {
+        .pnl-row-normal td:not(:first-child):not(:last-child) {{
+            background: #ffffff;
+        }}
+
+        .pnl-row-normal:nth-child(even) td:not(:first-child):not(:last-child) {{
+            background: #fafafa;
+        }}
+
+        .pnl-row-inc,
+        .pnl-row-inc td {{
+            background: #dceee6 !important;
+            color: #185c43 !important;
+            font-weight: 700;
+        }}
+
+        .pnl-row-inc td:first-child {{
+            background: #dceee6 !important;
+        }}
+
+        .pnl-row-inc td:last-child {{
+            background: #d6e9e1 !important;
+        }}
+
+        .pnl-row-exp-header,
+        .pnl-row-exp-header td {{
+            background: #f4dddd !important;
+            color: #8b3038 !important;
+            font-weight: 700;
+        }}
+
+        .pnl-row-exp-header td:last-child {{
+            background: #efd8d9 !important;
+        }}
+
+        .pnl-row-exp-total,
+        .pnl-row-exp-total td {{
+            background: #fff4cf !important;
+            color: #745713 !important;
+            font-weight: 700;
+        }}
+
+        .pnl-row-exp-total td:last-child {{
+            background: #fff0c2 !important;
+        }}
+
+        .pnl-row-cash,
+        .pnl-row-cash td {{
+            background: #e8eaed !important;
+            color: #374151 !important;
+            font-weight: 700;
+        }}
+
+        .pnl-row-cash td:last-child {{
+            background: #e2e5e8 !important;
+        }}
+
+        .pnl-row-grp,
+        .pnl-row-grp td {{
+            background: #edf1f5 !important;
+            color: #1e3557 !important;
+            font-weight: 700 !important;
+            border-top: 1px solid #d2d8df !important;
+        }}
+
+        .pnl-row-grp td:first-child {{
+            background: #e5eaf0 !important;
+        }}
+
+        .pnl-row-grp td:last-child {{
+            background: #e8edf2 !important;
+        }}
+
+        .pnl-row-sub td:first-child {{
+            background: #ffffff !important;
+            padding-left: 22px !important;
+            color: #475569 !important;
+            font-weight: 400 !important;
+        }}
+
+        .pnl-row-sub:nth-child(even) td:not(:first-child):not(:last-child):not(.has-comment) {{
+            background: #fafafa;
+        }}
+
+        .pnl-row-sub:nth-child(odd) td:not(:first-child):not(:last-child):not(.has-comment) {{
+            background: #ffffff;
+        }}
+
+        .has-comment {{
             position: relative !important;
             cursor: pointer !important;
-            background-color: #fef9c3 !important;
+            background: #fff4c7 !important;
+            color: #1e293b !important;
             font-weight: 600;
-        }
-        .has-comment::after {
+            transition: background-color 0.12s ease;
+        }}
+
+        .has-comment::after {{
             content: '';
             position: absolute;
             top: 0;
             right: 0;
             width: 0;
             height: 0;
-            border-top: 8px solid #f59e0b;
+            border-top: 8px solid #f0a800;
             border-left: 8px solid transparent;
-        }
-        .has-comment:hover {
-            background-color: #fef08a !important;
-        }
+        }}
 
-        .pnl-row-inc, .pnl-row-inc td {
-            background-color: #d1e7dd !important;
-            color: #0f5132 !important;
-            font-weight: 700;
-        }
-        .pnl-row-exp-header, .pnl-row-exp-header td {
-            background-color: #f8d7da !important;
-            color: #842029 !important;
-            font-weight: 700;
-        }
-        .pnl-row-exp-total, .pnl-row-exp-total td {
-            background-color: #fff3cd !important;
-            color: #664d03 !important;
-            font-weight: 700;
-        }
-        .pnl-row-cash, .pnl-row-cash td {
-            background-color: #e2e3e5 !important;
-            color: #383d41 !important;
-            font-weight: 700;
-        }
+        .has-comment:hover {{
+            background: #ffefad !important;
+        }}
 
-        .pnl-row-grp, .pnl-row-grp td {
-            background-color: #f1f5f9 !important;
-            font-weight: 700 !important;
-            border-top: 1px solid #cbd5e1 !important;
-        }
+        .pnl-today {{
+            box-shadow: inset 2px 0 0 #1e3557, inset -2px 0 0 #1e3557;
+        }}
 
-        .pnl-row-sub:nth-child(even) td:not(:first-child):not(:last-child):not(.has-comment) {
-            background-color: #f9fafb;
-        }
-        .pnl-row-sub:nth-child(odd) td:not(:first-child):not(:last-child):not(.has-comment) {
-            background-color: #ffffff;
-        }
+        .pnl-table th.pnl-today {{
+            background: #dfe8f2 !important;
+            color: #1e3557 !important;
+            box-shadow: inset 2px 0 0 #1e3557, inset -2px 0 0 #1e3557;
+        }}
+
+        {hover_column_css}
+
+        @media (max-width: 900px) {{
+            .pnl-wrapper {{
+                max-height: 72vh;
+            }}
+            .pnl-table {{
+                font-size: 12px;
+            }}
+            .pnl-table th,
+            .pnl-table td {{
+                padding: 7px 6px;
+            }}
+            .pnl-table th:first-child,
+            .pnl-table td:first-child {{
+                width: 250px !important;
+                min-width: 250px !important;
+                max-width: 250px !important;
+            }}
+            .pnl-table th:not(:first-child):not(:last-child),
+            .pnl-table td:not(:first-child):not(:last-child) {{
+                width: 68px !important;
+                min-width: 68px !important;
+                max-width: 68px !important;
+            }}
+            .pnl-table th:last-child,
+            .pnl-table td:last-child {{
+                width: 90px !important;
+                min-width: 90px !important;
+                max-width: 90px !important;
+            }}
+        }}
         </style>
         """
 
-        table_parts = [pnl_css, '<div class="pnl-wrapper"><table class="pnl-table"><thead><tr>']
+        table_parts = [
+            pnl_css,
+            '<div class="pnl-wrapper">',
+            '<table class="pnl-table">',
+            "<thead><tr>",
+        ]
+
         table_parts.append("<th>Стаття</th>")
+
         for d in range(1, num_days + 1):
-            table_parts.append(f"<th>{d}</th>")
+            today_class = "pnl-today" if d == today_day else ""
+            table_parts.append(f'<th class="{today_class}">{d}</th>')
+
         table_parts.append("<th>Всього</th></tr></thead><tbody>")
 
         for r in order_full:
@@ -371,44 +517,80 @@ def render_pnl_tab():
 
             table_parts.append(f'<tr class="{row_cls}">')
             table_parts.append(f"<td>{r}</td>")
-
             row_total = 0
 
             for d in range(1, num_days + 1):
                 cell = report_data[r][str(d)]
+                today_class = "pnl-today" if d == today_day else ""
 
-                if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"] or r.startswith("📁 "):
-                    table_parts.append("<td></td>")
-                elif r in ["Касса на начало дня", "Касса на конец дня", "🔴 ВСЬОГО ВИТРАТ"]:
-                    val_str = str(cell["sum"]) if (cell["set"] and cell["sum"] != 0) else ""
+                if (
+                    r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ"]
+                    or r.startswith("📁 ")
+                ):
+                    table_parts.append(f'<td class="{today_class}"></td>')
+                    continue
+
+                if r in [
+                    "Касса на начало дня",
+                    "Касса на конец дня",
+                    "🔴 ВСЬОГО ВИТРАТ",
+                ]:
+                    val_str = (
+                        str(cell["sum"])
+                        if (cell["set"] and cell["sum"] != 0)
+                        else ""
+                    )
                     row_total += cell["sum"] if cell["set"] else 0
-                    table_parts.append(f"<td>{val_str}</td>")
+                    table_parts.append(
+                        f'<td class="{today_class}">{val_str}</td>'
+                    )
+                    continue
+
+                sum_val = cell["sum"]
+                row_total += sum_val
+
+                if sum_val == 0:
+                    table_parts.append(f'<td class="{today_class}"></td>')
+                    continue
+
+                val_str = str(sum_val)
+                valid_notes = [n for n in cell["notes"] if n]
+
+                if valid_notes:
+                    note_lines = "\n• " + "\n• ".join(valid_notes)
+                    safe_title = (
+                        note_lines.replace('"', "&quot;")
+                        .replace("'", "&apos;")
+                        .replace("\n", "&#10;")
+                    )
+                    js_comment = (
+                        note_lines.replace("\\", "\\\\")
+                        .replace("'", "\\'")
+                        .replace('"', "&quot;")
+                        .replace("\n", "\\n")
+                    )
+                    safe_stattya = r.replace("'", "\\'")
+
+                    table_parts.append(
+                        f'<td class="has-comment {today_class}" '
+                        f'title="{safe_title}" '
+                        f'ondblclick="alert(\'💬 {safe_stattya} ({d} число):\\n{js_comment}\')">'
+                        f"{val_str}</td>"
+                    )
                 else:
-                    sum_val = cell["sum"]
-                    row_total += sum_val
+                    table_parts.append(
+                        f'<td class="{today_class}">{val_str}</td>'
+                    )
 
-                    # При нулевом значении ячейка остается абсолютно пустой
-                    if sum_val == 0:
-                        table_parts.append("<td></td>")
-                    else:
-                        val_str = str(sum_val)
-                        valid_notes = [n for n in cell["notes"] if n]
-                        if valid_notes:
-                            note_lines = "\n• " + "\n• ".join(valid_notes)
-                            safe_title = f"{note_lines}".replace('"', '&quot;').replace("'", '&apos;').replace("\n", "&#10;")
-                            
-                            js_comment = note_lines.replace("\\", "\\\\").replace("'", "\\'").replace('"', '&quot;').replace("\n", "\\n")
-                            safe_stattya = r.replace("'", "\\'")
-
-                            table_parts.append(
-                                f'<td class="has-comment" title="{safe_title}" '
-                                f'ondblclick="alert(\'💬 {safe_stattya} ({d} число):\\n{js_comment}\')">'
-                                f'{val_str}</td>'
-                            )
-                        else:
-                            table_parts.append(f"<td>{val_str}</td>")
-
-            if r in ["🟢 НАДХОДЖЕННЯ", "🔴 ВИТРАТИ", "Касса на начало дня", "Касса на конец дня"] or r.startswith("📁 "):
+            if (
+                r in [
+                    "🟢 НАДХОДЖЕННЯ",
+                    "🔴 ВИТРАТИ",
+                    "Касса на начало дня",
+                    "Касса на конец дня",
+                ]
+                or r.startswith("📁 ")
+            ):
                 table_parts.append("<td></td>")
             else:
                 vsyogo_val = str(row_total) if row_total != 0 else ""
