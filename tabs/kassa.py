@@ -82,12 +82,19 @@ def render_kassa_tab(selected_date, can_edit):
                 margin-bottom: 16px;
             }
 
-            /* 1. ПОДТЯГИВАЕМ ВНЕШНИЙ КОНТЕЙНЕР STREAMLIT К ТАБЛИЦЕ */
-            div[data-testid="stElementContainer"]:has(.subtotal-badge) {
+            /* 1. ПОДТЯГИВАЕМ ПЛАШКИ ВПРИТЫК ТОЛЬКО ДЛЯ ТАБЛИЦ */
+            div[data-testid="stElementContainer"]:has(.subtotal-inc),
+            div[data-testid="stElementContainer"]:has(.subtotal-exp),
+            div[data-testid="stElementContainer"]:has(.subtotal-adv) {
                 margin-top: -16px !important;
             }
 
-            /* 2. СТИЛИ САМОЙ ПЛАШКИ ИТОГОВ */
+            /* 2. ОТДЕЛЬНЫЙ ОТСТУП ДЛЯ ФАКТА КАССЫ (чтобы не налезала на купюры) */
+            div[data-testid="stElementContainer"]:has(.subtotal-cash) {
+                margin-top: 6px !important;
+            }
+
+            /* 3. ОБЩИЕ СТИЛИ ПЛАШЕК ИТОГОВ */
             .subtotal-badge {
                 display: flex;
                 justify-content: space-between;
