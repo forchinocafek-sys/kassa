@@ -203,9 +203,11 @@ def render_pnl_tab():
         for d in range(1, num_days + 1):
             col_index = d + 1
             hover_column_css += f"""
-            .pnl-table:has(td:nth-child({col_index}):hover) td:nth-child({col_index}),
-            .pnl-table:has(th:nth-child({col_index}):hover) th:nth-child({col_index}) {{
-                background-color: #eef3f8 !important;
+            .pnl-table:has(td:nth-child({col_index}):hover) tr > td:nth-child({col_index}):not(:first-child):not(:last-child),
+            .pnl-table:has(th:nth-child({col_index}):hover) tr > td:nth-child({col_index}):not(:first-child):not(:last-child),
+            .pnl-table:has(td:nth-child({col_index}):hover) th:nth-child({col_index}):not(:first-child):not(:last-child),
+            .pnl-table:has(th:nth-child({col_index}):hover) th:nth-child({col_index}):not(:first-child):not(:last-child) {{
+                filter: brightness(0.92) !important;
             }}
             """
 
@@ -439,14 +441,18 @@ def render_pnl_tab():
             background: #ffefad !important;
         }}
 
-        .pnl-today {{
-            box-shadow: inset 2px 0 0 #1e3557, inset -2px 0 0 #1e3557;
+        /* --- ВЫДЕЛЕНИЕ СЕГОДНЯШНЕГО ДНЯ --- */
+        .pnl-table th.pnl-today {{
+            background: #1E3557 !important;
+            color: #ffffff !important;
+            border-left: 2px solid #1E3557 !important;
+            border-right: 2px solid #1E3557 !important;
         }}
 
-        .pnl-table th.pnl-today {{
-            background: #dfe8f2 !important;
-            color: #1e3557 !important;
-            box-shadow: inset 2px 0 0 #1e3557, inset -2px 0 0 #1e3557;
+        .pnl-table td.pnl-today {{
+            border-left: 2px solid #1E3557 !important;
+            border-right: 2px solid #1E3557 !important;
+            background-color: rgba(30, 53, 87, 0.06) !important;
         }}
 
         {hover_column_css}
