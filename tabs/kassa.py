@@ -69,7 +69,31 @@ def render_kassa_tab(selected_date, can_edit):
                 display: none !important;
             }
             
-            /* Премиальная карточка кассы */
+            /* 1. УМЕНЬШАЕМ ВЕРХНИЙ ОТСТУП ВНУТРИ КАРТОЧЕК */
+            div[data-testid="stVerticalBlockBorderWrapper"] {
+                padding-top: 10px !important;
+                padding-bottom: 10px !important;
+            }
+
+            /* 2. ПОДТЯГИВАЕМ ЗАГОЛОВОК К ВЕРХУ И ТАБЛИЦУ К ЗАГОЛОВКУ */
+            div[data-testid="stElementContainer"]:has(h4) {
+                margin-top: -4px !important;
+                margin-bottom: -12px !important;
+            }
+
+            /* 3. ПОДТЯГИВАЕМ ПЛАШКИ ВПРИТЫК К ТАБЛИЦАМ */
+            div[data-testid="stElementContainer"]:has(.subtotal-inc),
+            div[data-testid="stElementContainer"]:has(.subtotal-exp),
+            div[data-testid="stElementContainer"]:has(.subtotal-adv) {
+                margin-top: -16px !important;
+            }
+
+            /* 4. ОТСТУП ДЛЯ ФАКТА КАССЫ */
+            div[data-testid="stElementContainer"]:has(.subtotal-cash) {
+                margin-top: 6px !important;
+            }
+
+            /* Премиальная карточка кассы (шапка) */
             .kassa-card-header {
                 background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
                 border: 1px solid #e2e8f0;
@@ -82,19 +106,7 @@ def render_kassa_tab(selected_date, can_edit):
                 margin-bottom: 16px;
             }
 
-            /* 1. ПОДТЯГИВАЕМ ПЛАШКИ ВПРИТЫК ТОЛЬКО ДЛЯ ТАБЛИЦ */
-            div[data-testid="stElementContainer"]:has(.subtotal-inc),
-            div[data-testid="stElementContainer"]:has(.subtotal-exp),
-            div[data-testid="stElementContainer"]:has(.subtotal-adv) {
-                margin-top: -16px !important;
-            }
-
-            /* 2. ОТДЕЛЬНЫЙ ОТСТУП ДЛЯ ФАКТА КАССЫ (чтобы не налезала на купюры) */
-            div[data-testid="stElementContainer"]:has(.subtotal-cash) {
-                margin-top: 6px !important;
-            }
-
-            /* 3. ОБЩИЕ СТИЛИ ПЛАШЕК ИТОГОВ */
+            /* ОБЩИЕ СТИЛИ ПЛАШЕК ИТОГОВ */
             .subtotal-badge {
                 display: flex;
                 justify-content: space-between;
@@ -109,7 +121,7 @@ def render_kassa_tab(selected_date, can_edit):
             .subtotal-adv { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
             .subtotal-cash { background-color: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
 
-            /* Стильная кнопка сохранения */
+            /* Кнопка сохранения */
             div[data-testid="stButton"] > button {
                 background: #1E3557 !important;
                 border: none !important;
