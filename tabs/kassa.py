@@ -14,6 +14,7 @@ from utils import (
 
 
 def get_short_cat(cat_str):
+    """Извлекает подкатегорию после стрелки ➔ или ->."""
     if not cat_str or pd.isna(cat_str):
         return ""
     cat_str = str(cat_str).strip()
@@ -24,6 +25,7 @@ def get_short_cat(cat_str):
     return cat_str
 
 
+# --- АВТОМАППИНГ КАТЕГОРИЙ ---
 EXPENSE_SHORT_TO_FULL = {}
 SHORT_EXPENSE_CHOICES = [""]
 
@@ -37,7 +39,90 @@ EXPENSE_FULL_TO_SHORT = {v: k for k, v in EXPENSE_SHORT_TO_FULL.items()}
 INCOME_CHOICES = [""] + [c for c in INCOME_CATEGORIES if c]
 
 
+def clean_df_for_editor(df):
+    """Безопасная очистка DataFrame от 'None' и 'nan'."""
+    df = df.copy()
+    for col in df.columns:
+        if col == "Сума":
+            df[col] = pd.to_numeric(df[col], errors="coerce")
+        else:
+            df[col] = (
+                df[col]
+                .fillna("")
+                .astype(str)
+                .replace(["None", "nan", "NaN", "<NA>", "NoneType", "none"], "")
+            )
+    return df
+
+
+# ============================================================
+# РЕНДЕР КАССЫ (ИЗОЛИРОВАННЫЙ ФРАГМЕНТ — БЕЗ МЕРЦАНИЯ)
+# ============================================================
+@st.fragment
 def render_kassa_tab(selected_date, can_edit):
+    # Современные стабильные стили (БЕЗ ломающих layout отступов)
+    st.markdown(
+        """
+        <style>
+            /* Скрываем служебные маркдаун-контейнеры со стилями */
+            div[data-testid="stElementContainer"]:has(> div > style) {
+                display: none !important;
+            }
+            
+            /* Премиальная карточка кассы */
+            .kassa-card-header {
+                background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+                border: 1px solid #e2e8f0;
+                border-radius: 14px;
+                padding: 14px 20px;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                box-shadow: 0 4px 12px rgba(15, 23, 42, 0.03);
+                margin-bottom: 16px;
+            }
+
+            /* Красивые плашки итогов */
+            .subtotal-badge {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 10px 14px;
+                border-radius: 10px;
+                margin-top: 10px;
+                font-size: 14px;
+                font-weight: 700;
+            }
+            .subtotal-inc { background-color: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+            .subtotal-exp { background-color: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+            .subtotal-adv { background-color: #fff7ed; color: #c2410c; border: 1px solid #ffedd5; }
+            .subtotal-cash { background-color: #f0f9ff; color: #0369a1; border: 1px solid #bae6fd; }
+
+            /* Стильная кнопка сохранения */
+            div[data-testid="stButton"] > button {
+                background: #1E3557 !important;
+                border: none !important;
+                border-radius: 12px !important;
+                padding: 0.8rem 1.2rem !important;
+                box-shadow: 0 4px 14px rgba(30, 53, 87, 0.25) !important;
+                transition: all 0.2s ease-in-out !important;
+            }
+            div[data-testid="stButton"] > button * {
+                color: #ffffff !important;
+                font-weight: 800 !important;
+                font-size: 15px !important;
+                letter-spacing: 0.4px !important;
+            }
+            div[data-testid="stButton"] > button:hover {
+                background: #14243b !important;
+                transform: translateY(-1px);
+                box-shadow: 0 6px 18px rgba(30, 53, 87, 0.35) !important;
+            }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
     if not can_edit:
         st.warning(
             f"🔒 {st.session_state['user_name']}, ви переглядаєте цей день в режимі «Тільки читання»."
@@ -45,219 +130,337 @@ def render_kassa_tab(selected_date, can_edit):
 
     start_balance = get_int(get_start_balance(selected_date))
 
-    # --- 1. БЛОК: НА ПОЧАТОК ДНЯ ---
+    # --- КЭШИРОВАНИЕ ДАТАФРЕЙМОВ (Защита от пересоздания таблиц) ---
+    cache_key = f"kassa_dfs_{selected_date}"
+    if cache_key not in st.session_state:
+        inc_init = clean_df_for_editor(
+            prepare_df(
+                st.session_state.get("inc_data", []),
+                ["Категорія", "Сума", "Примітка"],
+            )
+        )
+        exp_init = clean_df_for_editor(
+            prepare_df(
+                st.session_state.get("exp_data", []),
+                ["Категорія", "Сума", "Примітка"],
+            )
+        )
+        if "Категорія" in exp_init.columns:
+            exp_init["Категорія"] = exp_init["Категорія"].map(
+                lambda x: EXPENSE_FULL_TO_SHORT.get(
+                    str(x).strip(), get_short_cat(x)
+                )
+            )
+        adv_init = clean_df_for_editor(
+            prepare_df(
+                st.session_state.get("adv_data", []),
+                ["Співробітник", "Сума", "Примітка"],
+            )
+        )
+
+        st.session_state[cache_key] = {
+            "inc": inc_init,
+            "exp": exp_init,
+            "adv": adv_init,
+        }
+
+    dfs = st.session_state[cache_key]
+
+    # --- 1. ШАПКА КАССЫ ---
     st.markdown(
         f"""
-        <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
-            <span style="font-size: 20px; font-weight: 700; color: #111827;">🏦 На початок дня:</span>
-            <span style="background-color: #ffffff; padding: 6px 18px; border-radius: 10px; border: 1px solid #eaeaea; font-size: 20px; font-weight: 800; color: #111827;">
-                {start_balance} грн
-            </span>
+        <div class="kassa-card-header">
+            <span style="font-size: 18px; font-weight: 700; color: #1e293b;">🏦 Каса на початок дня</span>
+            <span style="font-size: 22px; font-weight: 800; color: #0f172a;">{start_balance:,} грн</span>
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.divider()
+    # --- 2. СЕКЦИЯ: НАДХОДЖЕННЯ И ВИТРАТИ ---
+    c_inc, c_exp = st.columns(2)
 
-    # --- 2. ТАБЛИЦЫ ДОХОДОВ И РАСХОДОВ ---
-    col_t1, col_t2 = st.columns(2)
-
-    with col_t1:
-        st.subheader("📈 Надходження")
-        inc_df = prepare_df(
-            st.session_state["inc_data"], ["Категорія", "Сума", "Примітка"]
-        )
-
-        edited_inc_df = st.data_editor(
-            inc_df,
-            column_config={
-                "Категорія": st.column_config.SelectboxColumn(
-                    "Стаття надходження",
-                    options=INCOME_CHOICES,
-                    required=False,
-                ),
-                "Сума": st.column_config.NumberColumn(
-                    "Сума", min_value=0, step=1, format="%d грн"
-                ),
-                "Примітка": st.column_config.TextColumn("Деталі"),
-            },
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"inc_editor_{selected_date}",
-            disabled=not can_edit,
-        )
-
-        # Вывод итогов СТРОГО ПОД таблицей (как в старом коде)
-        subtotal_inc = sum(
-            get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows()
-        )
-        st.markdown(
-            f"<p style='font-weight: 800; font-size: 16px; color: #2e7d32; margin-top: 4px;'>Загалом надходжень: {subtotal_inc} грн</p>",
-            unsafe_allow_html=True,
-        )
-
-    with col_t2:
-        st.subheader("📉 Витрати")
-        exp_df = prepare_df(
-            st.session_state["exp_data"], ["Категорія", "Сума", "Примітка"]
-        )
-
-        edited_exp_df = st.data_editor(
-            exp_df,
-            column_config={
-                "Категорія": st.column_config.SelectboxColumn(
-                    "Стаття витрат",
-                    options=SHORT_EXPENSE_CHOICES,
-                    required=False,
-                ),
-                "Сума": st.column_config.NumberColumn(
-                    "Сума", min_value=0, step=1, format="%d грн"
-                ),
-                "Примітка": st.column_config.TextColumn("Деталі"),
-            },
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"exp_editor_{selected_date}",
-            disabled=not can_edit,
-        )
-
-        # Вывод итогов СТРОГО ПОД таблицей
-        subtotal_exp = sum(
-            get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows()
-        )
-        st.markdown(
-            f"<p style='font-weight: 800; font-size: 16px; color: #c62828; margin-top: 4px;'>Загалом витрат: {subtotal_exp} грн</p>",
-            unsafe_allow_html=True,
-        )
-
-    st.divider()
-
-    # --- 3. АВАНСЫ И ФАКТ ---
-    col_b1, col_b2 = st.columns(2)
-
-    with col_b1:
-        st.subheader("💸 Аванси")
-        adv_df = prepare_df(
-            st.session_state["adv_data"],
-            ["Співробітник", "Сума", "Примітка"],
-        )
-
-        edited_adv_df = st.data_editor(
-            adv_df,
-            column_config={
-                "Співробітник": st.column_config.TextColumn("Співробітник"),
-                "Сума": st.column_config.NumberColumn(
-                    "Сума", min_value=0, step=1, format="%d грн"
-                ),
-                "Примітка": st.column_config.TextColumn("Деталі"),
-            },
-            num_rows="dynamic",
-            use_container_width=True,
-            key=f"adv_editor_{selected_date}",
-            disabled=not can_edit,
-        )
-
-        subtotal_adv = sum(
-            get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows()
-        )
-        st.markdown(
-            f"<p style='font-weight: 800; font-size: 16px; color: #ef6c00; margin-top: 4px;'>Загалом авансів: {subtotal_adv} грн</p>",
-            unsafe_allow_html=True,
-        )
-
-    with col_b2:
-        st.subheader("💰 Факт")
-        m_coins = get_int(
-            st.text_input(
-                "Монети (загальна сума):",
-                placeholder="0",
-                key=f"coins_live_{selected_date}",
+    with c_inc:
+        with st.container(border=True):
+            st.markdown(
+                "<h4 style='margin:0 0 10px 0; color:#166534;'>📈 Надходження</h4>",
+                unsafe_allow_html=True,
+            )
+            edited_inc_df = st.data_editor(
+                dfs["inc"],
+                column_config={
+                    "Категорія": st.column_config.SelectboxColumn(
+                        "Стаття", options=INCOME_CHOICES, required=False
+                    ),
+                    "Сума": st.column_config.NumberColumn(
+                        "Сума", min_value=0, step=1, format="%d грн"
+                    ),
+                    "Примітка": st.column_config.TextColumn("Деталі"),
+                },
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"inc_editor_{selected_date}",
                 disabled=not can_edit,
             )
-        )
+            subtotal_inc = sum(
+                get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows()
+            )
+            st.markdown(
+                f"""
+                <div class="subtotal-badge subtotal-inc">
+                    <span>Загалом надходжень:</span>
+                    <span>{subtotal_inc:,} грн</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-        def cash_row(label, mult):
-            c1, c2 = st.columns([1, 4])
-            with c1:
-                st.markdown(
-                    f"<div style='margin-top:8px;font-weight:bold;'>{label}</div>",
-                    unsafe_allow_html=True,
-                )
-            with c2:
-                qty = get_int(
+    with c_exp:
+        with st.container(border=True):
+            st.markdown(
+                "<h4 style='margin:0 0 10px 0; color:#991b1b;'>📉 Витрати</h4>",
+                unsafe_allow_html=True,
+            )
+            edited_exp_df = st.data_editor(
+                dfs["exp"],
+                column_config={
+                    "Категорія": st.column_config.SelectboxColumn(
+                        "Стаття", options=SHORT_EXPENSE_CHOICES, required=False
+                    ),
+                    "Сума": st.column_config.NumberColumn(
+                        "Сума", min_value=0, step=1, format="%d грн"
+                    ),
+                    "Примітка": st.column_config.TextColumn("Деталі"),
+                },
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"exp_editor_{selected_date}",
+                disabled=not can_edit,
+            )
+            subtotal_exp = sum(
+                get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows()
+            )
+            st.markdown(
+                f"""
+                <div class="subtotal-badge subtotal-exp">
+                    <span>Загалом витрат:</span>
+                    <span>{subtotal_exp:,} грн</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    # --- 3. СЕКЦИЯ: АВАНСЫ И ФАКТ КАССЫ ---
+    c_adv, c_fact = st.columns(2)
+
+    with c_adv:
+        with st.container(border=True):
+            st.markdown(
+                "<h4 style='margin:0 0 10px 0; color:#9a3412;'>💸 Аванси</h4>",
+                unsafe_allow_html=True,
+            )
+            edited_adv_df = st.data_editor(
+                dfs["adv"],
+                column_config={
+                    "Співробітник": st.column_config.TextColumn("Співробітник"),
+                    "Сума": st.column_config.NumberColumn(
+                        "Сума", min_value=0, step=1, format="%d грн"
+                    ),
+                    "Примітка": st.column_config.TextColumn("Деталі"),
+                },
+                num_rows="dynamic",
+                use_container_width=True,
+                key=f"adv_editor_{selected_date}",
+                disabled=not can_edit,
+            )
+            subtotal_adv = sum(
+                get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows()
+            )
+            st.markdown(
+                f"""
+                <div class="subtotal-badge subtotal-adv">
+                    <span>Загалом авансів:</span>
+                    <span>{subtotal_adv:,} грн</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with c_fact:
+        with st.container(border=True):
+            st.markdown(
+                "<h4 style='margin:0 0 10px 0; color:#075985;'>💰 Факт каси (купюри)</h4>",
+                unsafe_allow_html=True,
+            )
+            fc1, fc2 = st.columns(2)
+            with fc1:
+                m_coins = get_int(
                     st.text_input(
-                        f"q{label}",
-                        label_visibility="collapsed",
+                        "🪙 Монети",
                         placeholder="0",
-                        key=f"qty_{label}_{selected_date}",
+                        key=f"coins_{selected_date}",
                         disabled=not can_edit,
                     )
                 )
-            return qty, qty * mult
+                q_20 = get_int(
+                    st.text_input(
+                        "💵 20 грн",
+                        placeholder="0",
+                        key=f"q20_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_50 = get_int(
+                    st.text_input(
+                        "💵 50 грн",
+                        placeholder="0",
+                        key=f"q50_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_100 = get_int(
+                    st.text_input(
+                        "💵 100 грн",
+                        placeholder="0",
+                        key=f"q100_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
 
-        q_20, v_20 = cash_row("20", 20)
-        q_50, v_50 = cash_row("50", 50)
-        q_100, v_100 = cash_row("100", 100)
-        q_200, v_200 = cash_row("200", 200)
-        q_500, v_500 = cash_row("500", 500)
-        q_1000, v_1000 = cash_row("1000", 1000)
+            with fc2:
+                q_200 = get_int(
+                    st.text_input(
+                        "💵 200 грн",
+                        placeholder="0",
+                        key=f"q200_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_500 = get_int(
+                    st.text_input(
+                        "💵 500 грн",
+                        placeholder="0",
+                        key=f"q500_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_1000 = get_int(
+                    st.text_input(
+                        "💵 1000 грн",
+                        placeholder="0",
+                        key=f"q1000_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
+                q_2000 = get_int(
+                    st.text_input(
+                        "💵 2000 грн",
+                        placeholder="0",
+                        key=f"q2000_{selected_date}",
+                        disabled=not can_edit,
+                    )
+                )
 
-        cash_pure = m_coins + v_20 + v_50 + v_100 + v_200 + v_500 + v_1000
-        st.markdown(
-            f"<h3 style='margin-top: 12px;'>💵 Разом в касі: {cash_pure} грн</h3>",
-            unsafe_allow_html=True,
-        )
+            cash_pure = (
+                m_coins
+                + q_20 * 20
+                + q_50 * 50
+                + q_100 * 100
+                + q_200 * 200
+                + q_500 * 500
+                + q_1000 * 1000
+                + q_2000 * 2000
+            )
+            st.markdown(
+                f"""
+                <div class="subtotal-badge subtotal-cash">
+                    <span>Разом готівки:</span>
+                    <span>{cash_pure:,} грн</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
-    st.divider()
-
-    # --- 4. ИТОГИ ---
+    # --- 4. СЕКЦИЯ: ИТОГИ ЗМЕНИ ---
     calculated_end = start_balance + subtotal_inc - subtotal_exp
     total_actual = cash_pure + subtotal_adv
     discrepancy = total_actual - calculated_end
 
-    st.subheader("🏁 Підсумки зміни")
-    res_c1, res_c2, res_c3 = st.columns(3)
-    res_c1.metric("Розрахунок", f"{calculated_end} грн")
-    res_c2.metric("Факт", f"{total_actual} грн")
-
     if discrepancy == 0:
-        res_c3.success("Зійшлася!")
+        disc_color, disc_bg, disc_title, disc_val = (
+            "#15803d",
+            "#f0fdf4",
+            "Зійшлася",
+            "0 грн",
+        )
     elif discrepancy > 0:
-        res_c3.warning(f"+{discrepancy} грн")
+        disc_color, disc_bg, disc_title, disc_val = (
+            "#c2410c",
+            "#fff7ed",
+            "Надлишок",
+            f"+{discrepancy:,} грн",
+        )
     else:
-        res_c3.error(f"{discrepancy} грн")
-
-    # --- 5. СОХРАНЕНИЕ ---
-    exp_df_full = edited_exp_df.copy()
-    if "Категорія" in exp_df_full.columns:
-        exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
-            lambda x: EXPENSE_SHORT_TO_FULL.get(
-                str(x).strip(), str(x).strip()
-            )
+        disc_color, disc_bg, disc_title, disc_val = (
+            "#b91c1c",
+            "#fef2f2",
+            "Різниця (нестача)",
+            f"{discrepancy:,} грн",
         )
 
-    st.session_state["kassa_current_payload"] = {
-        "edited_inc_df": edited_inc_df,
-        "edited_exp_df": exp_df_full,
-        "edited_adv_df": edited_adv_df,
-        "m_coins": m_coins,
-        "q_dict": {
-            "20": q_20,
-            "50": q_50,
-            "100": q_100,
-            "200": q_200,
-            "500": q_500,
-            "1000": q_1000,
-        },
-    }
+    with st.container(border=True):
+        st.markdown(
+            "<h4 style='margin:0 0 12px 0; color:#0f172a;'>🏁 Підсумки зміни</h4>",
+            unsafe_allow_html=True,
+        )
+        rc1, rc2, rc3 = st.columns(3)
+        with rc1:
+            st.markdown(
+                f"""
+                <div style="background:#f8fafc; padding:12px 16px; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="font-size:12px; font-weight:600; color:#64748b;">Розрахунок</div>
+                    <div style="font-size:22px; font-weight:800; color:#0f172a;">{calculated_end:,} грн</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with rc2:
+            st.markdown(
+                f"""
+                <div style="background:#f8fafc; padding:12px 16px; border-radius:10px; border:1px solid #e2e8f0;">
+                    <div style="font-size:12px; font-weight:600; color:#64748b;">Факт (готівка + аванси)</div>
+                    <div style="font-size:22px; font-weight:800; color:#0f172a;">{total_actual:,} грн</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+        with rc3:
+            st.markdown(
+                f"""
+                <div style="background:{disc_bg}; padding:12px 16px; border-radius:10px; border:1px solid {disc_color};">
+                    <div style="font-size:12px; font-weight:700; color:{disc_color};">{disc_title}</div>
+                    <div style="font-size:22px; font-weight:800; color:{disc_color};">{disc_val}</div>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
+    # --- 5. КНОПКА СОХРАНЕНИЯ ---
     if can_edit:
+        st.write("")
         if st.button(
             "🚀 ЗБЕРЕГТИ ФІНАЛЬНИЙ ЗВІТ",
             type="primary",
             use_container_width=True,
         ):
+            exp_df_full = edited_exp_df.copy()
+            if "Категорія" in exp_df_full.columns:
+                exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
+                    lambda x: EXPENSE_SHORT_TO_FULL.get(
+                        str(x).strip(), str(x).strip()
+                    )
+                )
+
             with st.spinner("Стерилізація та відправка звіту..."):
                 payload = {
                     "inc": sanitize_df(edited_inc_df),
@@ -271,6 +474,7 @@ def render_kassa_tab(selected_date, can_edit):
                         "200": q_200,
                         "500": q_500,
                         "1000": q_1000,
+                        "2000": q_2000,
                     },
                 }
 
@@ -291,8 +495,7 @@ def render_kassa_tab(selected_date, can_edit):
                         json={"date": selected_date, "payload": payload},
                     )
 
-                st.session_state["drafts_cache"][selected_date] = payload
-                st.cache_data.clear()
+                st.session_state.pop(cache_key, None)
 
                 requests.delete(
                     f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}",
@@ -319,6 +522,74 @@ def render_kassa_tab(selected_date, can_edit):
                 )
 
                 if res_shift.status_code in [200, 201]:
+                    inc_rows = []
+                    for _, r in edited_inc_df.iterrows():
+                        amt = get_int(r.get("Сума", 0))
+                        cat = str(r.get("Категорія", "")).strip()
+                        note = str(r.get("Примітка", "")).strip()
+                        if amt or cat:
+                            inc_rows.append({
+                                "date": selected_date,
+                                "type": "income",
+                                "description": f"{cat} | {note}"
+                                if note
+                                else cat,
+                                "amount": str(amt),
+                            })
+
+                    exp_rows = []
+                    for _, r in exp_df_full.iterrows():
+                        amt = get_int(r.get("Сума", 0))
+                        cat = str(r.get("Категорія", "")).strip()
+                        note = str(r.get("Примітка", "")).strip()
+                        if amt or cat:
+                            exp_rows.append({
+                                "date": selected_date,
+                                "type": "expense",
+                                "description": f"{cat} | {note}"
+                                if note
+                                else cat,
+                                "amount": str(amt),
+                            })
+
+                    adv_rows = []
+                    for _, r in edited_adv_df.iterrows():
+                        amt = get_int(r.get("Сума", 0))
+                        emp = str(r.get("Співробітник", "")).strip()
+                        raw_note = r.get("Примітка", "")
+                        safe_note = (
+                            str(raw_note).strip()
+                            if pd.notna(raw_note)
+                            and str(raw_note).lower() != "nan"
+                            else ""
+                        )
+                        if amt or emp:
+                            adv_rows.append({
+                                "date": selected_date,
+                                "employee": emp,
+                                "amount": str(amt),
+                                "note": safe_note,
+                            })
+
+                    if inc_rows:
+                        requests.post(
+                            f"{SUPABASE_URL}/rest/v1/transactions",
+                            headers=headers,
+                            json=inc_rows,
+                        )
+                    if exp_rows:
+                        requests.post(
+                            f"{SUPABASE_URL}/rest/v1/transactions",
+                            headers=headers,
+                            json=exp_rows,
+                        )
+                    if adv_rows:
+                        requests.post(
+                            f"{SUPABASE_URL}/rest/v1/advances",
+                            headers=headers,
+                            json=adv_rows,
+                        )
+
                     log_audit(
                         "Збережено фінальний звіт", f"Дата: {selected_date}"
                     )
