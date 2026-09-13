@@ -58,7 +58,7 @@ def clean_df_for_editor(df):
 
 
 def render_kassa_tab(selected_date, can_edit):
-    # CSS для превращения контейнеров в воздушные мягкие карточки и кастомизации кнопки
+    # CSS для карточек и надежной перекраски главной кнопки в #1E3557
     st.markdown(
         textwrap.dedent("""
         <style>
@@ -77,10 +77,13 @@ def render_kassa_tab(selected_date, can_edit):
                 border: 1px solid #f3f4f6 !important;
                 box-shadow: none !important;
             }
-            /* Фирменная кнопка сохранения #1E3557 */
-            div.stButton > button[kind="primary"],
-            div.stButton > button[data-testid="baseButton-primary"] {
+            /* Точная перекраска кнопки сохранения в темный синий #1E3557 */
+            button[data-testid="stBaseButton-primary"],
+            button[data-testid="baseButton-primary"],
+            button[kind="primary"],
+            div[data-testid="stButton"] > button {
                 background-color: #1E3557 !important;
+                background: #1E3557 !important;
                 color: #ffffff !important;
                 border: none !important;
                 border-radius: 12px !important;
@@ -89,9 +92,12 @@ def render_kassa_tab(selected_date, can_edit):
                 box-shadow: 0 4px 12px rgba(30, 53, 87, 0.25) !important;
                 transition: all 0.2s ease !important;
             }
-            div.stButton > button[kind="primary"]:hover,
-            div.stButton > button[data-testid="baseButton-primary"]:hover {
+            button[data-testid="stBaseButton-primary"]:hover,
+            button[data-testid="baseButton-primary"]:hover,
+            button[kind="primary"]:hover,
+            div[data-testid="stButton"] > button:hover {
                 background-color: #14243b !important;
+                background: #14243b !important;
                 color: #ffffff !important;
                 box-shadow: 0 6px 16px rgba(30, 53, 87, 0.35) !important;
             }
@@ -371,19 +377,19 @@ def render_kassa_tab(selected_date, can_edit):
     discrepancy = total_actual - calculated_end
 
     if discrepancy == 0:
-        disc_color = "#2e7d32"  # Зеленый
+        disc_color = "#2e7d32"
         disc_bg = "#e8f5e9"
         disc_border = "#c8e6c9"
         disc_title = "Зійшлася"
         disc_val = "0 грн"
     elif discrepancy > 0:
-        disc_color = "#ef6c00"  # Оранжевый
+        disc_color = "#ef6c00"
         disc_bg = "#fff3e0"
         disc_border = "#ffe0b2"
         disc_title = "Надлишок"
         disc_val = f"+{discrepancy} грн"
     else:
-        disc_color = "#c62828"  # Красный
+        disc_color = "#c62828"
         disc_bg = "#ffebee"
         disc_border = "#ffcdd2"
         disc_title = "Різниця (нестача)"
