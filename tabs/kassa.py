@@ -58,34 +58,27 @@ def clean_df_for_editor(df):
 
 
 def render_kassa_tab(selected_date, can_edit):
-    # CSS: скрываем элемент контейнера стилей и применяем безопасное оформление
+    # CSS: принудительное скрытие отступов контейнеров стилей для идеальной стабильности DOM
     st.markdown(
         textwrap.dedent("""
         <style>
-            /* Скрываем сам служебный контейнер со стилями, чтобы он не занимал место */
             div[data-testid="stElementContainer"]:has(> div > style) {
                 display: none !important;
             }
             div[data-testid="stMarkdownContainer"]:has(> style) {
                 display: none !important;
             }
-
-            /* Белые карточки на бежевом фоне без сбоя внутренних отступов layout */
             div[data-testid="stVerticalBlockBorderWrapper"] {
                 background-color: #ffffff !important;
                 border-radius: 16px !important;
                 border: 1px solid #eaeaea !important;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
             }
-
-            /* Мягкая рамка вокруг внутренних таблиц */
             div[data-testid="stDataEditor"] {
                 border-radius: 10px !important;
                 border: 1px solid #f3f4f6 !important;
                 box-shadow: none !important;
             }
-
-            /* Контейнер кнопки */
             div[data-testid="stButton"] > button {
                 background-color: #1E3557 !important;
                 background: #1E3557 !important;
@@ -121,6 +114,39 @@ def render_kassa_tab(selected_date, can_edit):
 
     start_balance = get_int(get_start_balance(selected_date))
 
+    # --- КЭШИРОВАНИЕ ИСХОДНЫХ DATAFRAME (Устраняет перезагрузку st.data_editor) ---
+    cache_key = f"kassa_prepared_dfs_{selected_date}"
+    if cache_key not in st.session_state:
+        inc_df_init = prepare_df(
+            st.session_state.get("inc_data", []), ["Категорія", "Сума", "Примітка"]
+        )
+        inc_df_init = clean_df_for_editor(inc_df_init)
+
+        exp_df_init = prepare_df(
+            st.session_state.get("exp_data", []), ["Категорія", "Сума", "Примітка"]
+        )
+        exp_df_init = clean_df_for_editor(exp_df_init)
+        if "Категорія" in exp_df_init.columns:
+            exp_df_init["Категорія"] = exp_df_init["Категорія"].map(
+                lambda x: EXPENSE_FULL_TO_SHORT.get(
+                    str(x).strip(), get_short_cat(x)
+                )
+            )
+
+        adv_df_init = prepare_df(
+            st.session_state.get("adv_data", []),
+            ["Співробітник", "Сума", "Примітка"],
+        )
+        adv_df_init = clean_df_for_editor(adv_df_init)
+
+        st.session_state[cache_key] = {
+            "inc": inc_df_init,
+            "exp": exp_df_init,
+            "adv": adv_df_init,
+        }
+
+    dfs = st.session_state[cache_key]
+
     # --- 1. БЛОК: "НА ПОЧАТОК ДНЯ" ---
     st.markdown(
         textwrap.dedent(f"""
@@ -148,13 +174,8 @@ def render_kassa_tab(selected_date, can_edit):
 
     with col_t1:
         with st.container(border=True):
-            inc_df = prepare_df(
-                st.session_state["inc_data"], ["Категорія", "Сума", "Примітка"]
-            )
-            inc_df = clean_df_for_editor(inc_df)
-
             edited_inc_df = st.data_editor(
-                inc_df,
+                dfs["inc"],
                 column_config={
                     "Категорія": st.column_config.SelectboxColumn(
                         "Стаття надходження",
@@ -190,20 +211,8 @@ def render_kassa_tab(selected_date, can_edit):
 
     with col_t2:
         with st.container(border=True):
-            exp_df = prepare_df(
-                st.session_state["exp_data"], ["Категорія", "Сума", "Примітка"]
-            )
-            exp_df = clean_df_for_editor(exp_df)
-
-            if "Категорія" in exp_df.columns:
-                exp_df["Категорія"] = exp_df["Категорія"].map(
-                    lambda x: EXPENSE_FULL_TO_SHORT.get(
-                        str(x).strip(), get_short_cat(x)
-                    )
-                )
-
             edited_exp_df = st.data_editor(
-                exp_df,
+                dfs["exp"],
                 column_config={
                     "Категорія": st.column_config.SelectboxColumn(
                         "Стаття витрат",
@@ -242,14 +251,8 @@ def render_kassa_tab(selected_date, can_edit):
 
     with col_b1:
         with st.container(border=True):
-            adv_df = prepare_df(
-                st.session_state["adv_data"],
-                ["Співробітник", "Сума", "Примітка"],
-            )
-            adv_df = clean_df_for_editor(adv_df)
-
             edited_adv_df = st.data_editor(
-                adv_df,
+                dfs["adv"],
                 column_config={
                     "Співробітник": st.column_config.TextColumn("Співробітник"),
                     "Сума": st.column_config.NumberColumn(
@@ -512,6 +515,9 @@ def render_kassa_tab(selected_date, can_edit):
 
                 st.session_state["drafts_cache"][selected_date] = payload
                 st.cache_data.clear()
+
+                # Сбрасываем кэш обработанных датафреймов при успешном сохранении
+                st.session_state.pop(cache_key, None)
 
                 requests.delete(
                     f"{SUPABASE_URL}/rest/v1/shifts?date=eq.{selected_date}",
