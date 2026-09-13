@@ -57,76 +57,34 @@ def clean_df_for_editor(df):
     return df
 
 
-def compute_df_subtotal(base_df, editor_key, sum_col="Сума"):
-    """Предрасчет суммы из session_state для исключения st.empty() и скачков высоты."""
-    if editor_key not in st.session_state:
-        return (
-            sum(get_int(val) for val in base_df[sum_col])
-            if sum_col in base_df.columns
-            else 0
-        )
-
-    state = st.session_state[editor_key]
-    if not isinstance(state, dict):
-        return (
-            sum(get_int(val) for val in base_df[sum_col])
-            if sum_col in base_df.columns
-            else 0
-        )
-
-    df = base_df.copy()
-
-    # Применяем отредактированные строки
-    edited_rows = state.get("edited_rows", {})
-    for row_idx_str, cols in edited_rows.items():
-        try:
-            row_idx = int(row_idx_str)
-            if row_idx < len(df):
-                for col_name, val in cols.items():
-                    if col_name in df.columns:
-                        df.at[row_idx, col_name] = val
-        except (ValueError, TypeError):
-            continue
-
-    # Применяем добавленные строки
-    added_rows = state.get("added_rows", [])
-    for added_row in added_rows:
-        if isinstance(added_row, dict):
-            df = pd.concat([df, pd.DataFrame([added_row])], ignore_index=True)
-
-    # Применяем удаленные строки
-    deleted_rows = state.get("deleted_rows", [])
-    if deleted_rows:
-        valid_del = [
-            int(i) for i in deleted_rows if str(i).isdigit() and int(i) < len(df)
-        ]
-        df = df.drop(index=valid_del).reset_index(drop=True)
-
-    if sum_col in df.columns:
-        return sum(get_int(val) for val in df[sum_col])
-    return 0
-
-
 def render_kassa_tab(selected_date, can_edit):
-    # CSS для карточек и принудительного контрастного белого текста на кнопке #1E3557
+    # CSS: скрываем элемент контейнера стилей и применяем безопасное оформление
     st.markdown(
         textwrap.dedent("""
         <style>
-            /* Белые карточки на бежевом фоне */
+            /* Скрываем сам служебный контейнер со стилями, чтобы он не занимал место */
+            div[data-testid="stElementContainer"]:has(> div > style) {
+                display: none !important;
+            }
+            div[data-testid="stMarkdownContainer"]:has(> style) {
+                display: none !important;
+            }
+
+            /* Белые карточки на бежевом фоне без сбоя внутренних отступов layout */
             div[data-testid="stVerticalBlockBorderWrapper"] {
                 background-color: #ffffff !important;
                 border-radius: 16px !important;
                 border: 1px solid #eaeaea !important;
-                padding: 18px 22px !important;
                 box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02) !important;
-                margin-bottom: 12px !important;
             }
+
             /* Мягкая рамка вокруг внутренних таблиц */
             div[data-testid="stDataEditor"] {
                 border-radius: 10px !important;
                 border: 1px solid #f3f4f6 !important;
                 box-shadow: none !important;
             }
+
             /* Контейнер кнопки */
             div[data-testid="stButton"] > button {
                 background-color: #1E3557 !important;
@@ -137,14 +95,12 @@ def render_kassa_tab(selected_date, can_edit):
                 box-shadow: 0 4px 12px rgba(30, 53, 87, 0.25) !important;
                 transition: all 0.2s ease !important;
             }
-            /* Принудительно ярко-белый и читаемый текст внутри кнопки */
             div[data-testid="stButton"] > button * {
                 color: #ffffff !important;
                 font-weight: 800 !important;
                 font-size: 16px !important;
                 letter-spacing: 0.5px !important;
             }
-            /* Эффект наведения */
             div[data-testid="stButton"] > button:hover {
                 background-color: #14243b !important;
                 background: #14243b !important;
@@ -187,30 +143,15 @@ def render_kassa_tab(selected_date, can_edit):
         unsafe_allow_html=True,
     )
 
-    # --- 2. БЛОКИ: НАДХОДЖЕННЯ ТА ВИ ТРАТИ ---
+    # --- 2. БЛОКИ: НАДХОДЖЕННЯ ТА ВИТРАТИ ---
     col_t1, col_t2 = st.columns(2)
 
     with col_t1:
         with st.container(border=True):
-            inc_key = f"inc_editor_{selected_date}"
             inc_df = prepare_df(
                 st.session_state["inc_data"], ["Категорія", "Сума", "Примітка"]
             )
             inc_df = clean_df_for_editor(inc_df)
-
-            subtotal_inc = compute_df_subtotal(inc_df, inc_key)
-
-            st.markdown(
-                textwrap.dedent(f"""
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <span style="font-size: 19px; font-weight: 700; color: #111827;">📈 Надходження</span>
-                    <span style="background-color: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
-                        {subtotal_inc} грн
-                    </span>
-                </div>
-                """),
-                unsafe_allow_html=True,
-            )
 
             edited_inc_df = st.data_editor(
                 inc_df,
@@ -227,13 +168,28 @@ def render_kassa_tab(selected_date, can_edit):
                 },
                 num_rows="dynamic",
                 use_container_width=True,
-                key=inc_key,
+                key=f"inc_editor_{selected_date}",
                 disabled=not can_edit,
+            )
+
+            subtotal_inc = sum(
+                get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows()
+            )
+
+            st.markdown(
+                textwrap.dedent(f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <span style="font-size: 17px; font-weight: 700; color: #111827;">📈 Всього надходжень:</span>
+                    <span style="background-color: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
+                        {subtotal_inc} грн
+                    </span>
+                </div>
+                """),
+                unsafe_allow_html=True,
             )
 
     with col_t2:
         with st.container(border=True):
-            exp_key = f"exp_editor_{selected_date}"
             exp_df = prepare_df(
                 st.session_state["exp_data"], ["Категорія", "Сума", "Примітка"]
             )
@@ -245,20 +201,6 @@ def render_kassa_tab(selected_date, can_edit):
                         str(x).strip(), get_short_cat(x)
                     )
                 )
-
-            subtotal_exp = compute_df_subtotal(exp_df, exp_key)
-
-            st.markdown(
-                textwrap.dedent(f"""
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <span style="font-size: 19px; font-weight: 700; color: #111827;">📉 Витрати</span>
-                    <span style="background-color: #ffebee; color: #c62828; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
-                        {subtotal_exp} грн
-                    </span>
-                </div>
-                """),
-                unsafe_allow_html=True,
-            )
 
             edited_exp_df = st.data_editor(
                 exp_df,
@@ -275,8 +217,24 @@ def render_kassa_tab(selected_date, can_edit):
                 },
                 num_rows="dynamic",
                 use_container_width=True,
-                key=exp_key,
+                key=f"exp_editor_{selected_date}",
                 disabled=not can_edit,
+            )
+
+            subtotal_exp = sum(
+                get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows()
+            )
+
+            st.markdown(
+                textwrap.dedent(f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <span style="font-size: 17px; font-weight: 700; color: #111827;">📉 Всього витрат:</span>
+                    <span style="background-color: #ffebee; color: #c62828; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
+                        {subtotal_exp} грн
+                    </span>
+                </div>
+                """),
+                unsafe_allow_html=True,
             )
 
     # --- 3. БЛОКИ: АВАНСИ ТА ФАКТ ---
@@ -284,26 +242,11 @@ def render_kassa_tab(selected_date, can_edit):
 
     with col_b1:
         with st.container(border=True):
-            adv_key = f"adv_editor_{selected_date}"
             adv_df = prepare_df(
                 st.session_state["adv_data"],
                 ["Співробітник", "Сума", "Примітка"],
             )
             adv_df = clean_df_for_editor(adv_df)
-
-            subtotal_adv = compute_df_subtotal(adv_df, adv_key)
-
-            st.markdown(
-                textwrap.dedent(f"""
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <span style="font-size: 19px; font-weight: 700; color: #111827;">💸 Аванси</span>
-                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
-                        {subtotal_adv} грн
-                    </span>
-                </div>
-                """),
-                unsafe_allow_html=True,
-            )
 
             edited_adv_df = st.data_editor(
                 adv_df,
@@ -316,61 +259,28 @@ def render_kassa_tab(selected_date, can_edit):
                 },
                 num_rows="dynamic",
                 use_container_width=True,
-                key=adv_key,
+                key=f"adv_editor_{selected_date}",
                 disabled=not can_edit,
             )
 
-    with col_b2:
-        with st.container(border=True):
-            # Предрасчет кассы номиналов из session_state без st.empty()
-            m_coins_val = get_int(
-                st.session_state.get(f"coins_live_{selected_date}", 0)
-            )
-            q_20_val = get_int(
-                st.session_state.get(f"qty_20_{selected_date}", 0)
-            )
-            q_50_val = get_int(
-                st.session_state.get(f"qty_50_{selected_date}", 0)
-            )
-            q_100_val = get_int(
-                st.session_state.get(f"qty_100_{selected_date}", 0)
-            )
-            q_200_val = get_int(
-                st.session_state.get(f"qty_200_{selected_date}", 0)
-            )
-            q_500_val = get_int(
-                st.session_state.get(f"qty_500_{selected_date}", 0)
-            )
-            q_1000_val = get_int(
-                st.session_state.get(f"qty_1000_{selected_date}", 0)
-            )
-            q_2000_val = get_int(
-                st.session_state.get(f"qty_2000_{selected_date}", 0)
-            )
-
-            cash_pure_pre = (
-                m_coins_val
-                + q_20_val * 20
-                + q_50_val * 50
-                + q_100_val * 100
-                + q_200_val * 200
-                + q_500_val * 500
-                + q_1000_val * 1000
-                + q_2000_val * 2000
+            subtotal_adv = sum(
+                get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows()
             )
 
             st.markdown(
                 textwrap.dedent(f"""
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
-                    <span style="font-size: 19px; font-weight: 700; color: #111827;">💰 Факт</span>
-                    <span style="background-color: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
-                        {cash_pure_pre} грн
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <span style="font-size: 17px; font-weight: 700; color: #111827;">💸 Всього авансів:</span>
+                    <span style="background-color: #fff3e0; color: #ef6c00; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
+                        {subtotal_adv} грн
                     </span>
                 </div>
                 """),
                 unsafe_allow_html=True,
             )
 
+    with col_b2:
+        with st.container(border=True):
             fc1, fc2 = st.columns(2)
 
             with fc1:
@@ -450,6 +360,18 @@ def render_kassa_tab(selected_date, can_edit):
                 + q_500 * 500
                 + q_1000 * 1000
                 + q_2000 * 2000
+            )
+
+            st.markdown(
+                textwrap.dedent(f"""
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 8px;">
+                    <span style="font-size: 17px; font-weight: 700; color: #111827;">💰 Всього факт каси:</span>
+                    <span style="background-color: #e8f5e9; color: #2e7d32; padding: 4px 12px; border-radius: 20px; font-weight: 800; font-size: 14px;">
+                        {cash_pure} грн
+                    </span>
+                </div>
+                """),
+                unsafe_allow_html=True,
             )
 
     # --- 4. БЛОК: ПІДСУМКИ ЗМІНИ ---
