@@ -189,7 +189,7 @@ def render_pnl_tab():
                 running_balance = calc_end
 
         # ============================================================
-        # PnL TABLE — UI
+        # PnL TABLE — UI & FILTERING
         # ============================================================
 
         today = datetime.today()
@@ -198,6 +198,37 @@ def render_pnl_tab():
             if today.year == sel_y and today.month == m_num
             else None
         )
+
+        # 1. Расчет месячных итогов по каждой строке
+        month_totals = {
+            r: sum(report_data[r][str(d)]["sum"] for d in range(1, num_days + 1))
+            for r in order_full
+        }
+
+        # 2. Активные строки с ненулевой суммой
+        active_rows = {r for r, total in month_totals.items() if total != 0}
+
+        # 3. Обязательные системные строки
+        structural_headers = {
+            "Касса на начало дня",
+            "🟢 НАДХОДЖЕННЯ",
+            "🔴 ВИТРАТИ",
+            "🔴 ВСЬОГО ВИТРАТ",
+            "Касса на конец дня",
+        }
+
+        # 4. Формирование списка видимых строк
+        visible_rows = set(structural_headers)
+        for r in order_full:
+            if r in active_rows:
+                visible_rows.add(r)
+
+        # Папка показывается только если в ней есть хотя бы одна активная подкатегория
+        for grp, subs in EXPENSE_TREE.items():
+            grp_key = f"📁 {grp}"
+            has_active_sub = any(f"↳ {sub}" in active_rows for sub in subs)
+            if has_active_sub or grp_key in active_rows:
+                visible_rows.add(grp_key)
 
         hover_column_css = ""
         for d in range(1, num_days + 1):
@@ -505,25 +536,8 @@ def render_pnl_tab():
         table_parts.append("<th>Всього</th></tr></thead><tbody>")
 
         for r in order_full:
-            # --- ФИЛЬТРАЦИЯ ПУСТЫХ СТРОК ---
-            row_month_sum = sum(
-                report_data[r][str(d)]["sum"] for d in range(1, num_days + 1)
-            )
-            row_has_notes = any(
-                len(report_data[r][str(d)]["notes"]) > 0
-                for d in range(1, num_days + 1)
-            )
-
-            is_structural_header = r in [
-                "Касса на начало дня",
-                "🟢 НАДХОДЖЕННЯ",
-                "🔴 ВИТРАТИ",
-                "🔴 ВСЬОГО ВИТРАТ",
-                "Касса на конец дня",
-            ]
-
-            # Если по строке нет суммы и примечаний — скрываем ее
-            if not is_structural_header and row_month_sum == 0 and not row_has_notes:
+            # Скрываем неактивные строки и пустые папки
+            if r not in visible_rows:
                 continue
 
             if r == "🟢 НАДХОДЖЕННЯ":
