@@ -77,61 +77,66 @@ st.markdown(
     /* ========================================================= */
     #is-floating { display: none; }
     
-    /* Превращаем блок колонок в горизонтальный плавающий док снизу или сбоку */
+    /* Жестко фиксируем контейнер внизу экрана по центру для любых устройств */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) {
         position: fixed !important;
-        bottom: 20px !important;
+        bottom: 16px !important;
         left: 50% !important;
         transform: translateX(-50%) !important;
         z-index: 999999 !important;
         
         display: flex !important;
         flex-direction: row !important;
+        flex-wrap: nowrap !important;
         align-items: center !important;
         justify-content: center !important;
-        gap: 6px !important;
-        width: auto !important;
-        max-width: 95vw !important;
+        gap: 4px !important;
+        
+        width: max-content !important;
+        max-width: 96vw !important;
         overflow-x: auto !important;
         
-        background: rgba(255, 255, 255, 0.82) !important;
+        background: rgba(255, 255, 255, 0.85) !important;
         backdrop-filter: blur(14px) !important;
         -webkit-backdrop-filter: blur(14px) !important;
-        border: 1px solid rgba(255, 255, 255, 0.9) !important;
+        border: 1px solid rgba(255, 255, 255, 0.95) !important;
         border-radius: 20px !important;
-        padding: 8px 10px !important;
-        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.15), 0 2px 8px rgba(15, 23, 42, 0.05) !important;
+        padding: 6px 8px !important;
+        box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
     }
 
-    /* Нормализуем размер колонок внутри дока */
+    /* Отменяем адаптивное сжатие колонок Streamlit внутри нашего дока */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) > div[data-testid="column"] {
-        width: 42px !important;
-        min-width: 42px !important;
-        height: 42px !important;
-        flex: 0 0 42px !important;
+        width: 38px !important;
+        min-width: 38px !important;
+        max-width: 38px !important;
+        height: 38px !important;
+        flex: 0 0 38px !important;
         margin: 0 !important;
         padding: 0 !important;
     }
 
-    /* Все кнопки (включая popover даты) внутри дока */
+    /* Все кнопки внутри дока */
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button {
-        width: 42px !important;
-        height: 42px !important;
-        min-width: 42px !important;
-        min-height: 42px !important;
-        border-radius: 12px !important;
+        width: 38px !important;
+        height: 38px !important;
+        min-width: 38px !important;
+        min-height: 38px !important;
+        max-width: 38px !important;
+        max-height: 38px !important;
+        border-radius: 10px !important;
         border: 1px solid transparent !important;
-        background: rgba(241, 245, 249, 0.85) !important;
+        background: rgba(241, 245, 249, 0.9) !important;
         padding: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
-        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        transition: transform 0.15s ease, background 0.15s ease !important;
         box-shadow: none !important;
     }
 
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button * {
-        font-size: 18px !important;
+        font-size: 16px !important;
         line-height: 1 !important;
         margin: 0 !important;
         padding: 0 !important;
@@ -140,12 +145,11 @@ st.markdown(
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button:hover {
         background: #ffffff !important;
         border-color: #cbd5e1 !important;
-        transform: translateY(-3px) scale(1.08) !important;
-        box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14) !important;
+        transform: scale(1.1) !important;
     }
 
     div[data-testid="stHorizontalBlock"]:has(#is-floating) button:active {
-        transform: scale(0.95) !important;
+        transform: scale(0.92) !important;
     }
 </style>
 """,
