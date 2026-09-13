@@ -145,40 +145,72 @@ def render_kassa_tab(selected_date, can_edit):
             }
 
             /* ========================================================= */
-            /* FLOATING DOCK СТИЛИ                                       */
+            /* ТОЧЕЧНЫЙ БЕЗОПАСНЫЙ СТИЛЬ FLOATING DOCK                    */
             /* ========================================================= */
             
-            div[data-testid="stElementContainer"]:has(.dock-marker) {
+            /* Скрываем технические маркеры */
+            div[data-testid="stElementContainer"]:has(.floating-btn-draft),
+            div[data-testid="stElementContainer"]:has(.floating-btn-calendar),
+            div[data-testid="stElementContainer"]:has(.floating-btn-lock) {
                 display: none !important;
             }
 
-            div[data-testid="stVerticalBlock"]:has(.dock-marker) {
+            /* Подложка для дока (Glassmorphism) */
+            div[data-testid="stElementContainer"]:has(.floating-dock-bg) {
+                display: block !important;
                 position: fixed !important;
                 right: 18px !important;
                 top: 50% !important;
                 transform: translateY(-50%) !important;
-                z-index: 999999 !important;
+                width: 60px !important;
+                height: 172px !important;
                 background: rgba(255, 255, 255, 0.8) !important;
                 backdrop-filter: blur(14px) !important;
                 -webkit-backdrop-filter: blur(14px) !important;
                 border: 1px solid rgba(255, 255, 255, 0.9) !important;
                 border-radius: 20px !important;
-                padding: 10px 8px !important;
-                display: flex !important;
-                flex-direction: column !important;
-                gap: 8px !important;
+                z-index: 999990 !important;
                 box-shadow: 0 10px 30px rgba(15, 23, 42, 0.12), 
                             0 2px 8px rgba(15, 23, 42, 0.04) !important;
+                pointer-events: none !important;
             }
 
-            div[data-testid="stVerticalBlock"]:has(.dock-marker) div[data-testid="stButton"] > button {
+            /* Кнопка 1: Черновик */
+            div[data-testid="stElementContainer"]:has(.floating-btn-draft) + div[data-testid="stElementContainer"] {
+                position: fixed !important;
+                right: 26px !important;
+                top: calc(50% - 60px) !important;
+                z-index: 999999 !important;
+            }
+
+            /* Кнопка 2: Календарь */
+            div[data-testid="stElementContainer"]:has(.floating-btn-calendar) + div[data-testid="stElementContainer"] {
+                position: fixed !important;
+                right: 26px !important;
+                top: 50% !important;
+                transform: translateY(-50%) !important;
+                z-index: 999999 !important;
+            }
+
+            /* Кнопка 3: Заблокировать */
+            div[data-testid="stElementContainer"]:has(.floating-btn-lock) + div[data-testid="stElementContainer"] {
+                position: fixed !important;
+                right: 26px !important;
+                top: calc(50% + 16px) !important;
+                z-index: 999999 !important;
+            }
+
+            /* Внешний вид плавающих кнопок */
+            div[data-testid="stElementContainer"]:has(.floating-btn-draft) + div[data-testid="stElementContainer"] button,
+            div[data-testid="stElementContainer"]:has(.floating-btn-calendar) + div[data-testid="stElementContainer"] button,
+            div[data-testid="stElementContainer"]:has(.floating-btn-lock) + div[data-testid="stElementContainer"] button {
                 width: 44px !important;
                 height: 44px !important;
                 min-width: 44px !important;
                 min-height: 44px !important;
                 border-radius: 14px !important;
                 border: 1px solid transparent !important;
-                background: rgba(241, 245, 249, 0.8) !important;
+                background: rgba(241, 245, 249, 0.9) !important;
                 padding: 0 !important;
                 display: flex !important;
                 align-items: center !important;
@@ -187,22 +219,22 @@ def render_kassa_tab(selected_date, can_edit):
                 box-shadow: none !important;
             }
 
-            div[data-testid="stVerticalBlock"]:has(.dock-marker) div[data-testid="stButton"] > button * {
+            div[data-testid="stElementContainer"]:has(.floating-btn-draft) + div[data-testid="stElementContainer"] button *,
+            div[data-testid="stElementContainer"]:has(.floating-btn-calendar) + div[data-testid="stElementContainer"] button *,
+            div[data-testid="stElementContainer"]:has(.floating-btn-lock) + div[data-testid="stElementContainer"] button * {
                 font-size: 20px !important;
                 line-height: 1 !important;
                 margin: 0 !important;
                 padding: 0 !important;
             }
 
-            div[data-testid="stVerticalBlock"]:has(.dock-marker) div[data-testid="stButton"] > button:hover {
+            div[data-testid="stElementContainer"]:has(.floating-btn-draft) + div[data-testid="stElementContainer"] button:hover,
+            div[data-testid="stElementContainer"]:has(.floating-btn-calendar) + div[data-testid="stElementContainer"] button:hover,
+            div[data-testid="stElementContainer"]:has(.floating-btn-lock) + div[data-testid="stElementContainer"] button:hover {
                 background: #ffffff !important;
                 border-color: #cbd5e1 !important;
-                transform: scale(1.15) translateX(-2px) !important;
+                transform: scale(1.15) !important;
                 box-shadow: 0 6px 16px rgba(15, 23, 42, 0.14) !important;
-            }
-
-            div[data-testid="stVerticalBlock"]:has(.dock-marker) div[data-testid="stButton"] > button:active {
-                transform: scale(0.95) !important;
             }
         </style>
         """,
@@ -686,75 +718,79 @@ def render_kassa_tab(selected_date, can_edit):
                 else:
                     st.error(f"❌ Помилка: {res_shift.text}")
 
-    # --- 6. GLASSMORPHISM FLOATING DOCK (ПЛАВАЮЩЕЕ МЕНЮ С ЧЕРНОВИКОМ) ---
-    with st.container():
-        st.markdown('<span class="dock-marker"></span>', unsafe_allow_html=True)
+    # --- 6. БЕЗОПАСНЫЙ FLOATING DOCK СПРАВА ---
+    st.markdown('<div class="floating-dock-bg"></div>', unsafe_allow_html=True)
 
-        if st.button("📝", key="dock_draft", help="Зберегти чернетку"):
-            if can_edit:
-                try:
-                    exp_df_full = edited_exp_df.copy()
-                    if "Категорія" in exp_df_full.columns:
-                        exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
-                            lambda x: EXPENSE_SHORT_TO_FULL.get(
-                                str(x).strip(), str(x).strip()
-                            )
+    # Кнопка черновика
+    st.markdown('<div class="floating-btn-draft"></div>', unsafe_allow_html=True)
+    if st.button("📝", key="dock_draft", help="Зберегти чернетку"):
+        if can_edit:
+            try:
+                exp_df_full = edited_exp_df.copy()
+                if "Категорія" in exp_df_full.columns:
+                    exp_df_full["Категорія"] = exp_df_full["Категорія"].map(
+                        lambda x: EXPENSE_SHORT_TO_FULL.get(
+                            str(x).strip(), str(x).strip()
                         )
+                    )
 
-                    draft_payload = {
-                        "inc": sanitize_df(edited_inc_df),
-                        "exp": sanitize_df(exp_df_full),
-                        "adv": sanitize_df(edited_adv_df),
-                        "cash": {
-                            "coins": m_coins,
-                            "20": q_20,
-                            "50": q_50,
-                            "100": q_100,
-                            "200": q_200,
-                            "500": q_500,
-                            "1000": q_1000,
-                            "2000": q_2000,
-                        },
-                    }
+                draft_payload = {
+                    "inc": sanitize_df(edited_inc_df),
+                    "exp": sanitize_df(exp_df_full),
+                    "adv": sanitize_df(edited_adv_df),
+                    "cash": {
+                        "coins": m_coins,
+                        "20": q_20,
+                        "50": q_50,
+                        "100": q_100,
+                        "200": q_200,
+                        "500": q_500,
+                        "1000": q_1000,
+                        "2000": q_2000,
+                    },
+                }
 
-                    check_draft = requests.get(
+                check_draft = requests.get(
+                    f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
+                    headers=headers,
+                ).json()
+
+                if isinstance(check_draft, list) and len(check_draft) > 0:
+                    res = requests.patch(
                         f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
                         headers=headers,
-                    ).json()
+                        json={"payload": draft_payload},
+                    )
+                else:
+                    res = requests.post(
+                        f"{SUPABASE_URL}/rest/v1/drafts",
+                        headers=headers,
+                        json={"date": selected_date, "payload": draft_payload},
+                    )
 
-                    if isinstance(check_draft, list) and len(check_draft) > 0:
-                        res = requests.patch(
-                            f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{selected_date}",
-                            headers=headers,
-                            json={"payload": draft_payload},
-                        )
-                    else:
-                        res = requests.post(
-                            f"{SUPABASE_URL}/rest/v1/drafts",
-                            headers=headers,
-                            json={"date": selected_date, "payload": draft_payload},
-                        )
+                if res.status_code in [200, 201, 204]:
+                    if "drafts_cache" in st.session_state:
+                        st.session_state["drafts_cache"][selected_date] = draft_payload
+                    
+                    st.session_state.pop(cache_key, None)
+                    st.cache_data.clear()
+                    
+                    log_audit("Збережено чернетку", f"Дата: {selected_date}")
+                    st.toast("📝 Чернетку успішно збережено!", icon="✅")
+                else:
+                    st.toast(f"❌ Помилка сервера: {res.status_code}", icon="⚠️")
+            except Exception as e:
+                st.toast(f"❌ Помилка збереження: {e}", icon="⚠️")
+        else:
+            st.toast("🔒 Режим «Тільки читання»", icon="⚠️")
 
-                    if res.status_code in [200, 201, 204]:
-                        # Обновляем все уровни кэшей приложения
-                        if "drafts_cache" in st.session_state:
-                            st.session_state["drafts_cache"][selected_date] = draft_payload
-                        
-                        st.session_state.pop(cache_key, None)
-                        st.cache_data.clear()
-                        
-                        log_audit("Збережено чернетку", f"Дата: {selected_date}")
-                        st.toast("📝 Чернетку успішно збережено!", icon="✅")
-                    else:
-                        st.toast(f"❌ Помилка сервера: {res.status_code}", icon="⚠️")
-                except Exception as e:
-                    st.toast(f"❌ Помилка збереження: {e}", icon="⚠️")
-            else:
-                st.toast("🔒 Режим «Тільки читання»", icon="⚠️")
+    # Кнопка календаря
+    st.markdown('<div class="floating-btn-calendar"></div>', unsafe_allow_html=True)
+    if st.button("📅", key="dock_calendar", help="Обрати дату"):
+        st.session_state["show_calendar_modal"] = True
 
-        if st.button("📅", key="dock_calendar", help="Обрати дату"):
-            st.session_state["show_calendar_modal"] = True
-
-        if st.button("🔒", key="dock_lock", help="Заблокувати зміну"):
-            st.session_state["kassa_locked"] = True
-            st.toast("🔒 Касу заблоковано", icon="ℹ️")
+    # Кнопка блокировки
+    st.markdown('<div class="floating-btn-lock"></div>', unsafe_allow_html=True)
+    if st.button("🔒", key="dock_lock", help="Заблокувати зміну"):
+        st.session_state["kassa_locked"] = True
+        st.toast("🔒 Касу заблоковано", icon="ℹ️")
