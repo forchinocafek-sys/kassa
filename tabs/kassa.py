@@ -227,8 +227,10 @@ def render_kassa_tab(selected_date, can_edit):
                 key=f"inc_editor_{selected_date}",
                 disabled=not can_edit,
             )
-            subtotal_inc = sum(
-                get_int(r.get("Сума", 0)) for _, r in edited_inc_df.iterrows()
+            subtotal_inc = int(
+                pd.to_numeric(edited_inc_df["Сума"], errors="coerce")
+                .fillna(0)
+                .sum()
             )
             st.markdown(
                 f"""
@@ -262,8 +264,10 @@ def render_kassa_tab(selected_date, can_edit):
                 key=f"exp_editor_{selected_date}",
                 disabled=not can_edit,
             )
-            subtotal_exp = sum(
-                get_int(r.get("Сума", 0)) for _, r in edited_exp_df.iterrows()
+            subtotal_exp = int(
+                pd.to_numeric(edited_exp_df["Сума"], errors="coerce")
+                .fillna(0)
+                .sum()
             )
             st.markdown(
                 f"""
@@ -298,8 +302,10 @@ def render_kassa_tab(selected_date, can_edit):
                 key=f"adv_editor_{selected_date}",
                 disabled=not can_edit,
             )
-            subtotal_adv = sum(
-                get_int(r.get("Сума", 0)) for _, r in edited_adv_df.iterrows()
+            subtotal_adv = int(
+                pd.to_numeric(edited_adv_df["Сума"], errors="coerce")
+                .fillna(0)
+                .sum()
             )
             st.markdown(
                 f"""
@@ -319,71 +325,63 @@ def render_kassa_tab(selected_date, can_edit):
             )
             fc1, fc2 = st.columns(2)
             with fc1:
-                m_coins = get_int(
-                    st.text_input(
-                        "🪙 Монети",
-                        placeholder="0",
-                        key=f"coins_{selected_date}",
-                        disabled=not can_edit,
-                    )
+                m_coins = st.number_input(
+                    "🪙 Монети",
+                    min_value=0,
+                    step=1,
+                    key="m_coins",
+                    disabled=not can_edit,
                 )
-                q_20 = get_int(
-                    st.text_input(
-                        "💵 20 грн",
-                        placeholder="0",
-                        key=f"q20_{selected_date}",
-                        disabled=not can_edit,
-                    )
+                q_20 = st.number_input(
+                    "💵 20 грн",
+                    min_value=0,
+                    step=1,
+                    key="q_20",
+                    disabled=not can_edit,
                 )
-                q_50 = get_int(
-                    st.text_input(
-                        "💵 50 грн",
-                        placeholder="0",
-                        key=f"q50_{selected_date}",
-                        disabled=not can_edit,
-                    )
+                q_50 = st.number_input(
+                    "💵 50 грн",
+                    min_value=0,
+                    step=1,
+                    key="q_50",
+                    disabled=not can_edit,
                 )
-                q_100 = get_int(
-                    st.text_input(
-                        "💵 100 грн",
-                        placeholder="0",
-                        key=f"q100_{selected_date}",
-                        disabled=not can_edit,
-                    )
+                q_100 = st.number_input(
+                    "💵 100 грн",
+                    min_value=0,
+                    step=1,
+                    key="q_100",
+                    disabled=not can_edit,
                 )
 
             with fc2:
-                q_200 = get_int(
-                    st.text_input(
-                        "💵 200 грн",
-                        placeholder="0",
-                        key=f"q200_{selected_date}",
-                        disabled=not can_edit,
-                    )
+                q_200 = st.number_input(
+                    "💵 200 грн",
+                    min_value=0,
+                    step=1,
+                    key="q_200",
+                    disabled=not can_edit,
                 )
-                q_500 = get_int(
-                    st.text_input(
-                        "💵 500 грн",
-                        placeholder="0",
-                        key=f"q500_{selected_date}",
-                        disabled=not can_edit,
-                    )
+                q_500 = st.number_input(
+                    "💵 500 грн",
+                    min_value=0,
+                    step=1,
+                    key="q_500",
+                    disabled=not can_edit,
                 )
-                q_1000 = get_int(
-                    st.text_input(
-                        "💵 1000 грн",
-                        placeholder="0",
-                        key=f"q1000_{selected_date}",
-                        disabled=not can_edit,
-                    )
+                q_1000 = st.number_input(
+                    "💵 1000 грн",
+                    min_value=0,
+                    step=1,
+                    key="q_1000",
+                    disabled=not can_edit,
                 )
-                q_2000 = get_int(
-                    st.text_input(
-                        "💵 2000 грн",
-                        placeholder="0",
-                        key=f"q2000_{selected_date}",
-                        disabled=not can_edit,
-                    )
+                q_2000 = st.number_input(
+                    "💵 2000 грн",
+                    min_value=0,
+                    step=1,
+                    key="q_2000",
+                    disabled=not can_edit,
                 )
 
             cash_pure = (
