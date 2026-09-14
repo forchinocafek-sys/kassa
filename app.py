@@ -146,7 +146,7 @@ st.markdown(
         justify-content: center !important;
     }
 
-    /* --- ПРЯМАЯ СТИЛИЗАЦИЯ ДАТА-ПИКЕРА ПОД КНОПКУ ДОКА --- */
+    /* --- ПОЛНОЕ СКРЫТИЕ ТЕКСТА И СИМВОЛОВ ВНУТРИ КНОПКИ ДАТЫ --- */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] {
         width: 42px !important;
         height: 42px !important;
@@ -154,9 +154,32 @@ st.markdown(
         min-height: 42px !important;
         margin: 0 !important;
         padding: 0 !important;
+        overflow: hidden !important;
     }
 
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div {
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] * {
+        color: transparent !important;
+        font-size: 0 !important;
+        line-height: 0 !important;
+        user-select: none !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] input {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 42px !important;
+        height: 42px !important;
+        opacity: 0 !important;
+        color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        cursor: pointer !important;
+        z-index: 10 !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] div[data-baseweb="input"] {
         width: 42px !important;
         height: 42px !important;
         min-width: 42px !important;
@@ -173,34 +196,22 @@ st.markdown(
         transition: all 0.2s ease !important;
         position: relative !important;
         cursor: pointer !important;
+        overflow: hidden !important;
     }
 
-    /* Делаем сам текст даты (например 14/09/2026) невидимым, но сохраняем его кликабельность */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] input {
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100% !important;
-        height: 100% !important;
-        opacity: 0 !important;
-        cursor: pointer !important;
-        z-index: 2 !important;
-    }
-
-    /* Отрисовываем иконку 📅 по центру кнопки */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div::before {
+    /* Рисуем иконку 📅 в центре кнопки */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div::before,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] div[data-baseweb="input"]::before {
         content: "📅" !important;
         font-size: 20px !important;
         line-height: 1 !important;
+        color: #111827 !important;
         position: absolute !important;
-        z-index: 1 !important;
+        top: 50% !important;
+        left: 50% !important;
+        transform: translate(-50%, -50%) !important;
+        z-index: 5 !important;
         pointer-events: none !important;
-    }
-
-    /* Скрываем системные иконки поля даты */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] svg,
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] [data-testid="stIcon"] {
-        display: none !important;
     }
 
     /* Выравнивание обычных кнопок */
@@ -370,6 +381,7 @@ for idx, item in enumerate(dock_items):
             )
             if d != st.session_state["form_date"]:
                 st.session_state["form_date"] = d
+                st.session_state.pop("kassa_current_payload", None)
                 prefetch_week_window(d)
                 st.rerun()
 
