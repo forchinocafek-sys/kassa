@@ -96,7 +96,7 @@ st.markdown(
         padding: 0 !important;
     }
 
-    /* Превращаем блок колонок в плавающий Glassmorphism Dock */
+    /* Превращаем блок колонок в плавающий Glassmorphism Dock (ПК) */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
         position: fixed !important;
         bottom: 16px !important;
@@ -110,9 +110,12 @@ st.markdown(
         align-items: center !important;
         justify-content: center !important;
         gap: 6px !important;
-        width: auto !important;
         
-        background: rgba(255, 255, 255, 0.88) !important;
+        width: auto !important;
+        min-width: max-content !important;
+        max-width: max-content !important;
+        
+        background: rgba(255, 255, 255, 0.90) !important;
         backdrop-filter: blur(16px) !important;
         -webkit-backdrop-filter: blur(16px) !important;
         border: 1px solid rgba(255, 255, 255, 0.95) !important;
@@ -121,24 +124,15 @@ st.markdown(
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
     }
 
-    /* Адаптируем смещение влево на мобильных телефонах */
-    @media (max-width: 768px) {
-        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
-            left: 12px !important;
-            transform: none !important;
-            max-width: calc(100vw - 100px) !important;
-            overflow-x: auto !important;
-            justify-content: flex-start !important;
-        }
-    }
-
-    /* Жестко фиксируем размер колонок внутри дока */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) > div[data-testid="column"] {
+    /* Жесткая отмена растяжения колонок Streamlit */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) > div,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) [data-testid="column"],
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) [data-testid="stColumn"] {
         width: 42px !important;
         min-width: 42px !important;
         max-width: 42px !important;
         height: 42px !important;
-        flex: 0 0 42px !important;
+        flex: 0 0 42px !important; /* СТРОГИЙ ЗАПРЕТ flex-grow */
         margin: 0 !important;
         padding: 0 !important;
         display: flex !important;
@@ -146,17 +140,18 @@ st.markdown(
         justify-content: center !important;
     }
 
-    /* --- ПОЛНОЕ СКРЫТИЕ ТЕКСТА И СИМВОЛОВ ВНУТРИ КНОПКИ ДАТЫ --- */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stElementContainer"],
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) .stButton,
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] {
         width: 42px !important;
-        height: 42px !important;
         min-width: 42px !important;
-        min-height: 42px !important;
+        max-width: 42px !important;
+        height: 42px !important;
         margin: 0 !important;
         padding: 0 !important;
-        overflow: hidden !important;
     }
 
+    /* --- ПОЛНОЕ СКРЫТИЕ ТЕКСТА И СИМВОЛОВ ВНУТРИ КНОПКИ ДАТЫ --- */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] * {
         color: transparent !important;
         font-size: 0 !important;
@@ -246,6 +241,53 @@ st.markdown(
         border-color: #cbd5e1 !important;
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
+    }
+
+    /* ========================================================= */
+    /* ИДЕАЛЬНАЯ АДАПТАЦИЯ ДЛЯ МОБИЛЬНЫХ ЭКРАНОВ (<= 768px)      */
+    /* ========================================================= */
+    @media (max-width: 768px) {
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
+            bottom: 12px !important;
+            left: 50% !important;
+            transform: translateX(-50%) !important;
+            gap: 4px !important;
+            padding: 4px 6px !important;
+            border-radius: 18px !important;
+            max-width: calc(100vw - 20px) !important;
+        }
+
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) > div,
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) [data-testid="column"],
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) [data-testid="stColumn"] {
+            width: 36px !important;
+            min-width: 36px !important;
+            max-width: 36px !important;
+            height: 36px !important;
+            flex: 0 0 36px !important; /* СТРОГО 36px, БЕЗ РАСТЯЖЕНИЯ */
+        }
+
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stElementContainer"],
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) .stButton,
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button,
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"],
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div,
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] div[data-baseweb="input"],
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] input {
+            width: 36px !important;
+            height: 36px !important;
+            min-width: 36px !important;
+            min-height: 36px !important;
+            max-width: 36px !important;
+            max-height: 36px !important;
+            border-radius: 11px !important;
+        }
+
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button *,
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div::before,
+        div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] div[data-baseweb="input"]::before {
+            font-size: 17px !important;
+        }
     }
 
     /* Современный Glassmorphism Notification (iOS / Vercel style) */
