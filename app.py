@@ -247,6 +247,25 @@ st.markdown(
         transform: translateY(-2px) !important;
         box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
     }
+
+    /* Современный Glassmorphism Notification (iOS / Vercel style) */
+    div[data-testid="stToast"] {
+        background: rgba(17, 24, 39, 0.92) !important;
+        backdrop-filter: blur(16px) !important;
+        -webkit-backdrop-filter: blur(16px) !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 18px !important;
+        padding: 10px 16px !important;
+        box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2) !important;
+    }
+    div[data-testid="stToast"] * {
+        color: #ffffff !important;
+        font-size: 14px !important;
+        font-weight: 500 !important;
+    }
+    div[data-testid="stToast"] button {
+        color: #9ca3af !important;
+    }
 </style>
 """,
     unsafe_allow_html=True,
@@ -428,9 +447,9 @@ for idx, item in enumerate(dock_items):
                             kp["m_coins"],
                             kp["q_dict"],
                         )
-                        st.toast("📝 Чернетку успішно збережено!", icon="✅")
+                        st.toast("Чернетка збережена", icon="✨")
                 except Exception as e:
-                    st.toast(f"❌ Помилка збереження: {e}", icon="⚠️")
+                    st.toast(f"Помилка збереження: {e}", icon="⚠️")
 
         elif item == "logout":
             if st.button("🚫", key="btn_dock_logout", help="Вийти"):
