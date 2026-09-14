@@ -146,25 +146,65 @@ st.markdown(
         justify-content: center !important;
     }
 
-    /* Оформление кнопок и контейнера поповера */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] {
+    /* --- ПРЯМАЯ СТИЛИЗАЦИЯ ДАТА-ПИКЕРА ПОД КНОПКУ ДОКА --- */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] {
         width: 42px !important;
         height: 42px !important;
+        min-width: 42px !important;
+        min-height: 42px !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div {
+        width: 42px !important;
+        height: 42px !important;
+        min-width: 42px !important;
+        min-height: 42px !important;
+        border-radius: 14px !important;
+        border: 1px solid transparent !important;
+        background: rgba(241, 245, 249, 0.85) !important;
+        padding: 0 !important;
+        margin: 0 !important;
         display: flex !important;
         align-items: center !important;
         justify-content: center !important;
+        box-shadow: none !important;
+        transition: all 0.2s ease !important;
+        position: relative !important;
+        cursor: pointer !important;
     }
 
-    /* Полное удаление стрелочки (и любых иконок) у popover кнопки календаря */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] button svg,
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] button [data-testid="stIcon"],
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] button span:has(svg) {
+    /* Делаем сам текст даты (например 14/09/2026) невидимым, но сохраняем его кликабельность */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] input {
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        opacity: 0 !important;
+        cursor: pointer !important;
+        z-index: 2 !important;
+    }
+
+    /* Отрисовываем иконку 📅 по центру кнопки */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div::before {
+        content: "📅" !important;
+        font-size: 20px !important;
+        line-height: 1 !important;
+        position: absolute !important;
+        z-index: 1 !important;
+        pointer-events: none !important;
+    }
+
+    /* Скрываем системные иконки поля даты */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] svg,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] [data-testid="stIcon"] {
         display: none !important;
     }
 
-    /* Выравнивание обычных кнопок и кнопки popover */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button,
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] > button {
+    /* Выравнивание обычных кнопок */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button {
         width: 42px !important;
         height: 42px !important;
         min-width: 42px !important;
@@ -181,8 +221,7 @@ st.markdown(
         transition: all 0.2s ease !important;
     }
 
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button *,
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] > button * {
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button * {
         font-size: 20px !important;
         line-height: 1 !important;
         margin: 0 !important;
@@ -191,7 +230,7 @@ st.markdown(
     }
 
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button:hover,
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] > button:hover {
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div:hover {
         background: #ffffff !important;
         border-color: #cbd5e1 !important;
         transform: translateY(-2px) !important;
@@ -318,21 +357,21 @@ dock_cols = st.columns(len(dock_items))
 for idx, item in enumerate(dock_items):
     with dock_cols[idx]:
         if idx == 0:
-            # Anchor для CSS (теперь полностью убран из потока разметки via CSS)
+            # Anchor для CSS
             st.markdown('<div id="floating-dock-anchor"></div>', unsafe_allow_html=True)
 
         if item == "calendar":
-            with st.popover("📅", help="Оберіть дату"):
-                d = st.date_input(
-                    "Оберіть дату",
-                    st.session_state["form_date"],
-                    format="DD/MM/YYYY",
-                    label_visibility="collapsed",
-                )
-                if d != st.session_state["form_date"]:
-                    st.session_state["form_date"] = d
-                    prefetch_week_window(d)
-                    st.rerun()
+            d = st.date_input(
+                "date",
+                st.session_state["form_date"],
+                format="DD/MM/YYYY",
+                label_visibility="collapsed",
+                key="dock_direct_date_picker",
+            )
+            if d != st.session_state["form_date"]:
+                st.session_state["form_date"] = d
+                prefetch_week_window(d)
+                st.rerun()
 
         elif item == "Касса":
             if st.button("🧮", key="btn_dock_kas", help="Каса"):
@@ -367,7 +406,7 @@ for idx, item in enumerate(dock_items):
         elif item == "save":
             if st.button("💾", key="btn_dock_save", help="Зберегти чернетку"):
                 try:
-                    kp = st.session_state.get("kassa_currentpayload", {})
+                    kp = st.session_state.get("kassa_current_payload", {})
                     if kp:
                         save_kassa_draft_to_supabase(
                             selected_date,
