@@ -51,9 +51,15 @@ components.html(
 st.markdown(
     """
 <style>
-    /* Минимальный верхний отступ страницы и запас снизу для дока */
+    /* Единый бежевый фон для всей страницы и верхней безопасной зоны браузера */
+    html, body, .stApp, [data-testid="stAppViewContainer"] { 
+        background-color: #FAF0E6 !important; 
+    }
+
+    /* Полное убирание верхних отступов контейнера для прижатия заголовка */
     .block-container { 
-        padding-top: 0.2rem !important; 
+        padding-top: 0rem !important;
+        margin-top: 0rem !important; 
         padding-bottom: 6rem !important; 
     }
     @import url('https://fonts.googleapis.com/css2?family=Permanent+Marker&display=swap');
@@ -69,15 +75,16 @@ st.markdown(
         visibility: hidden !important; 
     }
     
-    /* Заголовок подтянут максимально к верху */
-    h1 { 
+    /* Заголовок поджат максимально к самому верху экрана */
+    h1, .brand-title { 
         font-family: 'Permanent Marker', cursive !important; 
-        font-size: 3em !important; 
+        font-size: 2.5em !important; 
         margin-top: 0 !important; 
         margin-bottom: 0.5rem !important;
         padding-top: 0 !important; 
+        line-height: 1 !important;
     }
-    .stApp { background-color: #FAF0E6 !important; }
+
     .stApp, .stApp p, .stApp h1, .stApp h2, .stApp h3, .stApp h4, .stApp h5, .stApp h6, .stApp label, .stApp li { color: #111827 !important; }
     div[data-baseweb="input"] > div, div[data-baseweb="select"] > div { background-color: #ffffff !important; border: 1px solid #d1d5db !important; }
     input, .stSelectbox span { color: #111827 !important; }
@@ -87,7 +94,7 @@ st.markdown(
     /* ========================================================= */
     #floating-dock-anchor { display: none; }
 
-    /* Убираем скрытый элемент-контейнер якоря, чтобы первая колонка не сдвигалась вниз */
+    /* Убираем скрытый элемент-контейнер якоря */
     div[data-testid="stElementContainer"]:has(#floating-dock-anchor) {
         display: none !important;
         position: absolute !important;
@@ -96,7 +103,7 @@ st.markdown(
         padding: 0 !important;
     }
 
-    /* Превращаем блок колонок в плавающий Glassmorphism Dock (ПК - ПО ЦЕНТРУ) */
+    /* Плавающий Glassmorphism Dock (ПК - по центру) */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
         position: fixed !important;
         bottom: 16px !important;
@@ -124,7 +131,7 @@ st.markdown(
         box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.06) !important;
     }
 
-    /* Жесткая отмена растяжения колонок Streamlit */
+    /* Отмена растяжения колонок Streamlit */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) > div,
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) [data-testid="column"],
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) [data-testid="stColumn"] {
@@ -151,7 +158,7 @@ st.markdown(
         padding: 0 !important;
     }
 
-    /* --- ПОЛНОЕ СКРЫТИЕ ТЕКСТА И СИМВОЛОВ ВНУТРИ КНОПКИ ДАТЫ --- */
+    /* Полное скрытие текста внутри кнопки даты */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] * {
         color: transparent !important;
         font-size: 0 !important;
@@ -194,7 +201,7 @@ st.markdown(
         overflow: hidden !important;
     }
 
-    /* Рисуем иконку 📅 в центре кнопки */
+    /* Иконка 📅 в центре кнопки */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] > div::before,
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stDateInput"] div[data-baseweb="input"]::before {
         content: "📅" !important;
@@ -209,7 +216,7 @@ st.markdown(
         pointer-events: none !important;
     }
 
-    /* Выравнивание обычных кнопок */
+    /* Кнопки дока */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) button {
         width: 42px !important;
         height: 42px !important;
@@ -243,18 +250,16 @@ st.markdown(
         box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1) !important;
     }
 
-    /* ========================================================= */
-    /* СМЕЩЕНИЕ К ЛЕВОМУ КРАЮ НА МОБИЛЬНЫХ ЭКРАНАХ (<= 768px)     */
-    /* ========================================================= */
+    /* Адаптация для мобильных экранов (<= 768px) */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
             bottom: 12px !important;
-            left: 12px !important;                  /* ПРИЖИМАЕМ К ЛЕВОМУ КРАЮ */
-            transform: none !important;             /* ОТМЕНЯЕМ ЦЕНТРИРОВАНИЕ */
+            left: 12px !important;
+            transform: none !important;
             gap: 4px !important;
             padding: 4px 6px !important;
             border-radius: 18px !important;
-            max-width: calc(100vw - 110px) !important; /* ОСТАВЛЯЕМ МЕСТО ДЛЯ ИКОНОК STREAMLIT */
+            max-width: calc(100vw - 110px) !important;
             overflow-x: auto !important;
             justify-content: flex-start !important;
         }
@@ -292,7 +297,7 @@ st.markdown(
         }
     }
 
-    /* Современный Glassmorphism Notification (iOS / Vercel style) */
+    /* Glassmorphism Notification */
     div[data-testid="stToast"] {
         background: rgba(17, 24, 39, 0.92) !important;
         backdrop-filter: blur(16px) !important;
@@ -315,7 +320,8 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-st.title("Cafe Forchino🍋")
+# Заголовок, прижатый к самому верху
+st.markdown('<h1 class="brand-title">Cafe Forchino🍋</h1>', unsafe_allow_html=True)
 
 # --- АВТОРИЗАЦІЯ ---
 auth_token = st.query_params.get("auth")
@@ -401,11 +407,10 @@ elif active_tab == "Закупки":
 elif active_tab == "Посуда":
     render_tableware_tab(selected_date, can_edit)
 
-# --- ДИНАМИЧЕСКИЙ ПЛАВАЮЩИЙ DOCK (НАТИВНЫЙ STREAMLIT — БЕЗ ПЕРЕЗАГРУЗОК) ---
+# --- ДИНАМИЧЕСКИЙ ПЛАВАЮЩИЙ DOCK ---
 allowed = st.session_state.get("allowed_tabs", [])
 dock_items = []
 
-# Показываем календарь только если не на вкладках PnL (Сличительная) или Посуда
 if active_tab not in ["Сличительная", "Посуда"]:
     dock_items.append("calendar")
 
@@ -425,13 +430,11 @@ if active_tab == "Касса" and can_edit:
 
 dock_items.append("logout")
 
-# Создаем ровно столько колонок, сколько элементов в меню
 dock_cols = st.columns(len(dock_items))
 
 for idx, item in enumerate(dock_items):
     with dock_cols[idx]:
         if idx == 0:
-            # Anchor для CSS
             st.markdown('<div id="floating-dock-anchor"></div>', unsafe_allow_html=True)
 
         if item == "calendar":
