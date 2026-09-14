@@ -87,6 +87,15 @@ st.markdown(
     /* ========================================================= */
     #floating-dock-anchor { display: none; }
 
+    /* Убираем скрытый элемент-контейнер якоря, чтобы первая колонка не сдвигалась вниз */
+    div[data-testid="stElementContainer"]:has(#floating-dock-anchor) {
+        display: none !important;
+        position: absolute !important;
+        height: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
     /* Превращаем блок колонок в плавающий Glassmorphism Dock */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
         position: fixed !important;
@@ -146,8 +155,10 @@ st.markdown(
         justify-content: center !important;
     }
 
-    /* Убираем стрелочку у поповера календаря */
-    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] button svg {
+    /* Полное удаление стрелочки (и любых иконок) у popover кнопки календаря */
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] button svg,
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] button [data-testid="stIcon"],
+    div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stPopover"] button span:has(svg) {
         display: none !important;
     }
 
@@ -307,7 +318,7 @@ dock_cols = st.columns(len(dock_items))
 for idx, item in enumerate(dock_items):
     with dock_cols[idx]:
         if idx == 0:
-            # Anchor для CSS
+            # Anchor для CSS (теперь полностью убран из потока разметки via CSS)
             st.markdown('<div id="floating-dock-anchor"></div>', unsafe_allow_html=True)
 
         if item == "calendar":
@@ -356,7 +367,7 @@ for idx, item in enumerate(dock_items):
         elif item == "save":
             if st.button("💾", key="btn_dock_save", help="Зберегти чернетку"):
                 try:
-                    kp = st.session_state.get("kassa_current_payload", {})
+                    kp = st.session_state.get("kassa_currentpayload", {})
                     if kp:
                         save_kassa_draft_to_supabase(
                             selected_date,
