@@ -181,90 +181,40 @@ def prepare_df(data_list, columns):
 
 
 def load_draft_or_init(date_str):
-    coins_key = f"coins_live_{date_str}"
-
-    if (
-        "drafts_cache" in st.session_state
-        and date_str in st.session_state["drafts_cache"]
-    ):
-        payload = st.session_state["drafts_cache"][date_str]
-
-        inc_loaded = payload.get("inc", [])
-        st.session_state["inc_data"] = (
-            inc_loaded
-            if inc_loaded
-            else [{"Категорія": INCOME_CATEGORIES[0], "Сума": None, "Примітка": ""}]
-        )
-
-        exp_loaded = payload.get("exp", [])
-        clean_exp = []
-        for e in exp_loaded:
-            if "Категорія" in e:
-                cat_val = e["Категорія"]
-            elif "Група" in e:
-                cat_val = f"{e['Група']} ➔ {e['Підкатегорія']}"
-            else:
-                cat_val = EXPENSE_CHOICES[0]
-            clean_exp.append(
-                {
-                    "Категорія": cat_val,
-                    "Сума": e.get("Сума"),
-                    "Примітка": e.get("Примітка", ""),
-                }
-            )
-
-        st.session_state["exp_data"] = (
-            clean_exp
-            if clean_exp
-            else [{"Категорія": EXPENSE_CHOICES[0], "Сума": None, "Примітка": ""}]
-        )
-
-        st.session_state["adv_data"] = payload.get(
-            "adv", [{"Співробітник": "", "Сума": None, "Примітка": ""}]
-        )
-        cash_data = payload.get("cash", {})
-        st.session_state[coins_key] = (
-            str(cash_data.get("coins", 0))
-            if cash_data.get("coins", 0)
-            else ""
-        )
-        for k in [20, 50, 100, 200, 500, 1000]:
-            st.session_state[f"qty_{k}_{date_str}"] = (
-                str(cash_data.get(str(k), 0))
-                if cash_data.get(str(k), 0)
-                else ""
-            )
-        return
-
+    """
+    Загружает черновик для выбранной даты.
+    Если черновик отсутствует, подтягивает значение "Монети" из предыдущей смены,
+    а купюры сбрасывает в 0.
+    """
     try:
-        url_draft = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{date_str}"
-        draft_res = requests.get(url_draft, headers=headers).json()
-        if isinstance(draft_res, list) and len(draft_res) > 0:
-            payload = draft_res[0].get("payload", {})
-            st.session_state["drafts_cache"][date_str] = payload
+        payload = None
 
+        # 1. Проверяем кэш или отправляем запрос к Supabase REST API
+        if "drafts_cache" in st.session_state and date_str in st.session_state["drafts_cache"]:
+            payload = st.session_state["drafts_cache"][date_str]
+        else:
+            url_draft = f"{SUPABASE_URL}/rest/v1/drafts?date=eq.{date_str}"
+            draft_res = requests.get(url_draft, headers=headers).json()
+            if isinstance(draft_res, list) and len(draft_res) > 0:
+                payload = draft_res[0].get("payload", {})
+                if "drafts_cache" in st.session_state:
+                    st.session_state["drafts_cache"][date_str] = payload
+
+        if payload:
+            # Черновик найден: восстанавливаем таблицы
             inc_loaded = payload.get("inc", [])
             st.session_state["inc_data"] = (
                 inc_loaded
                 if inc_loaded
-                else [
-                    {
-                        "Категорія": INCOME_CATEGORIES[0],
-                        "Сума": None,
-                        "Примітка": "",
-                    }
-                ]
+                else [{"Категорія": INCOME_CATEGORIES[0], "Сума": None, "Примітка": ""}]
             )
 
             exp_loaded = payload.get("exp", [])
             clean_exp = []
             for e in exp_loaded:
-                if "Категорія" in e:
-                    cat_val = e["Категорія"]
-                elif "Група" in e:
-                    cat_val = f"{e['Група']} ➔ {e['Підкатегорія']}"
-                else:
-                    cat_val = EXPENSE_CHOICES[0]
+                cat_val = e.get("Категорія") or (
+                    f"{e['Група']} ➔ {e['Підкатегорія']}" if "Група" in e else EXPENSE_CHOICES[0]
+                )
                 clean_exp.append(
                     {
                         "Категорія": cat_val,
@@ -276,50 +226,46 @@ def load_draft_or_init(date_str):
             st.session_state["exp_data"] = (
                 clean_exp
                 if clean_exp
-                else [
-                    {
-                        "Категорія": EXPENSE_CHOICES[0],
-                        "Сума": None,
-                        "Примітка": "",
-                    }
-                ]
+                else [{"Категорія": EXPENSE_CHOICES[0], "Сума": None, "Примітка": ""}]
             )
+
             st.session_state["adv_data"] = payload.get(
                 "adv", [{"Співробітник": "", "Сума": None, "Примітка": ""}]
             )
 
+            # Восстанавливаем монеты и купюры в st.session_state для st.number_input
             cash_data = payload.get("cash", {})
-            st.session_state[coins_key] = (
-                str(cash_data.get("coins", 0))
-                if cash_data.get("coins", 0)
-                else ""
-            )
-            for k in [20, 50, 100, 200, 500, 1000]:
-                st.session_state[f"qty_{k}_{date_str}"] = (
-                    str(cash_data.get(str(k), 0))
-                    if cash_data.get(str(k), 0)
-                    else ""
-                )
-            return
-    except Exception:
-        pass
+            st.session_state["m_coins"] = get_int(cash_data.get("coins", 0))
 
-    st.session_state["inc_data"] = [
-        {"Категорія": INCOME_CATEGORIES[0], "Сума": None, "Примітка": ""}
-    ]
-    st.session_state["exp_data"] = [
-        {"Категорія": EXPENSE_CHOICES[0], "Сума": None, "Примітка": ""}
-    ]
-    prev_adv = get_previous_advances(date_str)
-    st.session_state["adv_data"] = (
-        prev_adv
-        if prev_adv
-        else [{"Співробітник": "", "Сума": None, "Примітка": ""}]
-    )
-    prev_coins = get_previous_coins(date_str)
-    st.session_state[coins_key] = str(prev_coins) if prev_coins else ""
-    for k in [20, 50, 100, 200, 500, 1000]:
-        st.session_state[f"qty_{k}_{date_str}"] = ""
+            for nominal in [20, 50, 100, 200, 500, 1000, 2000]:
+                st.session_state[f"q_{nominal}"] = get_int(cash_data.get(str(nominal), 0))
+
+        else:
+            # Черновик отсутствует (новый день)
+            st.session_state["inc_data"] = [
+                {"Категорія": INCOME_CATEGORIES[0], "Сума": None, "Примітка": ""}
+            ]
+            st.session_state["exp_data"] = [
+                {"Категорія": EXPENSE_CHOICES[0], "Сума": None, "Примітка": ""}
+            ]
+
+            prev_adv = get_previous_advances(date_str)
+            st.session_state["adv_data"] = (
+                prev_adv
+                if prev_adv
+                else [{"Співробітник": "", "Сума": None, "Примітка": ""}]
+            )
+
+            # Переносим монеты вчерашнего дня в текущую сессию
+            prev_coins = get_previous_coins(date_str)
+            st.session_state["m_coins"] = prev_coins
+
+            # Обнуляем купюры для нового дня
+            for nominal in [20, 50, 100, 200, 500, 1000, 2000]:
+                st.session_state[f"q_{nominal}"] = 0
+
+    except Exception as e:
+        st.error(f"Помилка завантаження даних форми: {e}")
 
 
 def auto_assign_category(name, current_cat=""):
@@ -360,6 +306,7 @@ def save_kassa_draft_to_supabase(selected_date, edited_inc_df, edited_exp_df, ed
             "200": q_dict.get("200", 0),
             "500": q_dict.get("500", 0),
             "1000": q_dict.get("1000", 0),
+            "2000": q_dict.get("2000", 0),
         },
     }
     check_draft = requests.get(
