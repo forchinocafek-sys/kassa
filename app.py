@@ -96,7 +96,7 @@ st.markdown(
         padding: 0 !important;
     }
 
-    /* Превращаем блок колонок в плавающий Glassmorphism Dock (ПК) */
+    /* Превращаем блок колонок в плавающий Glassmorphism Dock (ПК - ПО ЦЕНТРУ) */
     div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
         position: fixed !important;
         bottom: 16px !important;
@@ -132,7 +132,7 @@ st.markdown(
         min-width: 42px !important;
         max-width: 42px !important;
         height: 42px !important;
-        flex: 0 0 42px !important; /* СТРОГИЙ ЗАПРЕТ flex-grow */
+        flex: 0 0 42px !important;
         margin: 0 !important;
         padding: 0 !important;
         display: flex !important;
@@ -244,17 +244,19 @@ st.markdown(
     }
 
     /* ========================================================= */
-    /* ИДЕАЛЬНАЯ АДАПТАЦИЯ ДЛЯ МОБИЛЬНЫХ ЭКРАНОВ (<= 768px)      */
+    /* СМЕЩЕНИЕ К ЛЕВОМУ КРАЮ НА МОБИЛЬНЫХ ЭКРАНАХ (<= 768px)     */
     /* ========================================================= */
     @media (max-width: 768px) {
         div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) {
             bottom: 12px !important;
-            left: 50% !important;
-            transform: translateX(-50%) !important;
+            left: 12px !important;                  /* ПРИЖИМАЕМ К ЛЕВОМУ КРАЮ */
+            transform: none !important;             /* ОТМЕНЯЕМ ЦЕНТРИРОВАНИЕ */
             gap: 4px !important;
             padding: 4px 6px !important;
             border-radius: 18px !important;
-            max-width: calc(100vw - 20px) !important;
+            max-width: calc(100vw - 110px) !important; /* ОСТАВЛЯЕМ МЕСТО ДЛЯ ИКОНОК STREAMLIT */
+            overflow-x: auto !important;
+            justify-content: flex-start !important;
         }
 
         div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) > div,
@@ -264,7 +266,7 @@ st.markdown(
             min-width: 36px !important;
             max-width: 36px !important;
             height: 36px !important;
-            flex: 0 0 36px !important; /* СТРОГО 36px, БЕЗ РАСТЯЖЕНИЯ */
+            flex: 0 0 36px !important;
         }
 
         div[data-testid="stHorizontalBlock"]:has(#floating-dock-anchor) div[data-testid="stElementContainer"],
