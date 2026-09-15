@@ -26,8 +26,8 @@ st.set_page_config(
 manifest = {
     "name": "meal & soul",
     "short_name": "MealSoul",
-    "theme_color": "#87CEFA",
-    "background_color": "#87CEFA",
+    "theme_color": "#E8F4FE",
+    "background_color": "#E8F4FE",
     "display": "standalone",
     "orientation": "portrait",
     "icons": [{"src": ICON_URL, "sizes": "512x512", "type": "image/png"}],
@@ -51,9 +51,9 @@ components.html(
 st.markdown(
     """
 <style>
-    /* Голубой фон #87CEFA для всей страницы */
+    /* Полупрозрачный бледный небесно-голубой фон */
     html, body, .stApp, [data-testid="stAppViewContainer"] { 
-        background-color: #87CEFA !important; 
+        background-color: rgba(135, 206, 250, 0.35) !important; 
     }
 
     /* Полное убирание верхних отступов контейнера */
@@ -63,7 +63,7 @@ st.markdown(
         padding-bottom: 6rem !important; 
     }
     
-    /* Геометрический шрифт Poppins (соответствует референсу) */
+    /* Геометрический шрифт Poppins */
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700&display=swap');
     
     /* Скрытие элементов шапки Streamlit */
@@ -325,7 +325,7 @@ st.markdown(
     unsafe_allow_html=True,
 )
 
-# Обновленный заголовок
+# Заголовок
 st.markdown('<h1 class="brand-title">meal & soul 💁‍♂️</h1>', unsafe_allow_html=True)
 
 # --- АВТОРИЗАЦІЯ ---
