@@ -1,17 +1,13 @@
 import streamlit as st
 
 # --- ПОДКЛЮЧЕНИЕ К SUPABASE ---
+# В скобках указываем строго названия ключей, а не значения!
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
 
 # --- ДИНАМИЧЕСКИЕ НАСТРОЙКИ ЗАВЕДЕНИЯ ---
-# Если в Secrets не указано название, подтянется "Cafe Forchino🍋"
-VENUE_NAME = st.secrets.get("VENUE_NAME", "Cafe Forchino🍋")
-VENUE_FOOTER = st.secrets.get("VENUE_FOOTER", "cafe forchino")
-ICON_URL = st.secrets.get(
-    "ICON_URL",
-    "https://ajkprfhuypcamnybqusr.supabase.co/storage/v1/object/public/assets/xHJLUtG-wHDFARC-LtBbXJE_original.png?v=2"
-)
+VENUE_NAME = st.secrets.get("VENUE_NAME", "meal&soul")
+VENUE_FOOTER = st.secrets.get("VENUE_FOOTER", "meal&soul")
 
 headers = {
     "apikey": SUPABASE_KEY,
