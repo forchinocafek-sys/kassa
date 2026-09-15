@@ -1,8 +1,17 @@
 import streamlit as st
 
-# --- НАЛАШТУВАННЯ БЕЗПЕКИ ТА КОРИСТУВАЧІВ ---
+# --- ПОДКЛЮЧЕНИЕ К SUPABASE ---
 SUPABASE_URL = st.secrets["SUPABASE_URL"]
 SUPABASE_KEY = st.secrets["SUPABASE_KEY"]
+
+# --- ДИНАМИЧЕСКИЕ НАСТРОЙКИ ЗАВЕДЕНИЯ ---
+# Если в Secrets не указано название, подтянется "Cafe Forchino🍋"
+VENUE_NAME = st.secrets.get("VENUE_NAME", "Cafe Forchino🍋")
+VENUE_FOOTER = st.secrets.get("VENUE_FOOTER", "cafe forchino")
+ICON_URL = st.secrets.get(
+    "ICON_URL",
+    "https://ajkprfhuypcamnybqusr.supabase.co/storage/v1/object/public/assets/xHJLUtG-wHDFARC-LtBbXJE_original.png?v=2"
+)
 
 headers = {
     "apikey": SUPABASE_KEY,
@@ -19,10 +28,7 @@ upload_headers = {
     "Content-Type": "image/jpeg",
 }
 
-ICON_URL = "https://ajkprfhuypcamnybqusr.supabase.co/storage/v1/object/public/assets/xHJLUtG-wHDFARC-LtBbXJE_original.png?v=2"
-
-# config.py
-
+# --- ПОЛЬЗОВАТЕЛИ И ПРАВА ДОСТУПА ---
 USERS = {
     "2000": {
         "name": "Юля",
@@ -51,9 +57,8 @@ USERS = {
     },
 }
 
-# --- КАТЕГОРІЇ ---
+# --- КАТЕГОРИИ И ТРЕЕ РАСХОДОВ ---
 INCOME_CATEGORIES = ["Касса", "Дотация", "Р/С", "Разное"]
-
 EXPENSE_TREE = {
     "Выдача денег/взаимозачёты": [
         "Материальная помощь собственникам",
@@ -69,38 +74,13 @@ EXPENSE_TREE = {
         "электроенергия",
     ],
     "COMMUNICATION SERVICES / услуги связи и ТВ": ["мобильная связь"],
-    "OPERATING SUPPLIES / хоз. материалы": [
-        "Хозтовары + хоз.инвентарь",
+    "OPERATING SUPPLIES / хоз. товары": [
+        "бытовая химия",
+        "инвентарь",
         "канцтовары",
     ],
-    "WARE, STOCK & LINEN / посуда, инвентарь, униформа, текстиль": [
-        "посуда для зала",
-        "форма официанты",
-        "текстиль для зала",
-        "барный/кухонный инвентарь",
-    ],
-    "MAINTENANCE & REPAIR / техобслуживание и ремонт": [
-        "вентиляционных систем",
-        "осмос",
-        "жироулавливатели",
-        "кухонного оборудования",
-        "ремонт мебели",
-        "фисной техники",
-        "прочий ремонт",
-        "ТМЦ для ремонта (расходники)",
-    ],
-    "OUTSIDE SERVICES / услуги внешних организаций": [
-        "услуги дизайнера/художника",
-        "реклама вакансий",
-        "озеленение (ТМЦ)",
-        "прочие услуги внешних организаций",
-    ],
-    "PROMOTION / продвижение": [
-        "меню choice/smap/knaipa",
-        "типография / брендированная продукция",
-    ],
-    "TRANSPORT / транспорт и топливо": [
-        "заправка газ. балона",
+    "LOGISTICS / логистика": [
+        "газ для балона",
         "новая почта",
         "такси",
         "транспорт",
@@ -124,5 +104,5 @@ SUPPLIES_CATEGORIES = [
     "Кассовая лента, канцтовары и прочие расходники",
     "Пакеты (фасовка, вакуум, ZIP), пленка, фольга и пергамент",
     "Приборы, шпажки, соломка и мешалки",
-    "Упаковка, контейнеры, стаканы, крышки, емкости и бутылки"
+    "Упаковка, контейнеры, стаканы, крышки, емкости и бутылки",
 ]
