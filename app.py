@@ -51,6 +51,26 @@ components.html(
 st.markdown(
     """
 <style>
+
+    /* 1. Белый фон для карточек-контейнеров (Надходження, Витрати, Аванси) */
+    div[data-testid="stVerticalBlockBorderWrapper"] {
+    background-color: #ffffff !important;
+    border-radius: 14px !important;
+    }
+
+    /* 2. Белый фон для интерактивных таблиц st.data_editor */
+    div[data-testid="stDataEditor"],
+    div[data-testid="stDataEditor"] > div,
+    div[data-testid="stDataEditor"] canvas {
+    background-color: #ffffff !important;
+    }
+
+    /* 3. Белый фон для полей ввода купюр и монет */
+    div[data-baseweb="input"], 
+    div[data-baseweb="input"] > div {
+    background-color: #ffffff !important;
+    }
+    
     /* Единый бежевый фон для всей страницы и верхней безопасной зоны браузера */
     html, body, .stApp, [data-testid="stAppViewContainer"] { 
         background-color: #FAF0E6 !important; 
